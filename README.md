@@ -447,6 +447,25 @@ pnpm --filter @resource-fallback-example/webpack-react test:e2e
 pnpm release                # build + publish 所有包到 npm
 ```
 
+### 测试预览包
+
+分支 push 和 PR 在所有 CI 检查通过后，会通过 [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) 生成临时预览包，不会发布到 npm。普通 PR 评论提供固定 SHA 链接；待发版的 Release PR 评论提供 `main` 和 SHA 链接。也可以在 [预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)或 CI 的 `preview / publish` 摘要中查找。
+
+例如，按需安装最新成功构建的 `main` 预览：
+
+```bash
+# Vite
+pnpm add -D "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/vite-plugin@main"
+
+# Webpack
+pnpm add -D "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/webpack-plugin@main"
+
+# Core
+pnpm add "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/core@main"
+```
+
+`@main` 可能仍指向较早的成功构建；新提交后请先确认其 CI 成功。需要准确复现时请使用 SHA 链接，并在切换预览时更新锁文件。PR 的 CI 检查模拟合并结果，预览包构建自 PR head。普通 PR 的自动评论对所有包都显示 `pnpm add`，插件作为开发依赖时可加 `-D`；CI 摘要已按包区分命令。三个包的预览会一起发布，插件自动使用同批 core。预览包会过期，测试结束后请恢复正式版本。更多说明见 [CONTRIBUTING.md](./CONTRIBUTING.md#未发版预览包)。
+
 ## TODO
 
 以下是后续的升级点、优化点和当前的不足，按优先级排列：

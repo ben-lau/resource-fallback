@@ -84,16 +84,17 @@ feat!: rename config option `retryCount` to `maxRetries`
 
 维护者先为本仓库安装 [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new/installations/new)，选择 `ben-lau/resource-fallback` 即可。CLI 已固定在开发依赖和锁文件中；预览发布不需要 npm token。
 
-| 触发方式                                    | 构建与评论位置                                                                        |
-| ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 其他分支向 `main` 提 PR，或继续向该 PR push | CI 检查通过后，基于 PR 与 main 的合并结果构建；安装命令评论在该 PR 下                 |
-| 直接 push 到 `main`                         | Release Please 创建或更新发版 PR 后，构建本次 `main` 提交；安装命令评论在待发版 PR 下 |
+| 触发方式            | 构建与安装命令位置                                                     |
+| ------------------- | ---------------------------------------------------------------------- |
+| push 仓库内任意分支 | 所有 CI 检查通过后发布；安装命令显示在 `CI` → `preview / publish` 摘要 |
+| 提交或更新 PR       | 所有 CI 检查通过后发布；安装命令显示在 PR 评论和上述运行摘要中         |
+| push 到 `main`      | 同样等待所有 CI 检查；待发版 PR 评论另提供 `@main` 和固定 SHA 链接     |
 
-两个入口都一次发布 `core`、`vite-plugin`、`webpack-plugin`，包内版本为 `0.0.0-preview-<sha>`，内部依赖指向同一批预览包。每次 push 后等流程完成，复制评论中的安装命令到外部工程测试即可，无需修改版本号或手动执行发布命令。正式发版仍通过合并 Release PR 完成。
+预览一次发布 `core`、`vite-plugin`、`webpack-plugin`，包内版本为 `0.0.0-preview-<sha>`，内部依赖指向同一批预览包。普通 PR 评论由 pkg.pr.new 自动更新，外部 fork PR 也使用同一流程。自动评论对所有包都显示 `pnpm add`；插件作为开发依赖时可加 `-D`，CI 摘要已按包区分命令。CI 对 PR 测试模拟合并结果，预览构建则检出 PR head，使预览链接中的 SHA 与构建源码对应；因此完整 CI 检查的是合并结果，而不是单独的 head。若旧分支尚无 `pkg-pr-new` 依赖，需先同步接入配置。首次贡献的 fork PR 可能需要维护者批准运行 workflow。
 
-普通 PR 的评论由 pkg.pr.new 自动更新，外部 fork PR 也使用同一流程。`main` 的安装命令通过 Sticky Pull Request Comment 更新到待发版 PR，旧的 main 构建不会覆盖新评论。如果暂时没有待发版 PR（例如只有文档修改，尚未产生可发布的变更），安装命令仍会显示在 `Release Please` → `preview / publish` 的运行摘要中。
+`@main` 指向最近一次成功生成的预览，新提交后请先确认对应 CI 成功；需要复现时使用固定 SHA 链接，并在切换预览时更新锁文件。没有待发版 PR 时，仍可从运行摘要或[预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)获取安装入口。仓库内已有 PR 的分支 push 可能同时触发 push 和 PR 两次构建；较旧的分支构建可能被新的 push 取消。
 
-预览包会被服务定期清理，仅用于临时测试，长期使用请换回正式 npm 版本。
+预览包会被服务定期清理，仅用于临时测试，长期使用请换回正式 npm 版本。npm 12 安装插件预览时，其 core 预览也是远程依赖，可能需要 `--allow-remote=all`；后续重新安装时也需保留相应设置。
 
 ## 项目结构
 

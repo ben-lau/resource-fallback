@@ -447,6 +447,25 @@ This project uses [release-please](https://github.com/googleapis/release-please)
 pnpm release                # build + publish all packages to npm
 ```
 
+### Testing preview packages
+
+Branch pushes and pull requests produce temporary packages through [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) after all CI checks pass, without publishing to npm. Ordinary PR comments contain commit SHA links; the pending Release PR links to both `main` and a specific SHA. Commands are also available on the [preview page](https://pkg.pr.new/~/ben-lau/resource-fallback) and in the CI `preview / publish` summary.
+
+For example, install the latest successful `main` preview for the package you need:
+
+```bash
+# Vite
+pnpm add -D "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/vite-plugin@main"
+
+# Webpack
+pnpm add -D "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/webpack-plugin@main"
+
+# Core
+pnpm add "https://pkg.pr.new/ben-lau/resource-fallback/@resource-fallback/core@main"
+```
+
+`@main` can still point to an earlier successful build, so check that CI has succeeded for the latest commit. For reproducible testing, use a SHA link and update the lockfile when changing previews. PR CI checks the simulated merge result, while the preview is built from the PR head. The automatic PR comment shows `pnpm add` for every package; add `-D` for plugins used as development dependencies, or use the package-specific commands in the CI summary. All three packages are published together, and the plugins use the matching core preview. Previews expire; restore a regular release after testing. See [CONTRIBUTING.md](./CONTRIBUTING.md#未发版预览包) for details.
+
 ## TODO
 
 Upcoming improvements, optimizations, and known limitations, sorted by priority:
