@@ -17,7 +17,17 @@ description: 区分构建器的支持声明、示例依赖、浏览器运行要�
 | SystemJS / plugin-legacy | 具备 instantiate 接入路径                   | 以示例测试覆盖的场景为准，不代表所有 legacy target                 |
 | Workbox / 其他 PWA       | 无独立合并集成保证                          | 先设计 scope 与路由，见 [SW 运维](./sw-operations.md#existing-pwa) |
 
-`Vite 4+` 是包的支持声明，不等于每个 Vite 大版本都在 CI 矩阵内。构建插件和浏览器运行环境也有不同要求：包声明 Node `>=18`，当前单元测试矩阵为 Node 20/22/24。
+### npm 发布前验收
+
+正式 npm 发布前，在独立消费项目中安装待发布的 `.tgz`，验证 ESM 和 CommonJS 入口、生产构建，以及 Chromium 在主 CDN 请求失败时能否从源站加载入口脚本和懒加载 chunk。当前验收组合如下。
+
+| 构建器                            | Node.js |
+| --------------------------------- | ------- |
+| Vite 4.0.0                        | 18      |
+| Vite 7、8                         | 22      |
+| Webpack 5 + html-webpack-plugin 5 | 18、22  |
+
+包声明支持 Vite `>=4`、Node `>=18`。常规 CI 的单元测试矩阵为 Node 20/22/24，发布验收覆盖上表列出的组合。
 
 ## 浏览器与运行模式
 

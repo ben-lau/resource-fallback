@@ -17,7 +17,17 @@ Declared support, example dependencies, and CI coverage are separate. Verify fai
 | SystemJS / plugin-legacy | Instantiate integration exists       | Scenarios covered by example tests, not every legacy target                      |
 | Workbox / other PWA      | No merged integration guarantee      | Design scope/routing first; see [SW operations](./sw-operations.md#existing-pwa) |
 
-Vite 4+ is the package's support declaration, not a CI matrix containing every major. Build and browser requirements also differ: packages declare Node `>=18`; unit tests currently run on Node 20/22/24.
+### npm release verification
+
+Before publishing to npm, clean consumer projects install the candidate `.tgz` files and verify the ESM and CommonJS entries, production builds, and recovery of entry scripts and lazy chunks from the origin when the primary CDN fails in Chromium.
+
+| Bundler                           | Node.js   |
+| --------------------------------- | --------- |
+| Vite 4.0.0                        | 18        |
+| Vite 7 and 8                      | 22        |
+| Webpack 5 + html-webpack-plugin 5 | 18 and 22 |
+
+Packages declare support for Vite `>=4` and Node `>=18`. Regular CI runs unit tests on Node 20/22/24, and the release checks cover the combinations above.
 
 ## Browsers and runtime modes
 

@@ -1,0 +1,9 @@
+{
+  "name": "resource-fallback-release-consumer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "playwright": "1.59.1"
+  }
+}

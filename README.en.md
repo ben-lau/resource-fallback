@@ -441,15 +441,13 @@ This project uses [release-please](https://github.com/googleapis/release-please)
 1. Push commits to `main` using conventional commits format
 2. release-please automatically creates/updates a **Release PR** (with version bump + CHANGELOG)
 3. Merge the Release PR when ready → automatically creates GitHub Release + git tag
-4. Publish to npm:
+4. Install the three candidate `.tgz` files in clean consumer projects, then publish those same files to npm once the builds and browser fallback checks pass.
 
-```bash
-pnpm release                # build + publish all packages to npm
-```
+The manual `Publish` workflow uses the same checks. See [CONTRIBUTING.md](./CONTRIBUTING.md#发布流程) for the release process.
 
 ### Testing preview packages
 
-Branch pushes and pull requests produce temporary packages through [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) after all CI checks pass, without publishing to npm. Ordinary PR comments contain commit SHA links; the pending Release PR links to both `main` and a specific SHA. Commands are also available on the [preview page](https://pkg.pr.new/~/ben-lau/resource-fallback) and in the CI `preview / publish` summary.
+Opening or updating a PR and pushing to `main` produce temporary packages through [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) after all CI checks pass. Ordinary PR comments contain commit SHA links; the pending Release PR links to both `main` and a specific SHA. Commands are also available on the [preview page](https://pkg.pr.new/~/ben-lau/resource-fallback) and in the CI `preview / publish` summary.
 
 For example, install the latest successful `main` preview for the package you need:
 
