@@ -1,0 +1,55 @@
+:root {
+  --rf-font: system-ui, -apple-system, sans-serif;
+  --rf-bg: #fafbfc;
+  --rf-card: #fff;
+  --rf-border: #e1e4e8;
+  --rf-accent: #0366d6;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  font-family: var(--rf-font);
+  background: var(--rf-bg);
+  color: #24292e;
+  line-height: 1.5;
+}
+
+.rf-app { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+.rf-card {
+  background: var(--rf-card);
+  border: 1px solid var(--rf-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.rf-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rf-badge--open { background: #fdd; color: #b00020; }
+.rf-badge--closed { background: #dfd; color: #0f7d2a; }
+
+.rf-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--rf-border);
+  border-radius: 6px;
+  background: var(--rf-card);
+  cursor: pointer;
+  font-size: 14px;
+}
+.rf-btn:disabled { opacity: .5; cursor: default; }
+.rf-btn:hover:not(:disabled) { background: #f0f4ff; border-color: var(--rf-accent); }
+
+.rf-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}

@@ -1,0 +1,39 @@
+{
+  "name": "resource-fallback",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Frontend resource fallback monorepo: retry + multi-CDN + origin recovery for Webpack & Vite",
+  "author": "ben-lau <408736066@qq.com>",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r --filter='./packages/*' run build",
+    "build:core": "pnpm --filter @resource-fallback/core run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r --filter='./packages/*' run typecheck",
+    "clean": "pnpm -r exec rm -rf dist node_modules/.cache",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.10",
+    "@swc/core": "^1.10.0",
+    "@types/node": "^22.10.0",
+    "jsdom": "^25.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.7.1",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "@esbuild/darwin-arm64", "@esbuild/darwin-x64", "@esbuild/linux-x64", "@swc/core"],
+    "overrides": {
+      "esbuild": "0.21.5",
+      "terser": "^5.46.2"
+    }
+  }
+}

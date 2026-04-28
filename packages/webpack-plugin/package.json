@@ -1,0 +1,35 @@
+{
+  "name": "@resource-fallback/webpack-plugin",
+  "version": "0.0.1",
+  "description": "Webpack 5 plugin that wires @resource-fallback/core into your build (HTML injection + chunkLoadingGlobal forwarding)",
+  "author": "ben-lau <408736066@qq.com>",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@resource-fallback/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "webpack": ">=5"
+  },
+  "devDependencies": {
+    "webpack": "^5.97.1",
+    "html-webpack-plugin": "^5.6.3"
+  },
+  "keywords": ["webpack", "webpack-plugin", "cdn", "fallback", "retry"],
+  "license": "MIT"
+}
