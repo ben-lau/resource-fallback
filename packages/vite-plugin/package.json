@@ -1,6 +1,6 @@
 {
   "name": "@resource-fallback/vite-plugin",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Vite 4+ plugin that wires @resource-fallback/core into your build (HTML injection + experimental.renderBuiltUrl)",
   "author": "ben-lau <408736066@qq.com>",
   "type": "module",
@@ -14,7 +14,10 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -29,7 +32,13 @@
   "devDependencies": {
     "vite": "^5.4.11"
   },
-  "keywords": ["vite", "vite-plugin", "cdn", "fallback", "retry"],
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "cdn",
+    "fallback",
+    "retry"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

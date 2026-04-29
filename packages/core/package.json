@@ -1,6 +1,6 @@
 {
   "name": "@resource-fallback/core",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Browser runtime + Node helpers for resource-fallback (multi-CDN retry & fallback)",
   "author": "ben-lau <408736066@qq.com>",
   "type": "module",
@@ -18,13 +18,23 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["cdn", "fallback", "retry", "webpack", "vite", "resource"],
+  "keywords": [
+    "cdn",
+    "fallback",
+    "retry",
+    "webpack",
+    "vite",
+    "resource"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
