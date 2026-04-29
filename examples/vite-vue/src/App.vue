@@ -38,6 +38,52 @@ function clearCircuit() {
   refreshCircuit();
 }
 
+const matchedLoading = ref(false);
+const matchedResult = ref<string | null>(null);
+const unmatchedLoading = ref(false);
+const unmatchedResult = ref<string | null>(null);
+
+function hasNewFallbackEvents(since: number): boolean {
+  const all = (window as any).__RF_EVENTS__ || [];
+  for (let i = since; i < all.length; i++) {
+    const t = all[i].type;
+    if (t === 'retry' || t === 'fallback') return true;
+  }
+  return false;
+}
+
+function loadMatchedScript() {
+  matchedLoading.value = true;
+  matchedResult.value = null;
+  const snapshot = ((window as any).__RF_EVENTS__ || []).length;
+  const s = document.createElement('script');
+  s.src = 'http://cdn-primary.example.invalid/external/lib.js';
+  s.onload = () => { matchedLoading.value = false; matchedResult.value = 'success'; };
+  s.onerror = () => {
+    setTimeout(() => {
+      matchedLoading.value = false;
+      matchedResult.value = hasNewFallbackEvents(snapshot) ? 'intercepted' : 'not-intercepted';
+    }, 500);
+  };
+  document.head.appendChild(s);
+}
+
+function loadUnmatchedScript() {
+  unmatchedLoading.value = true;
+  unmatchedResult.value = null;
+  const snapshot = ((window as any).__RF_EVENTS__ || []).length;
+  const s = document.createElement('script');
+  s.src = 'http://other-domain.example.invalid/lib.js';
+  s.onload = () => { unmatchedLoading.value = false; unmatchedResult.value = 'success'; };
+  s.onerror = () => {
+    setTimeout(() => {
+      unmatchedLoading.value = false;
+      unmatchedResult.value = hasNewFallbackEvents(snapshot) ? 'intercepted' : 'not-intercepted';
+    }, 500);
+  };
+  document.head.appendChild(s);
+}
+
 let timer: ReturnType<typeof setInterval>;
 
 onMounted(() => {
@@ -120,6 +166,44 @@ const typeColors: Record<string, string> = {
       </table>
     </div>
 
+    <!-- 外部脚本加载 -->
+    <div style="border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <strong>外部脚本加载（Observer 拦截测试）</strong>
+      <p style="font-size: 13px; color: #555; margin: 8px 0;">
+        通过 <code>document.createElement('script')</code> 手动加载外部资源，验证 Observer 行为。
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- 匹配规则的 URL -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button @click="loadMatchedScript" :disabled="matchedLoading"
+            style="cursor: pointer; padding: 4px 16px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; white-space: nowrap;">
+            {{ matchedLoading ? '加载中…' : '加载匹配规则的脚本' }}
+          </button>
+          <code style="font-size: 11px; color: #888;">cdn-primary.example.invalid/external/lib.js</code>
+          <span v-if="matchedResult === 'intercepted'" style="color: #0f7d2a; font-size: 13px; font-weight: 600;">
+            ✓ 已被 Observer 拦截并回退
+          </span>
+          <span v-if="matchedResult === 'not-intercepted'" style="color: #b00020; font-size: 13px;">
+            ✗ 未拦截（异常）
+          </span>
+        </div>
+        <!-- 不匹配规则的 URL -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button @click="loadUnmatchedScript" :disabled="unmatchedLoading"
+            style="cursor: pointer; padding: 4px 16px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; white-space: nowrap;">
+            {{ unmatchedLoading ? '加载中…' : '加载不匹配规则的脚本' }}
+          </button>
+          <code style="font-size: 11px; color: #888;">other-domain.example.invalid/lib.js</code>
+          <span v-if="unmatchedResult === 'not-intercepted'" style="color: #0f7d2a; font-size: 13px; font-weight: 600;">
+            ✓ 未被拦截（预期行为，不匹配任何规则）
+          </span>
+          <span v-if="unmatchedResult === 'intercepted'" style="color: #b00020; font-size: 13px;">
+            ✗ 被拦截了（不应该）
+          </span>
+        </div>
+      </div>
+    </div>
+
     <!-- 路由导航 -->
     <div style="border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
       <strong>路由（异步 chunk）</strong>
@@ -166,6 +250,8 @@ const typeColors: Record<string, string> = {
       <strong>测试场景</strong>
       <ol style="padding-left: 20px; margin: 8px 0 0;">
         <li><b>JS + CSS 回退</b>：刷新，看 Network 中 JS 和 CSS 从 <code>.invalid</code> → <code>/</code></li>
+        <li><b>外部脚本（匹配）</b>：点击「加载匹配规则的脚本」→ 应出现 ✓ 已被拦截，事件面板有新事件</li>
+        <li><b>外部脚本（不匹配）</b>：点击「加载不匹配规则的脚本」→ 应出现 ✓ 未被拦截，事件面板无新事件</li>
         <li><b>熔断跳闸</b>：切换 About → About2，观察后者跳过已熔断的 CDN</li>
         <li><b>熔断冷却</b>：等 15 秒后切换路由</li>
         <li><b>跨 Tab</b>：新 Tab 打开同一页面</li>

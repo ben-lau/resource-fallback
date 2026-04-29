@@ -31,5 +31,12 @@
     "html-webpack-plugin": "^5.6.3"
   },
   "keywords": ["webpack", "webpack-plugin", "cdn", "fallback", "retry"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ben-lau/resource-fallback.git",
+    "directory": "packages/webpack-plugin"
+  },
+  "homepage": "https://github.com/ben-lau/resource-fallback/tree/main/packages/webpack-plugin#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues"
 }

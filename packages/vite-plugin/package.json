@@ -30,5 +30,12 @@
     "vite": "^5.4.11"
   },
   "keywords": ["vite", "vite-plugin", "cdn", "fallback", "retry"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ben-lau/resource-fallback.git",
+    "directory": "packages/vite-plugin"
+  },
+  "homepage": "https://github.com/ben-lau/resource-fallback/tree/main/packages/vite-plugin#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues"
 }

@@ -11,6 +11,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
     throw new Error(`[${PLUGIN_NAME}] \`rules\` must be a non-empty array`);
   }
 
+  let shouldRewriteUrls = true;
   const tags = buildInjectedTags(options);
   const injectTo: HtmlTagDescriptor['injectTo'] =
     options.htmlInject === 'head-append' ? 'head' : 'head-prepend';
@@ -22,7 +23,17 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
       return options.enableDev ? true : env.command === 'build';
     },
 
-    config(): UserConfig {
+    config(userConfig): UserConfig {
+      const base = typeof userConfig?.base === 'string' ? userConfig.base : '/';
+      shouldRewriteUrls = options.rules.some((r) => {
+        if (typeof r.match === 'string') return base === r.match;
+        if (r.match instanceof RegExp) return r.match.test(base);
+        if (typeof r.match === 'function') return r.match(base);
+        return false;
+      });
+
+      if (!shouldRewriteUrls) return {};
+
       return {
         experimental: {
           renderBuiltUrl(filename, { hostType }) {
@@ -36,7 +47,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
     },
 
     renderDynamicImport({ targetChunk, format }) {
-      if (!targetChunk || format !== 'es') return null;
+      if (!shouldRewriteUrls || !targetChunk || format !== 'es') return null;
       return {
         left: `window.__RF__.load(${JSON.stringify(targetChunk.fileName)},`,
         right: ')',

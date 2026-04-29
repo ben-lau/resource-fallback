@@ -4,6 +4,12 @@
   "version": "0.0.0",
   "description": "Frontend resource fallback monorepo: retry + multi-CDN + origin recovery for Webpack & Vite",
   "author": "ben-lau <408736066@qq.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ben-lau/resource-fallback.git"
+  },
+  "homepage": "https://github.com/ben-lau/resource-fallback#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues",
   "type": "module",
   "scripts": {
     "build": "pnpm -r --filter='./packages/*' run build",

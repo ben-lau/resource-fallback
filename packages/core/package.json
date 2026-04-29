@@ -25,5 +25,12 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": ["cdn", "fallback", "retry", "webpack", "vite", "resource"],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ben-lau/resource-fallback.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/ben-lau/resource-fallback/tree/main/packages/core#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues"
 }

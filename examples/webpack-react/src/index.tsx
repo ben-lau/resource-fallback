@@ -96,12 +96,47 @@ function useCircuitState() {
   return { state, refresh };
 }
 
+function hasNewFallbackEvents(since: number): boolean {
+  const all = window.__RF_EVENTS__ || [];
+  for (let i = since; i < all.length; i++) {
+    const t = all[i].type;
+    if (t === 'retry' || t === 'fallback') return true;
+  }
+  return false;
+}
+
+function useExternalScript(url: string) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<'intercepted' | 'not-intercepted' | 'success' | null>(null);
+  const snapshotRef = React.useRef(0);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setResult(null);
+    snapshotRef.current = (window.__RF_EVENTS__ || []).length;
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => { setLoading(false); setResult('success'); };
+    s.onerror = () => {
+      setTimeout(() => {
+        setLoading(false);
+        setResult(hasNewFallbackEvents(snapshotRef.current) ? 'intercepted' : 'not-intercepted');
+      }, 500);
+    };
+    document.head.appendChild(s);
+  }, [url]);
+
+  return { loading, result, load };
+}
+
 function App() {
   const events = useRfEvents();
   const { state: circuit, refresh } = useCircuitState();
   const [showA, setShowA] = useState(false);
   const [showB, setShowB] = useState(false);
   const [showC, setShowC] = useState(false);
+  const extMatched = useExternalScript('http://cdn-primary.example.invalid/external/lib.js');
+  const extUnmatched = useExternalScript('http://other-domain.example.invalid/lib.js');
 
   const clearCircuit = () => { localStorage.removeItem(CIRCUIT_KEY); refresh(); };
   const circuitEntries = Object.entries(circuit);
@@ -178,6 +213,42 @@ function App() {
         )}
       </div>
 
+      {/* ── 外部脚本加载 ── */}
+      <div className="rf-card">
+        <strong>外部脚本加载（Observer 拦截测试）</strong>
+        <p style={{ fontSize: 13, color: '#555', margin: '8px 0' }}>
+          通过 <code>document.createElement('script')</code> 手动加载外部资源，验证 Observer 行为。
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 匹配规则的 URL */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button className="rf-btn" onClick={extMatched.load} disabled={extMatched.loading}>
+              {extMatched.loading ? '加载中…' : '加载匹配规则的脚本'}
+            </button>
+            <code style={{ fontSize: 11, color: '#888' }}>cdn-primary.example.invalid/external/lib.js</code>
+            {extMatched.result === 'intercepted' && (
+              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>✓ 已被 Observer 拦截并回退</span>
+            )}
+            {extMatched.result === 'not-intercepted' && (
+              <span style={{ color: '#b00020', fontSize: 13 }}>✗ 未拦截（异常）</span>
+            )}
+          </div>
+          {/* 不匹配规则的 URL */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button className="rf-btn" onClick={extUnmatched.load} disabled={extUnmatched.loading}>
+              {extUnmatched.loading ? '加载中…' : '加载不匹配规则的脚本'}
+            </button>
+            <code style={{ fontSize: 11, color: '#888' }}>other-domain.example.invalid/lib.js</code>
+            {extUnmatched.result === 'not-intercepted' && (
+              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>✓ 未被拦截（预期行为，不匹配任何规则）</span>
+            )}
+            {extUnmatched.result === 'intercepted' && (
+              <span style={{ color: '#b00020', fontSize: 13 }}>✗ 被拦截了（不应该）</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── 异步模块 ── */}
       <div className="rf-card">
         <strong>异步模块加载</strong>
@@ -239,6 +310,8 @@ function App() {
         <strong>测试场景</strong>
         <ol style={{ paddingLeft: 20, margin: '8px 0 0' }}>
           <li><b>JS + CSS 回退</b>：刷新页面，Network 面板可见 JS 和 CSS 都从 <code>.invalid</code> 失败 → 回退到 <code>/</code></li>
+          <li><b>外部脚本（匹配）</b>：点击「加载匹配规则的脚本」→ 应出现 ✓ 已被拦截，事件面板有新事件</li>
+          <li><b>外部脚本（不匹配）</b>：点击「加载不匹配规则的脚本」→ 应出现 ✓ 未被拦截，事件面板无新事件</li>
           <li><b>熔断跳闸</b>：依次加载 A → B → C，观察 C 跳过已熔断的 CDN（Network 请求更少）</li>
           <li><b>熔断冷却</b>：等 15 秒后加载新模块或刷新</li>
           <li><b>TTL 过期</b>：60 秒后刷新，localStorage 条目自动清除</li>
