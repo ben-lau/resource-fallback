@@ -1,5 +1,12 @@
 # @resource-fallback/core
 
+## 0.0.3
+
+### Patch Changes
+
+- db39ae0: fix vite bug
+- fix the asset path join bug
+
 ## 0.0.2
 
 ### Patch Changes

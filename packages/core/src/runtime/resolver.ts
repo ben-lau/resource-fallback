@@ -96,7 +96,8 @@ export function createResolver(config: RuntimeConfig): Resolver {
 
   function swap(currentUrl: string, fromPrefix: string, toPrefix: string): string {
     if (fromPrefix && currentUrl.indexOf(fromPrefix) === 0) {
-      return toPrefix + currentUrl.slice(fromPrefix.length);
+      const rest = currentUrl.slice(fromPrefix.length).replace(/^\/+/, '');
+      return joinAssetPrefix(toPrefix, rest);
     }
     return toPrefix;
   }
@@ -151,11 +152,11 @@ export function createResolver(config: RuntimeConfig): Resolver {
       for (let k = prepared.length - 1; k >= 0; k--) {
         const rule = prepared[k].raw;
         if (matchesFilename(rule.match, filename)) {
-          if (typeof rule.match === 'string') return rule.match + filename;
+          if (typeof rule.match === 'string') return joinAssetPrefix(rule.match, filename);
           for (let i = 0; i < rule.urls.length; i++) {
-            if (!breaker.isOpen(hostOf(rule.urls[i]))) return rule.urls[i] + filename;
+            if (!breaker.isOpen(hostOf(rule.urls[i]))) return joinAssetPrefix(rule.urls[i], filename);
           }
-          return rule.urls[0] + filename;
+          return joinAssetPrefix(rule.urls[0], filename);
         }
       }
       return filename;
@@ -187,4 +188,16 @@ function matchesFilename(pattern: MatchPattern, filename: string): boolean {
   if (pattern instanceof RegExp) return pattern.test(filename);
   if (typeof pattern === 'function') return !!pattern(filename);
   return false;
+}
+
+/**
+ * Vite/Rollup 传给 `renderBuiltUrl` 的文件名通常不带前导 `/`（如 `js/chunk.js`）。
+ * 若 `match` / `urls[i]` 写成无前导目录分隔的形式（漏掉末尾 `/`），
+ * 字符串相加会得到 `.../edu-study-platform-prod` + `js/x.js` → `...prodjs/x.js`。
+ */
+function joinAssetPrefix(prefix: string, filename: string): string {
+  if (!filename) return prefix.replace(/\/?$/, '') || '/';
+  const name = filename.replace(/^\/+/, '');
+  const sep = /[/\\]$/.test(prefix) ? '' : '/';
+  return `${prefix}${sep}${name}`;
 }

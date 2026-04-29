@@ -78,6 +78,22 @@ describe('resolver', () => {
     expect(r.resolveBuiltUrl('foo.js')).toBe(cdn1 + 'foo.js');
   });
 
+  it('resolveBuiltUrl inserts slash between match without trailing slash and nested filename', () => {
+    const r = createResolver({
+      rules: [
+        {
+          match: 'https://qn.cache.wpscdn.cn/fe/edu/edu-study-platform-prod',
+          urls: ['https://edu.wps.cn'],
+          retry: { max: 2, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+        },
+      ],
+      defaults: { circuit: { threshold: 100, cooldown: 60_000, shareAcrossTabs: false } },
+    });
+    expect(r.resolveBuiltUrl('js/app-layout.abc.js')).toBe(
+      'https://qn.cache.wpscdn.cn/fe/edu/edu-study-platform-prod/js/app-layout.abc.js',
+    );
+  });
+
   it('resolveBuiltUrl falls back to filename if no rule matches', () => {
     const r = createResolver({
       rules: [
