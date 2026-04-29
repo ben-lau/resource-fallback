@@ -206,6 +206,37 @@ function injectRuntimeModule(compiler: Compiler, webpack: typeof import('webpack
     '      __rf_wrapped_l.__rf_wrapped = true;',
     '      __webpack_require__.l = __rf_wrapped_l;',
     '    }',
+    '',
+    // 包装 __webpack_require__.f 中所有非 JS 的 chunk loader（CSS 等）。
+    // mini-css-extract-plugin 注册在 f.miniCss，webpack 原生 CSS 在 f.css，
+    // 其他 CSS 插件可能使用任意 key。统一遍历所有非 "j" 的 loader，
+    // 将其 promise 的 CSS 错误抑制——与 Vite 的 vite:preloadError + preventDefault() 同理。
+    // 实际 CSS 重试由 observer 通过 DOM 层面的 <link> 替换完成。
+    '    var __rf_fKeys = Object.keys(__webpack_require__.f);',
+    '    for (var __rf_i = 0; __rf_i < __rf_fKeys.length; __rf_i++) {',
+    '      (function(fk) {',
+    '        if (fk === "j") return;',
+    '        var origFn = __webpack_require__.f[fk];',
+    '        if (typeof origFn !== "function" || origFn.__rf_css) return;',
+    '        var wrapped = function(chunkId, promises) {',
+    '          var before = promises.length;',
+    '          origFn(chunkId, promises);',
+    '          for (var pi = before; pi < promises.length; pi++) {',
+    '            promises[pi] = promises[pi].catch(function(err) {',
+    '              var isCss = err && (',
+    '                err.code === "CSS_CHUNK_LOAD_FAILED" ||',
+    '                (err.request && /\\.css([?#]|$)/.test(err.request))',
+    '              );',
+    '              if (!isCss) throw err;',
+    '              try { window.__RF__.resolver.recordFailure(err.request || ""); } catch(e) {}',
+    '            });',
+    '          }',
+    '        };',
+    '        wrapped.__rf_css = true;',
+    '        __webpack_require__.f[fk] = wrapped;',
+    '      })(__rf_fKeys[__rf_i]);',
+    '    }',
+    '',
     '  } catch (e) { /* 吞掉异常——降级到 observer */ }',
     '}',
   ].join('\n');

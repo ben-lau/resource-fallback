@@ -8,22 +8,20 @@ interface AdapterDeps {
   log: Logger;
 }
 
-interface VitePreloadErrorPayload {
-  reason?: unknown;
-  payload?: { reason?: unknown };
+interface VitePreloadErrorEvent extends Event {
+  payload?: unknown;
 }
 
 /**
  * Vite 特有的运行时钩子。
  *
- * Vite 构建后的动态 import() 使用相对路径（`import("./chunk.js")`），
- * `experimental.renderBuiltUrl` 不控制这些 specifier（仅影响 `__vite__mapDeps`）。
- * 插件通过 Rollup 的 `renderDynamicImport` hook 将 `import(spec)` 替换为
- * `window.__RF__.load("assets/chunk.js", spec)`，其中第一个参数是 Rollup 提供的
- * `targetChunk.fileName`。`__RF__.load` 使用 `resolveBuiltUrl(filename)` 确定
- * 首次请求 URL，再执行与 webpack adapter 一致的 retry/fallback 循环。
+ * 插件通过 `writeBundle` hook（在 Vite 完成 `__vitePreload` / `__vite__mapDeps`
+ * 生成之后）将 `import("./chunk.js")` 替换为
+ * `window.__RF__.load("assets/chunk.js")`。这保证了：
+ * - `__vitePreload` 的 CSS deps 正常生成（异步组件的 CSS 不丢失）
+ * - `__RF__.load` 对 JS 动态 import 提供 retry/fallback 能力
  *
- * `__RF__.url` 仍供 `__vite__mapDeps` 中的 modulepreload 使用。
+ * `__RF__.url` 可选，用于外部代码将 filename 解析为完整 URL。
  */
 export function installViteAdapter(deps: AdapterDeps): void {
   if (typeof window === 'undefined') return;
@@ -81,8 +79,17 @@ export function installViteAdapter(deps: AdapterDeps): void {
   };
 
   window.addEventListener('vite:preloadError', (event: Event) => {
-    const detail = (event as CustomEvent<VitePreloadErrorPayload>).detail;
-    const reason = detail?.payload?.reason ?? detail?.reason ?? detail;
+    // Vite 的 __vitePreload 在 CSS 预加载失败时调用:
+    //   const e = new Event('vite:preloadError', { cancelable: true });
+    //   e.payload = error;
+    //   dispatchEvent(e);
+    //   if (!e.defaultPrevented) throw error;
+    //
+    // 必须 preventDefault，否则 throw 会阻断后续的 __RF__.load() 调用，
+    // 导致 JS 模块永远不加载。CSS 由 observer 通过 <link> error 事件重试。
+    event.preventDefault();
+
+    const reason = (event as VitePreloadErrorEvent).payload;
     const url = extractUrlFromError(reason);
     if (!url) {
       deps.log.warn('vite:preloadError 无法解析出 URL', reason);

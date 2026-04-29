@@ -1,4 +1,8 @@
 import type { HtmlTagDescriptor, Plugin, UserConfig } from 'vite';
+import { posix, join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { init, parse } from 'es-module-lexer';
+import MagicString from 'magic-string';
 
 import { buildInjectedTags, type HtmlTag, type PluginOptions } from '@resource-fallback/core';
 
@@ -32,26 +36,49 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
         return false;
       });
 
-      if (!shouldRewriteUrls) return {};
-
-      return {
-        experimental: {
-          renderBuiltUrl(filename, { hostType }) {
-            if (hostType === 'js') {
-              return { runtime: `window.__RF__.url(${JSON.stringify(filename)})` };
-            }
-            return { relative: true };
-          },
-        },
-      };
+      return {};
     },
 
-    renderDynamicImport({ targetChunk, format }) {
-      if (!shouldRewriteUrls || !targetChunk || format !== 'es') return null;
-      return {
-        left: `window.__RF__.load(${JSON.stringify(targetChunk.fileName)},`,
-        right: ')',
-      };
+    async writeBundle(options, bundle) {
+      if (!shouldRewriteUrls) return;
+
+      await init;
+
+      const outDir = options.dir!;
+
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        if (!chunk.dynamicImports || chunk.dynamicImports.length === 0) continue;
+
+        const dynamicChunks = new Set(chunk.dynamicImports);
+        const chunkDir = posix.dirname(chunk.fileName);
+        const filePath = join(outDir, chunk.fileName);
+        const code = readFileSync(filePath, 'utf8');
+
+        const [imports] = parse(code);
+        const s = new MagicString(code);
+        let modified = false;
+
+        for (const imp of imports) {
+          // imp.d === -1 → static import; imp.d >= 0 → dynamic import (position of `import` keyword)
+          if (imp.d < 0) continue;
+
+          // imp.n is the specifier string (e.g. "./About-xxx.js"), undefined for non-literal
+          if (!imp.n) continue;
+
+          const resolved = posix.normalize(posix.join(chunkDir, imp.n));
+          if (!dynamicChunks.has(resolved)) continue;
+
+          // imp.ss = statement start (position of `import` keyword)
+          // imp.se = statement end (position after closing `)`)
+          s.overwrite(imp.ss, imp.se, `window.__RF__.load(${JSON.stringify(resolved)})`);
+          modified = true;
+        }
+
+        if (modified) {
+          writeFileSync(filePath, s.toString());
+        }
+      }
     },
 
     transformIndexHtml: {

@@ -1,6 +1,6 @@
 {
   "name": "@resource-fallback/vite-plugin",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Vite 4+ plugin that wires @resource-fallback/core into your build (HTML injection + experimental.renderBuiltUrl)",
   "author": "ben-lau <408736066@qq.com>",
   "type": "module",
@@ -24,7 +24,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@resource-fallback/core": "workspace:*"
+    "@resource-fallback/core": "workspace:*",
+    "es-module-lexer": "^2.1.0",
+    "magic-string": "^0.30.21"
   },
   "peerDependencies": {
     "vite": ">=4"

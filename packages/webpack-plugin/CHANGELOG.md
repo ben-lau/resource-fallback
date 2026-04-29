@@ -1,5 +1,13 @@
 # @resource-fallback/webpack-plugin
 
+## 0.0.4
+
+### Patch Changes
+
+- fix the lack deps of css bundles
+- Updated dependencies
+  - @resource-fallback/core@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes

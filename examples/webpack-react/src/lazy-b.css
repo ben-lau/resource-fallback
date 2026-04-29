@@ -1,0 +1,12 @@
+.lazy-b-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: #fff3e0;
+  border: 2px solid #ff9800;
+  border-radius: 8px;
+}
+
+.lazy-b-title {
+  color: #e65100;
+  font-size: 18px;
+}

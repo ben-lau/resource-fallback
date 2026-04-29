@@ -220,18 +220,29 @@ describe('vite-adapter', () => {
   });
 
   describe('vite:preloadError', () => {
-    it('records failure on vite:preloadError event', () => {
+    function dispatchPreloadError(payload: unknown): Event {
+      const evt = new Event('vite:preloadError', { cancelable: true });
+      (evt as Event & { payload?: unknown }).payload = payload;
+      window.dispatchEvent(evt);
+      return evt;
+    }
+
+    it('calls preventDefault so __vitePreload does not throw', () => {
+      setup();
+      const evt = dispatchPreloadError(
+        new Error('Unable to preload CSS for https://cdn1.example.com/assets/chunk.css'),
+      );
+      expect(evt.defaultPrevented).toBe(true);
+    });
+
+    it('records failure from Error message containing URL', () => {
       const events: string[] = [];
-      const deps = setup({
+      setup({
         onFallback: (e) => events.push('fallback:' + (e as { from: string }).from),
       });
 
-      window.dispatchEvent(
-        new CustomEvent('vite:preloadError', {
-          detail: {
-            reason: new Error('Failed to fetch https://cdn1.example.com/assets/chunk.js'),
-          },
-        }),
+      dispatchPreloadError(
+        new Error('Unable to preload CSS for https://cdn1.example.com/assets/chunk.css'),
       );
 
       expect(events.some((e) => e.includes('cdn1.example.com'))).toBe(true);
@@ -243,27 +254,15 @@ describe('vite-adapter', () => {
         onFallback: (e) => events.push('fallback:' + (e as { from: string }).from),
       });
 
-      window.dispatchEvent(
-        new CustomEvent('vite:preloadError', {
-          detail: {
-            reason: { target: { src: cdn1 + 'assets/chunk.js' } },
-          },
-        }),
-      );
+      dispatchPreloadError({ target: { src: cdn1 + 'assets/chunk.js' } });
 
       expect(events).toContain('fallback:' + cdn1 + 'assets/chunk.js');
     });
 
-    it('warns when URL cannot be extracted from preloadError', () => {
+    it('warns when URL cannot be extracted but still prevents default', () => {
       setup();
-      // Should not throw even with unparseable detail
-      expect(() => {
-        window.dispatchEvent(
-          new CustomEvent('vite:preloadError', {
-            detail: { reason: null },
-          }),
-        );
-      }).not.toThrow();
+      const evt = dispatchPreloadError(null);
+      expect(evt.defaultPrevented).toBe(true);
     });
   });
 });
