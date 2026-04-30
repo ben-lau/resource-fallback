@@ -17,7 +17,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2, origin],
-          retry: { max: 2, baseDelay: 10, maxDelay: 50, timeout: 5000, jitter: false },
+          retry: { max: 2, baseDelay: 10, maxDelay: 50, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 60_000, shareAcrossTabs: false } },
@@ -63,7 +63,7 @@ describe('resolver', () => {
         {
           match: /^https:\/\/cdn\d+\.example\.com\//,
           urls: ['https://cdn1.example.com/', 'https://cdn2.example.com/'],
-          retry: { max: 0, baseDelay: 1, maxDelay: 1, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 1, maxDelay: 1, jitter: false },
         },
       ],
     });
@@ -84,7 +84,7 @@ describe('resolver', () => {
         {
           match: 'https://qn.cache.wpscdn.cn/fe/edu/edu-study-platform-prod',
           urls: ['https://edu.wps.cn'],
-          retry: { max: 2, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 2, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 60_000, shareAcrossTabs: false } },
@@ -116,7 +116,7 @@ describe('resolver', () => {
         {
           match: base,
           urls: [altCdn1, altCdn2, '/'],
-          retry: { max: 1, baseDelay: 1, maxDelay: 1, timeout: 1, jitter: false },
+          retry: { max: 1, baseDelay: 1, maxDelay: 1, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 60_000, shareAcrossTabs: false } },
@@ -172,7 +172,7 @@ describe('resolver', () => {
         {
           match: primary,
           urls: [cdn1, primary, origin],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 1, cooldown: 60_000, shareAcrossTabs: false } },
@@ -202,7 +202,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn2, cdn1, origin],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 1, cooldown: 60_000, shareAcrossTabs: false } },
@@ -227,12 +227,12 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
         {
           match: cdn1,
           urls: [cdn1, origin],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -251,7 +251,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 1, cooldown: 60_000, shareAcrossTabs: false } },
@@ -278,7 +278,7 @@ describe('resolver', () => {
         {
           match: base,
           urls: [fallback1, fallback2, '/'],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 1, cooldown: 60_000, shareAcrossTabs: false } },
@@ -308,7 +308,7 @@ describe('resolver', () => {
         {
           match: (url: string) => url.includes('/assets/'),
           urls: ['https://cdn.example.com/', 'https://backup.example.com/'],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -325,7 +325,7 @@ describe('resolver', () => {
         {
           match: () => false,
           urls: ['https://cdn.example.com/'],
-          retry: { max: 2, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 2, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -341,7 +341,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -369,7 +369,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2, origin],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 2, cooldown: 60_000, shareAcrossTabs: false } },
@@ -403,7 +403,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -451,12 +451,12 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
         {
           match: cdn1,
           urls: [cdn1, origin],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
     });
@@ -480,7 +480,7 @@ describe('resolver', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 3, baseDelay: 100, maxDelay: 1000, timeout: 5000, jitter: false },
+          retry: { max: 3, baseDelay: 100, maxDelay: 1000, jitter: false },
         },
       ],
     });

@@ -85,17 +85,9 @@ function hookArray(arr: ChunkArrayLike, deps: AdapterDeps): void {
   if (arr.__rfHooked) return;
   arr.__rfHooked = true;
 
-  // 包装在我们之前已经推入的 chunk（head-prepend 注入时很少出现，
-  // 但运行时异步加载时有可能）
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] && typeof arr[i][2] === 'function') {
-      // 无法重放运行时调用，但可以通过下一个安全网（轮询）扫描
-      // 其产生的 __webpack_require__
-    }
-  }
-
   const origPush = arr.push;
-  arr.push = function (chunk: ChunkPushArg) {
+  arr.push = function (...args: ChunkPushArg[]) {
+    const chunk = args[0];
     if (chunk && typeof chunk[2] === 'function') {
       const origRuntime = chunk[2];
       chunk[2] = function (req: WebpackRequireLike) {
@@ -104,7 +96,7 @@ function hookArray(arr: ChunkArrayLike, deps: AdapterDeps): void {
         return ret;
       };
     }
-    return origPush.apply(this, arguments as unknown as [ChunkPushArg]);
+    return origPush.apply(this, args);
   };
 }
 

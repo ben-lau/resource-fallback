@@ -16,7 +16,7 @@ export interface RetryOptions {
   baseDelay?: number;
   /** 指数退避的延迟上限（ms）。默认 3000。 */
   maxDelay?: number;
-  /** 为每次延迟添加最多 50% 的随机抖动，分散重试风暴。默认 true。 */
+  /** 为每次延迟添加最多 25% 的随机抖动，分散重试风暴。默认 true。 */
   jitter?: boolean;
 }
 
@@ -132,9 +132,6 @@ export interface PluginOptions extends RuntimeConfig {
   /** 注入到 `<head>` 中的位置。默认 `head-prepend`（最前面）。 */
   htmlInject?: 'head-prepend' | 'head-append';
 }
-
-/** 供 resolver 模块使用；install 入口仅消费公共 RuntimeConfig。 */
-export type AttemptKind = 'retry' | 'fallback' | 'giveup';
 
 export type ResolveResult =
   | { kind: 'retry'; url: string; delay: number; attempt: number }

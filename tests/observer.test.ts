@@ -18,7 +18,7 @@ function setup(onError?: (e: RfErrorEvent) => void, onFallback?: (e: FallbackEve
       {
         match: cdn1,
         urls: [cdn1, cdn2, origin],
-        retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+        retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
       },
     ],
     defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
@@ -304,7 +304,7 @@ describe('observer', () => {
         {
           match: cssCdn,
           urls: [cssCdn, cssBackup],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
@@ -333,7 +333,7 @@ describe('observer', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
@@ -363,7 +363,7 @@ describe('observer', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
@@ -456,7 +456,7 @@ describe('observer', () => {
         {
           match: 'https://keep-test.example.com/',
           urls: ['https://keep-test.example.com/', cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },

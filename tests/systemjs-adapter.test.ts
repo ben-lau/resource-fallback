@@ -61,7 +61,7 @@ function setup(opts?: {
       {
         match: cdn1,
         urls: [cdn1, cdn2, origin],
-        retry: { max: opts?.retryMax ?? 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+        retry: { max: opts?.retryMax ?? 1, baseDelay: 0, maxDelay: 0, jitter: false },
       },
     ],
     defaults: {

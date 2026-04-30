@@ -214,7 +214,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 **Vite adapter**（`adapter-vite.ts`）：
 
-- **`__RF__.load`** 内在 `catch` 后递增 `totalAttempts`，对 **再次 dynamic import** 使用带 **`appendCacheBust`** 的 URL，道理与 Observer 一致：打破 **失败 module record**。
+- **`__RF__.load`** 内在 `catch` 后递增 `totalAttempts`，对 **再次 dynamic import** 使用带 **`appendRetryParam`** 的 URL，道理与 Observer 一致：打破 **失败 module record**。
 
 这样 **可视化现象**应当是：每次「真重试」在 Network 里能看到 **URL 发生变化或 host 发生变化**的请求行，而不是静默 no-op。
 
@@ -337,9 +337,23 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 与 **§4.1**同理：**ownership**先于算法。区别在于 **Webpack 可以用 `data-webpack` 判别**；SystemJS路径需要 **运行时登记「此 URL 由 SystemJS 适配器认领」**，Observer **看到同一个 URL（或等价键）就不再 resolve**。
 
+曾评估过两种方案：
+
+**方案 A（完全接管 instantiate，已弃用）**：覆写 `System.constructor.prototype.instantiate`，不再委托给原始实现，而是自行创建 `<script>` 元素并通过 `data-systemjs` 属性标记，让 Observer 跳过这些脚本。
+
+- 优点：完全控制脚本创建、事件绑定和重试逻辑，不存在 Observer 与 adapter 的竞争
+- 缺点：
+  - 需要在 Observer 中增加 `isSystemJSScript` 检查
+  - 自建脚本可能遗漏 SystemJS 内部附加的属性（`crossOrigin`、`fetchPriority` 等）
+  - 如果 SystemJS 更新了 `instantiate` 的内部逻辑（如 integrity 校验、import map 支持），自建脚本不会自动获得这些改进
+
+**方案 B（委托式，采纳）**：覆写 `instantiate`，但内部仍**委托给原始 `origInstantiate`**，保留 SystemJS 全部的脚本创建逻辑，仅在 `.catch()` 中加入 retry/fallback 循环。通过 `systemjsManagedUrls` 共享 Set 通知 Observer 跳过正在被管理的 URL。
+
+方案 B 的核心优势：**不复制 SystemJS 内部实现**，当 SystemJS 升级或内部行为变化时自动兼容，维护成本显著低于方案 A。
+
 #### 解决方案（如何实现）
 
-**方案 B（委托为主）**：在 **`System.constructor.prototype.instantiate`**（或等价 hook）上做薄封装：**内部仍调原始 instantiate**，或在失败/重定向 URL 语义上接上 **`resolver`**。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
+采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入 **`resolver`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
 
 Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedUrls`**，直接 **return**，把 **全权**留给 SystemJS adapter。
 

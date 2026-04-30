@@ -3,6 +3,7 @@ import type { HookBus } from './hooks';
 import type { Logger } from './logger';
 import type { Resolver } from './resolver';
 import { systemjsManagedUrls } from './adapter-systemjs';
+import { appendRetryParam, stripRetryParam } from './utils';
 
 const ATTEMPT_ATTR = 'data-rf-attempt';
 const MANAGED_ATTR = 'data-rf-managed';
@@ -143,16 +144,6 @@ function needsCacheBust(el: HTMLElement): boolean {
   if (el.tagName !== 'SCRIPT') return false;
   const t = (el as HTMLScriptElement).type;
   return t === 'module';
-}
-
-function appendRetryParam(url: string, attempt: number): string {
-  const clean = stripRetryParam(url);
-  const nonce = attempt + '-' + Math.floor(Math.random() * 1e6).toString(36);
-  return clean + (clean.indexOf('?') === -1 ? '?' : '&') + '__rf=' + nonce;
-}
-
-function stripRetryParam(url: string): string {
-  return url.replace(/([?&])__rf=[^&#]*&?/g, (_m, sep) => sep).replace(/[?&]$/, '');
 }
 
 function readUrl(el: HTMLElement): string {

@@ -1,4 +1,5 @@
 import type { RetryOptions } from '../types';
+import { pick } from './utils';
 
 export const RETRY_DEFAULTS: Required<RetryOptions> = {
   max: 2,
@@ -17,12 +18,6 @@ export function mergeRetry(
     maxDelay: pick(rule?.maxDelay, defaults?.maxDelay, RETRY_DEFAULTS.maxDelay),
     jitter: pick(rule?.jitter, defaults?.jitter, RETRY_DEFAULTS.jitter),
   };
-}
-
-function pick<T>(a: T | undefined, b: T | undefined, c: T): T {
-  if (a !== undefined) return a;
-  if (b !== undefined) return b;
-  return c;
 }
 
 /**

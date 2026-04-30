@@ -16,7 +16,7 @@ function setup(globals: string[]) {
       {
         match: cdn1,
         urls: [cdn1, cdn2],
-        retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+        retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
       },
     ],
     defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
@@ -77,7 +77,7 @@ describe('webpack adapter', () => {
         {
           match: cdn1,
           urls: [cdn1, cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, timeout: 1000, jitter: false },
+          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },

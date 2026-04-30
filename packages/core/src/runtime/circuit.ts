@@ -1,4 +1,5 @@
 import type { CircuitOptions } from '../types';
+import { pick } from './utils';
 
 export const CIRCUIT_DEFAULTS: Required<CircuitOptions> = {
   threshold: 5,
@@ -46,12 +47,6 @@ export function mergeCircuit(
   };
 }
 
-function pick<T>(a: T | undefined, b: T | undefined, c: T): T {
-  if (a !== undefined) return a;
-  if (b !== undefined) return b;
-  return c;
-}
-
 export function hostOf(url: string): string {
   try {
     return new URL(url, typeof location !== 'undefined' ? location.href : 'http://x/').host;
@@ -90,17 +85,16 @@ export function createCircuitBreaker(opts: Required<CircuitOptions>): CircuitBre
     if (!opts.shareAcrossTabs) return;
     try {
       const stored: StoredStateMap = {};
+      const cleared = new Set<string>();
       const ts = now();
       const cutoff = ts - opts.storageTtl;
       Object.keys(memory).forEach((k) => {
         const s = memory[k];
-        if (s.fails === 0 && s.openedAt === 0) return;
+        if (s.fails === 0 && s.openedAt === 0) {
+          cleared.add(k);
+          return;
+        }
         stored[k] = { fails: s.fails, openedAt: s.openedAt, updatedAt: ts };
-      });
-      const cleared = new Set<string>();
-      Object.keys(memory).forEach((k) => {
-        const s = memory[k];
-        if (s.fails === 0 && s.openedAt === 0) cleared.add(k);
       });
       const existing = readRaw();
       if (existing) {

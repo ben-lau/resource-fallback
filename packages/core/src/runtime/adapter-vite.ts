@@ -1,6 +1,7 @@
 import type { HookBus } from './hooks';
 import type { Logger } from './logger';
 import type { Resolver } from './resolver';
+import { appendRetryParam } from './utils';
 
 interface AdapterDeps {
   resolver: Resolver;
@@ -46,7 +47,7 @@ export function installViteAdapter(deps: AdapterDeps): void {
         // 添加 cache-busting 参数（与 observer 的 appendRetryParam 格式一致）
         // 强制浏览器将其视为新的 module record。
         const importUrl = totalAttempts > 0
-          ? appendCacheBust(currentUrl, totalAttempts)
+          ? appendRetryParam(currentUrl, totalAttempts)
           : currentUrl;
         const mod = await dynamicImport(importUrl);
         deps.resolver.recordSuccess(currentUrl);
@@ -112,10 +113,4 @@ function extractUrlFromError(reason: unknown): string | null {
 function matchUrl(text: string): string | null {
   const m = text.match(/(https?:\/\/\S+|\/[\w./?=&%-]+)/);
   return m ? m[1] : null;
-}
-
-function appendCacheBust(url: string, attempt: number): string {
-  const clean = url.replace(/([?&])__rf=[^&#]*&?/g, (_m, sep) => sep).replace(/[?&]$/, '');
-  const nonce = attempt + '-' + Math.floor(Math.random() * 1e6).toString(36);
-  return clean + (clean.indexOf('?') === -1 ? '?' : '&') + '__rf=' + nonce;
 }
