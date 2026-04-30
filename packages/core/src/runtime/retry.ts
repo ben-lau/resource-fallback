@@ -4,7 +4,6 @@ export const RETRY_DEFAULTS: Required<RetryOptions> = {
   max: 2,
   baseDelay: 300,
   maxDelay: 3000,
-  timeout: 10000,
   jitter: true,
 };
 
@@ -16,7 +15,6 @@ export function mergeRetry(
     max: pick(rule?.max, defaults?.max, RETRY_DEFAULTS.max),
     baseDelay: pick(rule?.baseDelay, defaults?.baseDelay, RETRY_DEFAULTS.baseDelay),
     maxDelay: pick(rule?.maxDelay, defaults?.maxDelay, RETRY_DEFAULTS.maxDelay),
-    timeout: pick(rule?.timeout, defaults?.timeout, RETRY_DEFAULTS.timeout),
     jitter: pick(rule?.jitter, defaults?.jitter, RETRY_DEFAULTS.jitter),
   };
 }

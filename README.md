@@ -355,10 +355,10 @@ pnpm changeset publish      # 推 npm
 
 ### 功能增强
 
+- [ ] **（高优先级）单次加载超时 / `retry.timeout`** — 已从公开类型中移除未实现的 `RetryOptions.timeout`。后续需在各加载路径（Observer、`__RF__.load`、webpack chunk 等）落地「超过 N ms 视为失败并驱动 resolver」；可选配合 `fetch`+`AbortSignal` 或 HEAD 预检；经典 `<script>` 无原生超时 API，需单独权衡实现。
 - [ ] **Service Worker 拦截模式** — 通过 SW 的 `fetch` 事件拦截所有资源请求，实现比 DOM 层更可靠的全量拦截，特别是对 CSS 中的 `@import`、`url()` 引用、字体文件等
 - [ ] **图片/字体资源支持** — 当前仅覆盖 `<script>` 和 `<link rel="stylesheet">`，未处理 `<img>`、`<video>`、`@font-face` 等资源类型
 - [ ] **Vite dev 模式支持** — 当前 Vite dev 使用原生 ESM，动态 import 失败无法拦截
-- [ ] **HEAD 探测** — `RetryOptions.timeout` 字段已定义但未实现网络探测逻辑；可在重试前用 `fetch(url, { method: 'HEAD' })` 预检目标是否可达
 - [ ] **per-rule 熔断器** — 当前所有规则共享同一个熔断器实例，无法按规则独立配置不同的熔断阈值
 - [ ] **动态规则更新** — `install()` 是一次性的，无法在运行时动态添加/修改规则。考虑增加 `addRule()` / `removeRule()` API
 - [ ] **Rspack / esbuild 插件** — 扩展构建工具支持

@@ -16,8 +16,6 @@ export interface RetryOptions {
   baseDelay?: number;
   /** 指数退避的延迟上限（ms）。默认 3000。 */
   maxDelay?: number;
-  /** 软超时时间（ms）。默认 10000。用作 HEAD 探测的提示。 */
-  timeout?: number;
   /** 为每次延迟添加最多 50% 的随机抖动，分散重试风暴。默认 true。 */
   jitter?: boolean;
 }

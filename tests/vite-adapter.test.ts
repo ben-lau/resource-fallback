@@ -38,7 +38,6 @@ function setup(opts?: {
           max: opts?.retryMax ?? 1,
           baseDelay: 0,
           maxDelay: 0,
-          timeout: 1000,
           jitter: false,
         },
       },
