@@ -1,5 +1,7 @@
 # @resource-fallback/vite-plugin
 
+> **[中文](README.md)** | [English](README.en.md)
+
 Vite 4+ 插件，为 Vite 构建产物（同步 JS/CSS、异步 chunk、modulepreload）提供运行时重试与多 CDN 回退能力。
 
 ## 安装

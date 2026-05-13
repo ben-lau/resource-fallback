@@ -1,5 +1,7 @@
 # Vite + Vue 示例
 
+> **[中文](README.md)** | [English](README.en.md)
+
 演示 `@resource-fallback/vite-plugin` 在 Vue 3 应用中的完整集成，包括：
 
 - Vue Router 懒加载路由（`() => import('./views/About.vue')`）

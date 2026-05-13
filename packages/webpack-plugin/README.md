@@ -1,5 +1,7 @@
 # @resource-fallback/webpack-plugin
 
+> **[中文](README.md)** | [English](README.en.md)
+
 Webpack 5+ 插件，为 Webpack 构建产物（入口脚本、异步 chunk、CSS）提供运行时重试与多 CDN 回退能力。
 
 ## 安装

@@ -1,5 +1,7 @@
 # resource-fallback
 
+> **[中文](README.md)** | [English](README.en.md)
+
 零心智负担的前端资源回退方案。为 Webpack 与 Vite 构建产物（同步 / 异步 JS、CSS）提供运行时 **重试 → 多 CDN 回退 → 回源** 能力，业务代码无需任何改动。
 
 ## 核心特性

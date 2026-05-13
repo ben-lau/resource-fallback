@@ -1,5 +1,7 @@
 # Webpack + React 示例
 
+> **[中文](README.md)** | [English](README.en.md)
+
 演示 `@resource-fallback/webpack-plugin` 在 React 18 应用中的完整集成，包括：
 
 - `React.lazy()` + `<Suspense>` 异步组件加载

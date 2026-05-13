@@ -1,5 +1,7 @@
 # @resource-fallback/core
 
+> **[中文](README.md)** | [English](README.en.md)
+
 浏览器运行时 + Node 端工具函数，是 `resource-fallback` 方案的核心包。
 
 终端用户通常不需要直接依赖本包——请安装 [`@resource-fallback/vite-plugin`](../vite-plugin) 或 [`@resource-fallback/webpack-plugin`](../webpack-plugin)。仅当需要自定义集成或手动注入运行时时才需要直接使用。
