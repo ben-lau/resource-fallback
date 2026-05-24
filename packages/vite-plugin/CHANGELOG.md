@@ -1,5 +1,18 @@
 # @resource-fallback/vite-plugin
 
+## 0.1.0
+
+### Minor Changes
+
+- 207f03f: Add opt-in Hybrid Service Worker fallback support for non-script resources.
+
+  This release adds manifest-based Service Worker interception for images, fonts, media, CSS subresources, and controlled CSS imports while keeping script loading owned by the existing page-side adapters. It also emits SW assets from both Vite and Webpack plugins, preloads SW configuration to avoid first-load races, hardens SW event delivery and error handling, and documents the new behavior with examples and tests.
+
+### Patch Changes
+
+- Updated dependencies [207f03f]
+  - @resource-fallback/core@0.1.0
+
 ## 0.0.4
 
 ### Patch Changes
