@@ -39,4 +39,17 @@ export default defineConfig([
     footer: { js: '' },
     banner: { js: '' },
   },
+  // 3) Service Worker runtime: separate bundle because SW has no window/document.
+  {
+    entry: { sw: 'src/sw/entry.ts' },
+    format: ['iife'],
+    target: 'es2018',
+    outDir: 'dist',
+    outExtension: () => ({ js: '.js' }),
+    globalName: '__RF_SW__',
+    sourcemap: false,
+    minify: true,
+    clean: false,
+    splitting: false,
+  },
 ]);

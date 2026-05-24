@@ -35,6 +35,10 @@ module.exports = {
         test: /\.css$/,
         use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
+      {
+        test: /\.(svg|woff2?|ttf)$/,
+        type: 'asset/resource',
+      },
     ],
   },
   plugins: [
@@ -42,6 +46,16 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, 'src/index.html'),
     }),
+    {
+      apply(compiler) {
+        compiler.hooks.thisCompilation.tap('ExternalScriptDemoAssetPlugin', (compilation) => {
+          compilation.emitAsset(
+            'external/lib.js',
+            new compiler.webpack.sources.RawSource('window.__RF_EXTERNAL_LIB_LOADED__ = true;\n'),
+          );
+        });
+      },
+    },
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
@@ -56,6 +70,7 @@ module.exports = {
         },
       ],
       debug: true,
+      serviceWorker: { fallbackOnOpaque: true },
     }),
   ],
 };

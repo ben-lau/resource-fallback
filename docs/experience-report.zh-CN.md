@@ -428,6 +428,119 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 ---
 
+### 4.10 Hybrid Service Worker：补齐图片/字体/CSS 子资源，但不能把 SW 当成“全能 onerror”
+
+#### 背景
+
+本轮引入 **Hybrid SW** 的目标不是替换现有 Observer / Vite / Webpack / SystemJS adapter，而是补齐 DOM 层很难看见的资源：`img`、`@font-face`、CSS `url()`、媒体资源以及受控 CSS `@import`。
+
+实现后暴露了几个很典型的 Service Worker 误区：
+
+- **默认 `path: '/__rf/sw.js'` + `scope: '/'` 会制造部署心智负担**：浏览器默认只允许 SW 控制其脚本所在目录及子目录。若脚本在 `/__rf/sw.js`，想控制 `/`，服务器必须返回 `Service-Worker-Allowed: /`。这不适合作为库默认值。
+- **页面 `postMessage` 配置太晚**：图片、背景图和字体可能在页面 runtime 完成注册并 `postMessage` manifest 之前就发起请求；SW 若没有配置，只能 pass-through，视觉上就像“SW 没效果”。
+- **图片/CSS 背景图常是 `no-cors` 请求**：SW 看到的是 opaque response，无法读取真实 status。某些本地/代理环境中，假 CDN 的错误响应会变成 opaque，若默认当成功返回，浏览器拿到的仍是坏资源。
+- **本地 IP 不是 secure context**：`http://localhost` / `http://127.0.0.1` 可注册 SW，但 `http://192.168.x.x` 这类局域网 IP 默认不能注册。Webpack example 的 `http-server` 会展示 LAN IP，很容易误以为也能测试 SW。
+- **Service Worker 持久存在**：rebuild 后旧 SW 可能继续控制当前页面；磁盘 `dist/sw.js` 已经是新的，不代表浏览器当前 controller 就是新的。
+- **测试“元素可见”不等于资源生效**：`<img>` 元素可见、背景块可见，只说明 DOM 渲染了；必须检查 `naturalWidth`、`document.fonts.check()`、SW 事件和 request/response，才能证明图片/字体真正 fallback 成功。
+
+#### 思考过程
+
+核心取舍是 **Hybrid ownership**：
+
+- **script / dynamic import / Webpack async script / SystemJS** 继续归页面侧 adapter。它们处理的不只是网络请求，还包括构建器 Promise、module map cache、CSS chunk reject、SRI/属性复制等语义。
+- **image / font / media / CSS 子资源** 归 SW。它们没有脚本执行顺序和构建器 Promise 的复杂语义，更适合在 fetch 层统一 retry/fallback。
+- **顶层 stylesheet** 暂不交给 SW。Observer 仍负责 `<link rel="stylesheet">`，避免 SW 与 Observer 对同一 `<link>` 重复 retry、重复计数、事件顺序混乱。
+- **CSS `@import`** 仅在 `request.destination === 'style'` 且 `request.referrer` 命中 manifest 中的 CSS 资源时接管，避免误伤页面主动加载的顶层 stylesheet。
+
+由此可以把 SW 当成 **一层补充的资源请求 owner**，而不是“fetch 层统一替换所有 adapter”。
+
+#### 解决方案（如何实现）
+
+1. **默认 path 跟随 scope 派生**
+
+   `normalizeServiceWorkerOptions()` 中不再默认 `/__rf/sw.js`，而是：
+
+   - `scope: '/'` → `path: '/sw.js'`
+   - `scope: '/app/'` → `path: '/app/sw.js'`
+
+   只有用户显式把 `path` 配到 scope 目录之外时，才需要自己配置 `Service-Worker-Allowed`。这样默认配置能在普通静态服务器上直接跑通。
+
+2. **manifest 预置进 SW 文件**
+
+   Vite/Webpack 插件构建时生成 `ResourceFallbackManifest`，再通过 `buildServiceWorkerAssets()` 把 `{ manifest, runtimeConfig, serviceWorker }` 写入 `self.__RF_SW_PRELOAD__`，拼在 SW bundle 前面。这里不能用普通 `JSON.stringify`：`RegExp` 会被序列化成 `{}`，导致 SW 中的 `match` 规则失效；当前使用 JS 表达式序列化，保留正则字面量。
+
+   `packages/core/src/sw/entry.ts` 在模块初始化时优先读取这个 preload：
+
+   - 有 preload：SW 第一个 fetch 事件前就有 ownership 信息；
+   - 页面 runtime 后续仍会 `postMessage` 最新配置，作为更新/补发通道。
+
+   这修掉了“SW 已控制页面，但早期图片/字体仍透传主 CDN”的竞态。
+
+3. **显式处理 opaque response 策略**
+
+   默认仍保守：opaque response 不当失败，避免跳过本来可用的跨源图片。
+
+   但示例为了演示“假 CDN 返回 opaque 错误也要继续回源”，新增 `serviceWorker.fallbackOnOpaque`，在 SW core 中对 **跨源 opaque response** 视作失败继续进入 resolver。这个选项是 opt-in，因为它可能牺牲正常 CDN opaque 图片的首选命中率。
+
+4. **Cache API 保守落地**
+
+   只缓存 **fallback 成功后的非 opaque 2xx response**；网络 retry/fallback 全部耗尽后，才读当前 manifest version 的 cache。manifest version 纳入资源、fallback rules 和关键 SW cache 策略，`activate` 时清理旧 `resource-fallback-*` cache，避免 rules/cache 策略变化后旧 manifest 的资源长期污染。
+
+5. **Webpack/Vite 插件都 emit SW asset + manifest**
+
+   - Vite：`generateBundle` 收集 bundle 输出，`transformIndexHtml` 使用 `post` 阶段，确保有最终 bundle 可生成非空 manifest。
+   - Webpack：从 `compilation.getAssets()` 与 HtmlWebpackPlugin tags 收集资源，输出 `sw.js` 和 `manifest.json`，并把 manifest 注入页面安装配置。
+
+6. **事件与错误路径加固**
+
+   SW fetch 事件会优先使用 `FetchEvent.clientId` + `clients.get()` 定向给触发请求的页面；只有没有 `clientId` 时才回退到窗口广播，避免多 tab 共用一个 SW 时互相收到对方资源的 `rf:*` 事件。
+
+   `respondWith()` 外层增加最终兜底：如果 `fetchWithFallback()` 仍然 reject，SW 会补发一次 `rf:error`（若 core 尚未发出），并返回 `Response.error()`。这样浏览器看到的仍是接近真实网络失败的资源结果，而不是伪造的 503 文本响应，同时不会留下未处理 rejection。
+
+   另一个容易忽略的边界是熔断器：页面 runtime 默认可以通过 `localStorage` 跨 tab 共享 host 状态，但 SW resolver 必须强制使用独立内存 circuit。否则某个 tab 的页面侧状态会影响 SW 全局 fetch 决策，排障时会出现“清了页面状态但 SW 仍跳过 host”的错觉。
+
+#### 排障经验
+
+- **先看 secure context**：`localhost` 能跑、IP 不行，通常不是库逻辑错，而是 SW 注册被浏览器拒绝。必须用 `localhost`、`127.0.0.1` 或 HTTPS。
+- **先清旧 SW 再判断**：调试命令：
+
+  ```js
+  await Promise.all((await navigator.serviceWorker.getRegistrations()).map(r => r.unregister()));
+  await caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
+  location.reload();
+  ```
+
+- **看当前 controller，不只看磁盘文件**：
+
+  ```js
+  navigator.serviceWorker.controller?.scriptURL
+  ```
+
+  `dist/sw.js` 已更新，不代表当前 tab 已由它控制。
+
+- **验证视觉资源不要只用 `toBeVisible()`**：
+
+  - 图片：检查 `img.naturalWidth > 0`
+  - 字体：检查 `await document.fonts.ready` + `document.fonts.check(...)`
+  - 背景图：检查 computed style 只是“URL 被写入”，还需结合 SW 事件/Network 证明请求成功
+  - SW 事件：检查资源 URL 是否出现 `retry/fallback/success`
+
+- **字体示例必须用真实字体**：文本占位的 `.woff2` 会被浏览器当坏字体丢弃，E2E 应使用真实 `.ttf/.woff2` 并断言 `document.fonts.check()`。
+
+#### 亮点总结
+
+这套 Hybrid SW 的亮点不是“多写一个 SW”，而是 **把每种资源的 owner、时机和可观测性拆清楚**：
+
+- manifest 让 SW 不靠后缀猜资源归属；
+- preload 消除页面 `postMessage` 竞态，并保留 `RegExp` 规则语义；
+- `fallbackOnOpaque` 把平台不可见性变成显式策略；
+- `clientId` 定向事件和 `Response.error()` 兜底让观测更准确；
+- manifest version + cache namespace 让 rules/cache 策略变化能自然失效；
+- 默认 path/scope 避免部署心智负担；
+- E2E 从“页面没挂”升级到“资源真实生效”。
+
+---
+
 ### 已知未在库内闭环（诚实记录）
 
 - **Vue runtime `nextSibling` 为 null**（Observer `replaceChild` 与 Vue patch 链表竞态）：有现场栈，需个案上 **减少对框架控制边界的 DOM 强拆**或 **业务兜底刷新**。  
@@ -461,7 +574,16 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 10. **SystemJS 与 Observer必须登记 URL 互斥**。  
 11. **Resolver `isFallback` 才允许 urls-prefix 命中**，避免误判；**熔断与首轮 match语义**拆开；**duplicate match 后来者胜**。  
 12. **`rf:error` ≠ 一定走了回退**：展示与告警要拆开 **no-match**。  
-13. **要全集拦截与任意资源**：倾向 **SW**；要 **Webpack+Vite+cross-browser 一致运行时语义**：插件 + **`__RF__` + Observer**更合适。
+13. **SW 默认路径必须与 scope 对齐**：默认 `scope: '/'` 就输出 `/sw.js`，不要把 `Service-Worker-Allowed` 变成默认部署负担。  
+14. **SW 配置不要只靠页面 `postMessage`**：早期图片/字体/CSS 子资源可能先于消息发生，构建期应把 manifest 预置进 SW 文件。  
+15. **opaque response 是策略问题，不是实现细节**：默认保守不当失败；若要演示或业务确认“跨源 opaque 错误也继续回源”，用显式 `fallbackOnOpaque`。  
+16. **SW 本地调试必须看 origin**：`localhost`、`127.0.0.1`、局域网 IP 是不同 origin；局域网 IP 的 HTTP 不是 secure context，SW 不会注册。  
+17. **验证视觉资源要验真实加载**：图片看 `naturalWidth`，字体看 `document.fonts.check()`，背景图结合 Network/SW 事件；`toBeVisible()` 只能证明 DOM 存在。  
+18. **SW preload 里有 `RegExp` 就不能裸 `JSON.stringify`**：否则规则会变 `{}`，manifest 看似存在但 fetch 永远匹配不上。  
+19. **SW 事件要按 `clientId` 定向**：同一个 SW 控制多个 tab 时，广播会污染观测和业务 hook。  
+20. **SW 的最终失败应返回 `Response.error()`**：补发 `rf:error` 但不伪造内容响应，让资源语义仍像真实 network error。  
+21. **SW 内 circuit 不应共享页面 `localStorage`**：SW 是跨客户端上下文，页面侧跨 tab 熔断状态不应反向污染 SW fetch 决策。  
+22. **要全集拦截与任意资源**：倾向 **SW**；要 **Webpack+Vite+cross-browser 一致运行时语义**：插件 + **`__RF__` + Observer**更合适。
 
 ---
 

@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 
+const swLogo = new URL('./sw-logo.svg', import.meta.url).href;
+
 interface RfEvent {
   ts: number;
   type: string;
@@ -43,13 +45,35 @@ const matchedResult = ref<string | null>(null);
 const unmatchedLoading = ref(false);
 const unmatchedResult = ref<string | null>(null);
 
-function hasNewFallbackEvents(since: number): boolean {
+function hasNewFallbackEventsFor(since: number, url: string): boolean {
   const all = (window as any).__RF_EVENTS__ || [];
   for (let i = since; i < all.length; i++) {
-    const t = all[i].type;
-    if (t === 'retry' || t === 'fallback') return true;
+    const event = all[i];
+    if ((event.type === 'retry' || event.type === 'fallback') && eventTouchesUrl(event.detail, url)) {
+      return true;
+    }
   }
   return false;
+}
+
+function eventTouchesUrl(detail: unknown, url: string): boolean {
+  if (!detail || typeof detail !== 'object') return false;
+  const values = Object.values(detail as Record<string, unknown>);
+  return values.some((value) => typeof value === 'string' && sameResource(value, url));
+}
+
+function sameResource(value: string, url: string): boolean {
+  if (value === url) return true;
+  try {
+    const target = new URL(url, window.location.href);
+    const candidate = new URL(value, window.location.href);
+    return target.pathname === candidate.pathname && (
+      target.hostname === candidate.hostname ||
+      candidate.origin === window.location.origin
+    );
+  } catch {
+    return false;
+  }
 }
 
 function loadMatchedScript() {
@@ -62,7 +86,7 @@ function loadMatchedScript() {
   s.onerror = () => {
     setTimeout(() => {
       matchedLoading.value = false;
-      matchedResult.value = hasNewFallbackEvents(snapshot) ? 'intercepted' : 'not-intercepted';
+      matchedResult.value = hasNewFallbackEventsFor(snapshot, s.src) ? 'intercepted' : 'not-intercepted';
     }, 500);
   };
   document.head.appendChild(s);
@@ -78,7 +102,7 @@ function loadUnmatchedScript() {
   s.onerror = () => {
     setTimeout(() => {
       unmatchedLoading.value = false;
-      unmatchedResult.value = hasNewFallbackEvents(snapshot) ? 'intercepted' : 'not-intercepted';
+      unmatchedResult.value = hasNewFallbackEventsFor(snapshot, s.src) ? 'intercepted' : 'not-intercepted';
     }, 500);
   };
   document.head.appendChild(s);
@@ -134,6 +158,20 @@ const typeColors: Record<string, string> = {
           <tr><td style="padding: 2px 8px; color: #888;">熔断器</td><td>threshold=2 · cooldown=15s · TTL=60s</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Service Worker 子资源回退 -->
+    <div style="border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+      <strong>Service Worker 子资源回退</strong>
+      <p style="font-size: 13px; color: #555; margin: 8px 0;">
+        图片、CSS url()、CSS @import 和字体资源由 Hybrid SW 负责回退。
+      </p>
+      <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <img :src="swLogo" data-testid="sw-image" alt="SW fallback asset" width="48" height="48" />
+        <div class="sw-css-url" data-testid="sw-css-url">CSS url() 背景图</div>
+        <div class="sw-import-card" data-testid="sw-import-card">CSS @import 背景图</div>
+        <div class="sw-font-sample" data-testid="sw-font-sample">Font fallback sample</div>
+      </div>
     </div>
 
     <!-- 熔断器状态 -->
@@ -260,3 +298,27 @@ const typeColors: Record<string, string> = {
     </div>
   </main>
 </template>
+
+<style>
+@import './sw-import.css';
+
+@font-face {
+  font-family: 'RfSwFallbackDemo';
+  src: url('./sw-font.ttf') format('truetype');
+}
+
+.sw-css-url {
+  border: 1px dashed #4f46e5;
+  border-radius: 8px;
+  padding: 12px 12px 12px 48px;
+  background: #eef2ff url('./sw-logo.svg') no-repeat 12px center / 28px 28px;
+}
+
+.sw-font-sample {
+  font-family: 'RfSwFallbackDemo', system-ui, sans-serif;
+  font-size: 18px;
+  border: 1px dashed #0f7d2a;
+  border-radius: 8px;
+  padding: 12px;
+}
+</style>

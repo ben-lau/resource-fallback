@@ -16,7 +16,7 @@ export interface AdapterDeps {
 export const systemjsManagedUrls = new Set<string>();
 
 interface SystemJSLike {
-  constructor: { prototype: SystemJSProto };
+  constructor: Function & { prototype: SystemJSProto };
   import: (id: string, parentUrl?: string) => Promise<unknown>;
   getRegister: (url?: string) => unknown;
 }

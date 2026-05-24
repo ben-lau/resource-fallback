@@ -1,0 +1,6 @@
+.sw-import-card {
+  border: 1px dashed #8b5cf6;
+  border-radius: 8px;
+  padding: 12px 12px 12px 48px;
+  background: #faf5ff url('./sw-logo.svg') no-repeat 12px center / 28px 28px;
+}

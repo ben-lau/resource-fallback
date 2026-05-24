@@ -6,9 +6,16 @@ export default defineConfig({
     globals: false,
     include: ['tests/**/*.test.ts', 'packages/*/src/**/*.test.ts'],
     coverage: {
+      provider: 'v8',
       reporter: ['text', 'html'],
       include: ['packages/*/src/**/*.ts'],
       exclude: ['packages/*/src/**/*.test.ts'],
+      thresholds: {
+        statements: 65,
+        branches: 80,
+        functions: 90,
+        lines: 65,
+      },
     },
   },
   resolve: {

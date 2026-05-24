@@ -22,6 +22,15 @@ async function setupEventRecording(page: import('@playwright/test').Page) {
   return events;
 }
 
+async function reloadUnderServiceWorker(page: import('@playwright/test').Page) {
+  await page.goto('/', { timeout: 60_000 });
+  await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) throw new Error('Service Worker unsupported');
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload({ timeout: 60_000, waitUntil: 'domcontentloaded' });
+}
+
 /**
  * CDN URLs use `.invalid` domains (DNS always fails).
  * The runtime retries, then falls back to the origin on localhost:4174.
@@ -123,4 +132,26 @@ test('no console errors from resource-fallback runtime', async ({ page }) => {
 
   // There should be no runtime errors (network failures are expected and handled)
   expect(consoleErrors).toHaveLength(0);
+});
+
+test('hybrid service worker falls back image and css subresources after activation', async ({ page }) => {
+  const events = await setupEventRecording(page);
+
+  await reloadUnderServiceWorker(page);
+  await expect(page.getByTestId('sw-image')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('sw-css-url')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('sw-import-card')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('sw-font-sample')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('sw-image')).toHaveJSProperty('naturalWidth', 96);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    if (!document.fonts.check('18px "RfSwFallbackDemo"')) {
+      throw new Error('RfSwFallbackDemo font was not applied');
+    }
+  });
+  await page.waitForTimeout(1000);
+
+  const serialized = events.map((event) => JSON.stringify(event.payload)).join('\n');
+  expect(events.some((event) => event.type === 'fallback')).toBe(true);
+  expect(serialized).toMatch(/sw-logo|\.svg/);
 });

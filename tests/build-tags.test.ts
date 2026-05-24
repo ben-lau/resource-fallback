@@ -89,4 +89,23 @@ describe('buildInjectedTags', () => {
     const script = tags.find((t) => t.tagName === 'script' && t.innerHTML?.includes('install('));
     expect(script?.innerHTML).toContain('/^https:\\/\\/cdn\\d+\\//');
   });
+
+  it('serialises service worker manifest into the install config when provided', () => {
+    const tags = buildInjectedTags(
+      defineConfig({
+        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+        injectPreconnect: false,
+        serviceWorker: true,
+        serviceWorkerManifest: {
+          version: 'rf-test',
+          rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+          assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image', owner: 'sw' }],
+        },
+      }),
+    );
+    const script = tags.find((t) => t.tagName === 'script' && t.innerHTML?.includes('install('));
+    expect(script?.innerHTML).toContain('"serviceWorker":true');
+    expect(script?.innerHTML).toContain('"serviceWorkerManifest"');
+    expect(script?.innerHTML).toContain('"owner":"sw"');
+  });
 });

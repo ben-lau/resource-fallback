@@ -12,15 +12,27 @@ export type {
   HtmlTag,
   HtmlTagAttributes,
   MatchPattern,
+  NormalizedServiceWorkerOptions,
   PluginOptions,
   ResolveResult,
   RetryEvent,
   RetryOptions,
+  ResourceFallbackAssetOwner,
+  ResourceFallbackAssetType,
+  ResourceFallbackManifest,
+  ResourceFallbackManifestAsset,
   RuntimeConfig,
   RuntimeHooks,
+  ServiceWorkerOptions,
   SriPolicy,
   SuccessEvent,
 } from './types';
+export {
+  buildResourceFallbackManifest,
+  buildServiceWorkerAssets,
+  inferResourceFallbackAssetType,
+  normalizeServiceWorkerOptions,
+} from './service-worker';
 
 /**
  * 恒等辅助函数——让用户在编写配置时获得类型检查和 IDE 悬浮提示。
@@ -67,6 +79,44 @@ export function getRuntimeCode(): string {
     cachedCode = readFileSync(getRuntimePath(), 'utf8');
   }
   return cachedCode;
+}
+
+/** 返回 Service Worker 运行时文件的绝对路径。 */
+export function getServiceWorkerPath(): string {
+  let here: string;
+  try {
+    here = dirname(fileURLToPath(import.meta.url));
+  } catch {
+    const cjsDirname = (globalThis as { __dirname?: string }).__dirname;
+    here = typeof cjsDirname === 'string' ? cjsDirname : process.cwd();
+  }
+  const candidates = [
+    resolve(here, 'sw.js'),
+    resolve(here, '..', 'dist', 'sw.js'),
+  ];
+  for (const c of candidates) {
+    try {
+      readFileSync(c);
+      return c;
+    } catch {
+      /* 尝试下一个路径 */
+    }
+  }
+  return candidates[0];
+}
+
+let cachedSwCode: string | null = null;
+
+/** 读取 Service Worker 运行时代码。源码测试环境未构建时返回占位代码。 */
+export function getServiceWorkerCode(): string {
+  if (cachedSwCode === null) {
+    try {
+      cachedSwCode = readFileSync(getServiceWorkerPath(), 'utf8');
+    } catch {
+      cachedSwCode = '/* resource-fallback service worker: RF_SW_CONFIG */';
+    }
+  }
+  return cachedSwCode;
 }
 
 interface ExtendedPluginOptions extends PluginOptions {

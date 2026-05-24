@@ -53,3 +53,23 @@ body {
   border-radius: 8px;
   margin-bottom: 16px;
 }
+
+@font-face {
+  font-family: 'RfSwFallbackDemo';
+  src: url('./sw-font.ttf') format('truetype');
+}
+
+.sw-css-url {
+  border: 1px dashed #4f46e5;
+  border-radius: 8px;
+  padding: 12px 12px 12px 48px;
+  background: #eef2ff url('./sw-logo.svg') no-repeat 12px center / 28px 28px;
+}
+
+.sw-font-sample {
+  font-family: 'RfSwFallbackDemo', var(--rf-font);
+  font-size: 18px;
+  border: 1px dashed #0f7d2a;
+  border-radius: 8px;
+  padding: 12px;
+}

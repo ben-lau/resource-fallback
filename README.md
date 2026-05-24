@@ -7,7 +7,8 @@
 ## 核心特性
 
 - **业务零侵入** — 构建配置注册插件即可。`React.lazy`、Vue `defineAsyncComponent`、Vue Router 懒加载等异步模式完全不需要改动
-- **全资源覆盖** — JS 与 CSS 的同步与异步加载全链路拦截（Webpack chunk loader / Vite dynamic import / `<script>` & `<link>` error 事件）
+- **脚本与样式回退** — JS 与 CSS 的同步/异步加载链路拦截（Webpack chunk loader / Vite dynamic import / `<script>` & `<link>` error 事件）
+- **Hybrid Service Worker（opt-in）** — 通过 SW 补齐 `img`、`@font-face`、CSS `url()`、媒体资源和受控 CSS `@import` 的资源回退；脚本仍由现有 adapter 负责
 - **智能重试** — 指数退避 + 随机抖动，避免失败风暴；可配置每个 URL 的最大重试次数
 - **per-host 熔断器** — 连续失败达阈值后自动跳过该 host，冷却后恢复；通过 `localStorage` + `storage` 事件实现跨标签页状态共享
 - **三重 Kill Switch** — `window.__RF_DISABLE__` 全局变量 / `?__rf=off` 查询参数 / `__rf_disable=1` Cookie，线上紧急关停无需发版
@@ -40,6 +41,7 @@ graph TB
       VA["Vite Adapter<br/><small>__RF__.load / __RF__.url</small>"]
       WA["Webpack Adapter<br/><small>__webpack_require__.l 包装</small>"]
       SA["SystemJS Adapter<br/><small>instantiate hook</small>"]
+      SWA["SW Adapter<br/><small>register / postMessage bridge</small>"]
     end
 
     subgraph engine["决策引擎"]
@@ -56,6 +58,7 @@ graph TB
     INSTALL --> VA
     INSTALL --> WA
     INSTALL --> SA
+    INSTALL --> SWA
     OBS --> RES
     VA --> RES
     WA --> RES
@@ -92,6 +95,22 @@ flowchart TD
 | [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件 | `0.0.1` |
 
 ## 快速上手
+
+### 安装
+
+Vite 项目：
+
+```bash
+pnpm add -D @resource-fallback/vite-plugin
+```
+
+Webpack 项目：
+
+```bash
+pnpm add -D @resource-fallback/webpack-plugin html-webpack-plugin
+```
+
+> Webpack 插件依赖 `html-webpack-plugin` 自动注入运行时；如果项目不使用它，需要通过 `@resource-fallback/core` 手动注入 runtime。
 
 ### Vite
 
@@ -150,6 +169,14 @@ module.exports = {
 };
 ```
 
+### 上手注意点
+
+1. **`match` 要对齐构建产物前缀**：Vite 对齐 `base`，Webpack 对齐 `output.publicPath`。如果首次资源 URL 匹配不上 `match`，运行时不会进入 retry/fallback。
+2. **`urls` 顺序就是回退顺序**：建议写成备用 CDN → 自建静态源 → 回源 `'/'`。最后一个通常放同源回源，避免主 CDN 故障时再次命中 CDN。
+3. **Vite dev 不是主要验证环境**：dev server 使用原生 ESM，动态 `import()` 失败无法完整拦截；请用 `vite build && vite preview` 或示例里的 E2E 验证。
+4. **入口资源失败要自己兜底 UI**：无论 Vite 还是 Webpack，入口 bundle 如果所有候选 URL 都失败，React/Vue 还没启动；建议在 `index.html` 加一个轻量 `rf:error` 监听显示降级文案。
+5. **Hybrid SW 是 opt-in**：需要 `serviceWorker: true` 或对象配置才会接管图片、字体、CSS 背景图等子资源。SW 调试请使用 `localhost` / `127.0.0.1` / HTTPS；普通局域网 IP 的 HTTP 不是 secure context，浏览器不会注册 SW。
+
 ## 配置参考
 
 完整 TypeScript 类型见 [`packages/core/src/types.ts`](packages/core/src/types.ts)。
@@ -168,6 +195,7 @@ module.exports = {
 | `externalRuntimePath` | `string` | `'/__rf/runtime.js'` | 外链运行时的路径 |
 | `injectPreconnect` | `boolean` | `true` | 为每个 fallback 域名注入 `<link rel="preconnect">` |
 | `htmlInject` | `'head-prepend' \| 'head-append'` | `'head-prepend'` | 注入到 `<head>` 的位置 |
+| `serviceWorker` | `boolean \| ServiceWorkerOptions` | `false` | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import` |
 | `hooks` | `RuntimeHooks` | — | JS 函数钩子（仅 `externalRuntime` 模式可用） |
 | `disableGlobals` | `string[]` | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名 |
 | `disableQueryParam` | `string` | `'__rf'` | 值为 `off` 时禁用运行时的查询参数名 |
@@ -200,6 +228,36 @@ module.exports = {
 | `shareAcrossTabs` | `boolean` | `true` | 通过 `localStorage` 跨标签页共享熔断状态 |
 | `storageTtl` | `number` | `120000` | localStorage 中熔断条目的存活时长（ms） |
 
+### ServiceWorkerOptions
+
+Hybrid SW 默认关闭。启用后，Vite/Webpack 插件会生成资源 manifest，并输出 SW asset；SW bundle 会预置 manifest/config（保留 `RegExp` 规则语义），页面 runtime 负责注册 SW、补发配置，并把 SW `postMessage` 事件桥接为现有 `rf:*` 事件。SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串台。
+
+```ts
+resourceFallback({
+  rules: [...],
+  serviceWorker: {
+    scope: '/',
+    includeStyleImports: true,
+    fallbackOnOpaque: false,
+    cache: { enabled: true, cacheOpaque: false },
+  },
+});
+```
+
+| 字段 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `enabled` | `boolean` | `true`（对象配置时） | 设为 `false` 可在对象配置中关闭 |
+| `path` | `string` | 跟随 `scope`，如 `/` → `/sw.js`、`/app/` → `/app/sw.js` | SW 文件路径。默认与 scope 同层，避免依赖 `Service-Worker-Allowed` 响应头 |
+| `scope` | `string` | `'/'` | SW 控制范围 |
+| `includeStyleImports` | `boolean` | `true` | 允许 SW 在 `request.destination === 'style'` 且 referrer 命中 CSS manifest 时接管 CSS `@import` |
+| `fallbackOnOpaque` | `boolean` | `false` | 将跨源 opaque response 视为失败继续 fallback。适合 CDN 错误被浏览器隐藏成 opaque 的图片/CSS 子资源场景；开启后可能跳过本来可用的 opaque CDN 响应 |
+| `cache.enabled` | `boolean` | `true` | fallback 网络链路成功后写入 Cache API |
+| `cache.cacheOpaque` | `boolean` | `false` | 是否缓存 opaque response。默认不缓存 |
+
+缓存策略固定为保守模式：只缓存 fallback 成功后的可读 2xx 响应；网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
+
+SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 `defaults.circuit.shareAcrossTabs` 为 `true`，SW 也不会读写 `localStorage`。若 SW fetch 链路最终 reject，会发出 `rf:error` 并返回 `Response.error()`，保持浏览器侧资源表现接近真实 network error。
+
 ## 运行时行为
 
 ### 事件
@@ -221,8 +279,13 @@ module.exports = {
 | 异步 chunk（`import()`） | ✓ `__webpack_require__.l` hook | ✓ `__RF__.load` + `renderDynamicImport` | ✗ |
 | CSS 动态注入 | ✓ Observer | ✓ Observer | ✓ Observer |
 | SystemJS（legacy bundle） | ✓ `instantiate` hook | ✓ `instantiate` hook | — |
+| 图片 / 字体 / 媒体资源 | ✓ Hybrid SW（opt-in，受控页面） | ✓ Hybrid SW（opt-in，受控页面） | ✗ |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW（opt-in，受控页面） | ✓ Hybrid SW（opt-in，受控页面） | ✗ |
+| CSS `@import` | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✗ |
 
 > Vite dev 模式使用原生 ESM，无法拦截动态 import 失败。请使用 `vite preview` 或生产构建验证回退逻辑。
+> SW 无法保证首次访问已经控制页面；首次 HTML 解析期间发出的早期请求仍依赖现有页面 runtime/adapter 兜底。
+> SW 只接管触发 fetch 的页面客户端；没有 `clientId` 的极少数场景才会回退为窗口广播。
 
 ## CSP 指南
 
@@ -266,6 +329,8 @@ resourceFallback({
 ## 同步脚本限制
 
 `<script>`（非 module）失败后，浏览器只触发 `error` 事件，**已执行的部分不可撤回**。插件会替换 DOM 为下一个 URL 并重新加载，但如果原脚本已挂载全局变量，再次执行可能产生副作用。所有候选 URL 耗尽后**仅触发 `rf:error`，不自动刷新页面**——由业务决定如何兜底。
+
+Hybrid SW 不在本轮接管 script，也不实现同步 classic script 的强顺序保证。若后续需要强顺序，应作为独立的 opt-in ScriptSequencer 能力设计：构建期把阻塞脚本改写成队列，运行时按 DOM 顺序串行完成 retry/fallback 后再继续下一个脚本。
 
 ## 监控接入
 
@@ -332,6 +397,7 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 pnpm install
 pnpm build          # 构建所有 packages
 pnpm test           # Vitest 单测
+pnpm test:coverage  # Vitest 覆盖率检查（含阈值）
 pnpm typecheck      # TypeScript 类型检查
 ```
 
@@ -358,8 +424,8 @@ pnpm changeset publish      # 推 npm
 ### 功能增强
 
 - [ ] **（高优先级）单次加载超时 / `retry.timeout`** — 已从公开类型中移除未实现的 `RetryOptions.timeout`。后续需在各加载路径（Observer、`__RF__.load`、webpack chunk 等）落地「超过 N ms 视为失败并驱动 resolver」；可选配合 `fetch`+`AbortSignal` 或 HEAD 预检；经典 `<script>` 无原生超时 API，需单独权衡实现。
-- [ ] **Service Worker 拦截模式** — 通过 SW 的 `fetch` 事件拦截所有资源请求，实现比 DOM 层更可靠的全量拦截，特别是对 CSS 中的 `@import`、`url()` 引用、字体文件等
-- [ ] **图片/字体资源支持** — 当前仅覆盖 `<script>` 和 `<link rel="stylesheet">`，未处理 `<img>`、`<video>`、`@font-face` 等资源类型
+- [x] **Hybrid Service Worker 拦截模式（opt-in）** — SW 负责 `image`、`font`、`media`、CSS `url()` 和受控 CSS `@import`；现有 Observer/Vite/Webpack/SystemJS adapter 继续负责 script 与构建器语义
+- [x] **图片/字体资源支持（SW 模式）** — 已在 Hybrid SW 中覆盖 `<img>`、`@font-face`、CSS 背景图和媒体资源；仍需满足浏览器 CORS/MIME/SRI 等安全策略
 - [ ] **Vite dev 模式支持** — 当前 Vite dev 使用原生 ESM，动态 import 失败无法拦截
 - [ ] **per-rule 熔断器** — 当前所有规则共享同一个熔断器实例，无法按规则独立配置不同的熔断阈值
 - [ ] **动态规则更新** — `install()` 是一次性的，无法在运行时动态添加/修改规则。考虑增加 `addRule()` / `removeRule()` API
@@ -369,7 +435,7 @@ pnpm changeset publish      # 推 npm
 ### 可靠性
 
 - [ ] **同步脚本执行顺序保证** — 当前同步 `<script>` 失败后的替换无法保证与后续脚本的执行顺序，可能导致依赖关系断裂
-- [ ] **CSS `@import` 级联失败** — Observer 只处理顶层 `<link>`，CSS 内部的 `@import` 失败不可见
+- [x] **CSS `@import` 级联失败（受控场景）** — Hybrid SW 在 `includeStyleImports` 开启且 referrer 命中 CSS manifest 时接管；未受 SW 控制的首次访问仍不保证覆盖
 - [ ] **Worker / SharedWorker 中的资源加载** — 当前运行时依赖 DOM API，无法在 Worker 环境工作
 
 ### 开发体验

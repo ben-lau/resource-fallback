@@ -1,7 +1,10 @@
 import './styles.css';
+import './sw-import.css';
 import React, { Component, Suspense, useState, useEffect, useCallback, lazy } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+
+const swLogo = new URL('./sw-logo.svg', import.meta.url).toString();
 
 const LazyA = lazy(() => import(/* webpackChunkName: "lazy-a" */ './Lazy'));
 const LazyB = lazy(() => import(/* webpackChunkName: "lazy-b" */ './LazyB'));
@@ -96,13 +99,35 @@ function useCircuitState() {
   return { state, refresh };
 }
 
-function hasNewFallbackEvents(since: number): boolean {
+function hasNewFallbackEventsFor(since: number, url: string): boolean {
   const all = window.__RF_EVENTS__ || [];
   for (let i = since; i < all.length; i++) {
-    const t = all[i].type;
-    if (t === 'retry' || t === 'fallback') return true;
+    const event = all[i];
+    if ((event.type === 'retry' || event.type === 'fallback') && eventTouchesUrl(event.detail, url)) {
+      return true;
+    }
   }
   return false;
+}
+
+function eventTouchesUrl(detail: unknown, url: string): boolean {
+  if (!detail || typeof detail !== 'object') return false;
+  const values = Object.values(detail as Record<string, unknown>);
+  return values.some((value) => typeof value === 'string' && sameResource(value, url));
+}
+
+function sameResource(value: string, url: string): boolean {
+  if (value === url) return true;
+  try {
+    const target = new URL(url, window.location.href);
+    const candidate = new URL(value, window.location.href);
+    return target.pathname === candidate.pathname && (
+      target.hostname === candidate.hostname ||
+      candidate.origin === window.location.origin
+    );
+  } catch {
+    return false;
+  }
 }
 
 function useExternalScript(url: string) {
@@ -120,7 +145,7 @@ function useExternalScript(url: string) {
     s.onerror = () => {
       setTimeout(() => {
         setLoading(false);
-        setResult(hasNewFallbackEvents(snapshotRef.current) ? 'intercepted' : 'not-intercepted');
+        setResult(hasNewFallbackEventsFor(snapshotRef.current, url) ? 'intercepted' : 'not-intercepted');
       }, 500);
     };
     document.head.appendChild(s);
@@ -168,6 +193,20 @@ function App() {
           打开 DevTools → Network 面板，可以看到 <code>.invalid</code> 域名的 DNS 失败 → 最终回退到 <code>/</code>。
           <br/>本页加载了 <b>JS 入口 + CSS 样式表</b>，两者都走了完整的回退链。
         </p>
+      </div>
+
+      {/* ── Service Worker 子资源回退 ── */}
+      <div className="rf-card">
+        <strong>Service Worker 子资源回退</strong>
+        <p style={{ fontSize: 13, color: '#555', margin: '8px 0' }}>
+          图片、CSS url()、CSS @import 和字体资源由 Hybrid SW 负责回退。
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <img src={swLogo} data-testid="sw-image" alt="SW fallback asset" width={48} height={48} />
+          <div className="sw-css-url" data-testid="sw-css-url">CSS url() 背景图</div>
+          <div className="sw-import-card" data-testid="sw-import-card">CSS @import 背景图</div>
+          <div className="sw-font-sample" data-testid="sw-font-sample">Font fallback sample</div>
+        </div>
       </div>
 
       {/* ── 熔断器状态 ── */}

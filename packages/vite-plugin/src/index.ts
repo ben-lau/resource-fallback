@@ -4,11 +4,22 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { init, parse } from 'es-module-lexer';
 import MagicString from 'magic-string';
 
-import { buildInjectedTags, type HtmlTag, type PluginOptions } from '@resource-fallback/core';
+import {
+  buildInjectedTags,
+  buildServiceWorkerAssets,
+  getServiceWorkerCode,
+  inferResourceFallbackAssetType,
+  normalizeServiceWorkerOptions,
+  type HtmlTag,
+  type PluginOptions,
+  type ResourceFallbackManifest,
+} from '@resource-fallback/core';
 
 export type ViteResourceFallbackOptions = PluginOptions;
 
 const PLUGIN_NAME = 'resource-fallback';
+
+type OutputBundleLike = Record<string, { fileName: string; type: 'chunk' | 'asset' }>;
 
 export default function resourceFallback(options: ViteResourceFallbackOptions): Plugin {
   if (!options || !Array.isArray(options.rules) || options.rules.length === 0) {
@@ -16,7 +27,8 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
   }
 
   let shouldRewriteUrls = true;
-  const tags = buildInjectedTags(options);
+  let base = '/';
+  let serviceWorkerManifest: ResourceFallbackManifest | undefined;
   const injectTo: HtmlTagDescriptor['injectTo'] =
     options.htmlInject === 'head-append' ? 'head' : 'head-prepend';
 
@@ -28,7 +40,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
     },
 
     config(userConfig): UserConfig {
-      const base = typeof userConfig?.base === 'string' ? userConfig.base : '/';
+      base = typeof userConfig?.base === 'string' ? userConfig.base : '/';
       shouldRewriteUrls = options.rules.some((r) => {
         if (typeof r.match === 'string') return base === r.match;
         if (r.match instanceof RegExp) return r.match.test(base);
@@ -37,6 +49,28 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
       });
 
       return {};
+    },
+
+    generateBundle(_outputOptions, bundle) {
+      const serviceWorker = normalizeServiceWorkerOptions(options.serviceWorker);
+      if (!serviceWorker.enabled) return;
+      const swAssets = buildServiceWorkerAssets(options, {
+        versionSeed: createVersionSeed(bundle),
+        assets: collectBundleAssets(bundle, base),
+        code: getServiceWorkerCode(),
+      });
+      if (!swAssets) return;
+      serviceWorkerManifest = swAssets.manifest;
+      this.emitFile({
+        type: 'asset',
+        fileName: stripLeadingSlash(serviceWorker.path),
+        source: swAssets.code,
+      });
+      this.emitFile({
+        type: 'asset',
+        fileName: manifestFileName(serviceWorker.path),
+        source: JSON.stringify(swAssets.manifest),
+      });
     },
 
     async writeBundle(options, bundle) {
@@ -82,8 +116,13 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
     },
 
     transformIndexHtml: {
-      order: 'pre',
-      handler(html: string) {
+      order: 'post',
+      handler(html: string, ctx) {
+        const manifest = serviceWorkerManifest || buildInlineManifest(ctx.bundle, base, options);
+        const tags = buildInjectedTags({
+          ...options,
+          serviceWorkerManifest: manifest,
+        });
         return {
           html,
           tags: tags.map((t) => toViteTag(t, injectTo)),
@@ -91,6 +130,50 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
       },
     },
   };
+}
+
+function buildInlineManifest(bundle: OutputBundleLike | undefined, base: string, options: ViteResourceFallbackOptions): ResourceFallbackManifest | undefined {
+  const serviceWorker = normalizeServiceWorkerOptions(options.serviceWorker);
+  if (!serviceWorker.enabled) return undefined;
+  const swAssets = buildServiceWorkerAssets(options, {
+    versionSeed: bundle ? createVersionSeed(bundle) : 'vite-html',
+    assets: bundle ? collectBundleAssets(bundle, base) : [],
+    code: getServiceWorkerCode(),
+  });
+  return swAssets?.manifest;
+}
+
+function collectBundleAssets(bundle: OutputBundleLike, base: string) {
+  return Object.values(bundle).map((item) => {
+    const fileName = item.fileName;
+    return {
+      url: joinAssetPrefix(base, fileName),
+      type: item.type === 'chunk' ? 'script' as const : inferResourceFallbackAssetType(fileName),
+    };
+  });
+}
+
+function createVersionSeed(bundle: OutputBundleLike): string {
+  return Object.values(bundle)
+    .map((item) => item.fileName)
+    .sort()
+    .join('|') || 'vite';
+}
+
+function stripLeadingSlash(path: string): string {
+  return path.replace(/^\/+/, '');
+}
+
+function manifestFileName(swPath: string): string {
+  const parts = stripLeadingSlash(swPath).split('/');
+  parts[parts.length - 1] = 'manifest.json';
+  return parts.join('/');
+}
+
+function joinAssetPrefix(prefix: string, filename: string): string {
+  if (/^https?:\/\//.test(filename) || filename[0] === '/') return filename;
+  const sep = /[/\\]$/.test(prefix) ? '' : '/';
+  return `${prefix}${sep}${filename}`;
 }
 
 function toViteTag(tag: HtmlTag, injectTo: HtmlTagDescriptor['injectTo']): HtmlTagDescriptor {

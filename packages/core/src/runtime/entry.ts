@@ -3,6 +3,7 @@ import { installObserver } from './observer';
 import { installViteAdapter } from './adapter-vite';
 import { installWebpackAdapter } from './adapter-webpack';
 import { installSystemJSAdapter } from './adapter-systemjs';
+import { installSwAdapter } from './adapter-sw';
 import { createHookBus } from './hooks';
 import { createLogger, type Logger } from './logger';
 import { createResolver } from './resolver';
@@ -71,6 +72,7 @@ export function install(config: InstallOptions): void {
   const resolver = createResolver(config);
   const bus = createHookBus(config.hooks, log);
 
+  installSwAdapter({ config, bus, log });
   installObserver({
     resolver,
     bus,

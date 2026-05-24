@@ -5,6 +5,9 @@ import resourceFallback from '@resource-fallback/vite-plugin';
 
 export default defineConfig({
   base: 'http://cdn-primary.example.invalid/',
+  build: {
+    assetsInlineLimit: 0,
+  },
   plugins: [
     vue(),
     legacy({
@@ -24,6 +27,7 @@ export default defineConfig({
         },
       ],
       debug: true,
+      serviceWorker: { fallbackOnOpaque: true },
     }),
   ],
 });

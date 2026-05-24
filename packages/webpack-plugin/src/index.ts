@@ -1,6 +1,14 @@
 import type { Compiler, Compilation, RuntimeModule as RuntimeModuleType } from 'webpack';
 
-import { buildInjectedTags, type HtmlTag, type PluginOptions } from '@resource-fallback/core';
+import {
+  buildInjectedTags,
+  buildServiceWorkerAssets,
+  getServiceWorkerCode,
+  inferResourceFallbackAssetType,
+  normalizeServiceWorkerOptions,
+  type HtmlTag,
+  type PluginOptions,
+} from '@resource-fallback/core';
 
 const PLUGIN = 'ResourceFallbackWebpackPlugin';
 
@@ -55,15 +63,28 @@ export class ResourceFallbackWebpackPlugin {
       const chunkGlobal = resolveChunkLoadingGlobal(
         (compilation.outputOptions as Compiler['options']['output']) || compiler.options.output,
       );
-      const tags = buildInjectedTags({
-        ...pluginOptions,
-        webpackChunkLoadingGlobals: [chunkGlobal],
-      } as Parameters<typeof buildInjectedTags>[0]);
+      let emittedServiceWorker = false;
       const hooks = getHooks(compilation);
       hooks.alterAssetTagGroups.tapAsync(
         PLUGIN,
         (data: AlterAssetTagGroupsData, cb: (err: Error | null, data: AlterAssetTagGroupsData) => void) => {
           const order = pluginOptions.htmlInject || 'head-prepend';
+          const swAssets = buildWebpackServiceWorkerAssets(
+            compiler,
+            compilation,
+            pluginOptions,
+            data,
+          );
+          if (swAssets && !emittedServiceWorker) {
+            emittedServiceWorker = true;
+            emitTextAsset(compiler, compilation, swAssets.path, swAssets.code);
+            emitTextAsset(compiler, compilation, manifestFileName(swAssets.path), JSON.stringify(swAssets.manifest));
+          }
+          const tags = buildInjectedTags({
+            ...pluginOptions,
+            webpackChunkLoadingGlobals: [chunkGlobal],
+            serviceWorkerManifest: swAssets?.manifest,
+          } as Parameters<typeof buildInjectedTags>[0]);
           const converted = tags.map(toHtmlPluginTag);
           if (order === 'head-prepend') data.headTags.unshift(...converted);
           else data.headTags.push(...converted);
@@ -72,6 +93,84 @@ export class ResourceFallbackWebpackPlugin {
       );
     });
   }
+}
+
+function buildWebpackServiceWorkerAssets(
+  compiler: Compiler,
+  compilation: Compilation,
+  options: WebpackPluginOptions,
+  data: AlterAssetTagGroupsData,
+) {
+  const serviceWorker = normalizeServiceWorkerOptions(options.serviceWorker);
+  if (!serviceWorker.enabled) return null;
+  return buildServiceWorkerAssets(options, {
+    versionSeed: collectWebpackAssetNames(compilation).sort().join('|') || 'webpack',
+    assets: collectWebpackManifestAssets(compiler, compilation, data),
+    code: getServiceWorkerCode(),
+  });
+}
+
+function collectWebpackManifestAssets(
+  compiler: Compiler,
+  compilation: Compilation,
+  data: AlterAssetTagGroupsData,
+) {
+  const publicPath = resolvePublicPath(compilation, compiler);
+  const names = new Set<string>();
+  for (const name of collectWebpackAssetNames(compilation)) names.add(name);
+  for (const tag of data.headTags.concat(data.bodyTags)) {
+    const src = tag.attributes.src;
+    const href = tag.attributes.href;
+    if (typeof src === 'string') names.add(src);
+    if (typeof href === 'string') names.add(href);
+  }
+  return Array.from(names).map((name) => ({
+    url: joinAssetPrefix(publicPath, name),
+    type: inferResourceFallbackAssetType(name),
+  }));
+}
+
+function collectWebpackAssetNames(compilation: Compilation): string[] {
+  const c = compilation as Compilation & {
+    getAssets?: () => Array<{ name: string }>;
+    assets?: Record<string, unknown>;
+  };
+  if (typeof c.getAssets === 'function') return c.getAssets().map((asset) => asset.name);
+  return Object.keys(c.assets || {});
+}
+
+function emitTextAsset(
+  compiler: Compiler,
+  compilation: Compilation,
+  path: string,
+  source: string,
+): void {
+  const fileName = stripLeadingSlash(path);
+  const RawSource = (compiler.webpack || (compiler as unknown as { webpack: typeof import('webpack') }).webpack)
+    .sources.RawSource;
+  compilation.emitAsset(fileName, new RawSource(source));
+}
+
+function manifestFileName(swPath: string): string {
+  const parts = stripLeadingSlash(swPath).split('/');
+  parts[parts.length - 1] = 'manifest.json';
+  return parts.join('/');
+}
+
+function stripLeadingSlash(path: string): string {
+  return path.replace(/^\/+/, '');
+}
+
+function resolvePublicPath(compilation: Compilation, compiler: Compiler): string {
+  const output = (compilation.outputOptions as Compiler['options']['output']) || compiler.options.output;
+  const publicPath = output?.publicPath;
+  return typeof publicPath === 'string' && publicPath !== 'auto' ? publicPath : '/';
+}
+
+function joinAssetPrefix(prefix: string, filename: string): string {
+  if (/^https?:\/\//.test(filename) || filename[0] === '/') return filename;
+  const sep = /[/\\]$/.test(prefix) ? '' : '/';
+  return `${prefix}${sep}${filename}`;
 }
 
 const warnedNoHtml = new WeakSet<Compiler>();

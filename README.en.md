@@ -7,7 +7,8 @@ Zero-mental-overhead frontend resource fallback solution. Provides runtime **ret
 ## Core Features
 
 - **Zero business code changes** — just register the plugin in your build config. `React.lazy`, Vue `defineAsyncComponent`, Vue Router lazy-loaded routes, and other async patterns work out of the box
-- **Full resource coverage** — intercepts the entire loading pipeline for both sync and async JS & CSS (Webpack chunk loader / Vite dynamic import / `<script>` & `<link>` error events)
+- **Scripts and styles fallback** — intercepts the sync/async JS and CSS loading pipeline (Webpack chunk loader / Vite dynamic import / `<script>` & `<link>` error events)
+- **Hybrid Service Worker (opt-in)** — uses a SW to cover `img`, `@font-face`, CSS `url()`, media resources, and controlled CSS `@import`; scripts remain owned by the existing adapters
 - **Smart retry** — exponential backoff + random jitter to avoid thundering herd; configurable max retries per URL
 - **Per-host circuit breaker** — automatically skips hosts after consecutive failures reach a threshold, recovers after cooldown; cross-tab state sharing via `localStorage` + `storage` events
 - **Triple kill switch** — `window.__RF_DISABLE__` global variable / `?__rf=off` query param / `__rf_disable=1` cookie; emergency shutoff without a new release
@@ -93,6 +94,22 @@ flowchart TD
 
 ## Quick Start
 
+### Installation
+
+Vite projects:
+
+```bash
+pnpm add -D @resource-fallback/vite-plugin
+```
+
+Webpack projects:
+
+```bash
+pnpm add -D @resource-fallback/webpack-plugin html-webpack-plugin
+```
+
+> The Webpack plugin uses `html-webpack-plugin` to inject the runtime automatically. If your project does not use it, inject the runtime manually via `@resource-fallback/core`.
+
 ### Vite
 
 ```ts
@@ -150,6 +167,14 @@ module.exports = {
 };
 ```
 
+### Getting Started Notes
+
+1. **Align `match` with the emitted asset prefix**: for Vite, align it with `base`; for Webpack, align it with `output.publicPath`. If the initial resource URL does not match `match`, the runtime will not enter retry/fallback.
+2. **`urls` order is fallback order**: a common order is backup CDN → self-hosted static origin → same-origin fallback `'/'`. The last entry is usually same-origin to avoid hitting a broken CDN again.
+3. **Vite dev is not the main verification target**: the dev server uses native ESM, so dynamic `import()` failures cannot be fully intercepted. Use `vite build && vite preview` or the example E2E tests to verify fallback behavior.
+4. **Add your own UI fallback for entry resource failures**: for both Vite and Webpack, if the entry bundle exhausts all candidate URLs, React/Vue has not started yet. Add a lightweight `rf:error` listener in `index.html` to show a degraded message.
+5. **Hybrid SW is opt-in**: set `serviceWorker: true` or an object config to handle images, fonts, CSS background images, and other subresources. Debug SW on `localhost`, `127.0.0.1`, or HTTPS; plain HTTP LAN IPs are not secure contexts, so browsers will not register the SW.
+
 ## Configuration Reference
 
 Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts).
@@ -168,6 +193,7 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 | `externalRuntimePath` | `string` | `'/__rf/runtime.js'` | Path for the external runtime script |
 | `injectPreconnect` | `boolean` | `true` | Inject `<link rel="preconnect">` for each fallback domain |
 | `htmlInject` | `'head-prepend' \| 'head-append` | `'head-prepend'` | Position in `<head>` for injection |
+| `serviceWorker` | `boolean \| ServiceWorkerOptions` | `false` | Enable Hybrid SW for non-script subresources and controlled CSS `@import` |
 | `hooks` | `RuntimeHooks` | — | JS function hooks (only available in `externalRuntime` mode) |
 | `disableGlobals` | `string[]` | `['__RF_DISABLE__']` | Additional kill-switch global variable names |
 | `disableQueryParam` | `string` | `'__rf'` | Query param name that disables runtime when set to `off` |
@@ -200,6 +226,36 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 | `shareAcrossTabs` | `boolean` | `true` | Share circuit state across tabs via `localStorage` |
 | `storageTtl` | `number` | `120000` | TTL for circuit entries in localStorage (ms) |
 
+### ServiceWorkerOptions
+
+Hybrid SW is disabled by default. When enabled, the Vite/Webpack plugins generate a resource manifest and emit a SW asset. The SW bundle preloads the manifest/config (preserving `RegExp` rule semantics), while the page runtime registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into the existing `rf:*` events. SW events are delivered to the triggering page first via `FetchEvent.clientId`, avoiding cross-tab event leakage.
+
+```ts
+resourceFallback({
+  rules: [...],
+  serviceWorker: {
+    scope: '/',
+    includeStyleImports: true,
+    fallbackOnOpaque: false,
+    cache: { enabled: true, cacheOpaque: false },
+  },
+});
+```
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `boolean` | `true` for object config | Set to `false` to disable from an object config |
+| `path` | `string` | Derived from `scope`, e.g. `/` → `/sw.js`, `/app/` → `/app/sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header |
+| `scope` | `string` | `'/'` | SW control scope |
+| `includeStyleImports` | `boolean` | `true` | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset |
+| `fallbackOnOpaque` | `boolean` | `false` | Treat cross-origin opaque responses as failures and continue fallback. Useful when CDN errors are hidden by the browser as opaque responses; may skip otherwise usable opaque CDN responses |
+| `cache.enabled` | `boolean` | `true` | Write to Cache API after a fallback network response succeeds |
+| `cache.cacheOpaque` | `boolean` | `false` | Whether to cache opaque responses. Disabled by default |
+
+The SW cache policy is intentionally conservative: only readable 2xx responses from a successful fallback are cached; the current manifest-version cache is read only after all network retry/fallback attempts are exhausted; old `resource-fallback-*` caches are cleaned when a new manifest version activates. The manifest version includes resources, fallback rules, and key SW cache policy so rule/cache changes do not keep using stale caches.
+
+The SW resolver always uses an isolated in-memory circuit breaker. Even if page-side `defaults.circuit.shareAcrossTabs` is `true`, the SW does not read or write `localStorage`. If the SW fetch chain ultimately rejects, it emits `rf:error` and returns `Response.error()`, keeping the browser-visible resource behavior close to a real network error.
+
 ## Runtime Behavior
 
 ### Events
@@ -221,8 +277,13 @@ Application code can listen via `window.addEventListener('rf:fallback', (e) => {
 | Async chunk (`import()`) | ✓ `__webpack_require__.l` hook | ✓ `__RF__.load` + `renderDynamicImport` | ✗ |
 | CSS dynamic injection | ✓ Observer | ✓ Observer | ✓ Observer |
 | SystemJS (legacy bundle) | ✓ `instantiate` hook | ✓ `instantiate` hook | — |
+| Images / fonts / media | ✓ Hybrid SW (opt-in, controlled pages) | ✓ Hybrid SW (opt-in, controlled pages) | ✗ |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW (opt-in, controlled pages) | ✓ Hybrid SW (opt-in, controlled pages) | ✗ |
+| CSS `@import` | ✓ Hybrid SW (CSS referrer must match manifest) | ✓ Hybrid SW (CSS referrer must match manifest) | ✗ |
 
 > Vite dev mode uses native ESM — dynamic import failures cannot be intercepted. Use `vite preview` or a production build to verify fallback behavior.
+> The SW cannot guarantee control over the very first page load. Early requests issued during initial HTML parsing still rely on the page runtime/adapters.
+> SW events target the page client that triggered the fetch. Only rare requests without `clientId` fall back to window broadcasting.
 
 ## CSP Guide
 
@@ -266,6 +327,8 @@ Three ways to disable the runtime without a new release:
 ## Sync Script Limitations
 
 When a `<script>` (non-module) fails, the browser only fires an `error` event — **already-executed portions are irreversible**. The plugin replaces the DOM node with the next URL and reloads, but if the original script already mounted globals, re-execution may cause side effects. When all candidate URLs are exhausted, **only `rf:error` is fired; the page does not auto-refresh** — it's up to the application to decide the fallback strategy.
+
+Hybrid SW does not take over scripts and does not guarantee strict ordering for synchronous classic scripts. If strong ordering is needed later, it should be designed as a separate opt-in ScriptSequencer capability: rewrite blocking scripts into a queue at build time, then load each script serially with retry/fallback before continuing to the next one.
 
 ## Monitoring Integration
 
@@ -332,6 +395,7 @@ Open DevTools → Network to observe the complete retry → fallback → origin 
 pnpm install
 pnpm build          # Build all packages
 pnpm test           # Vitest unit tests
+pnpm test:coverage  # Vitest coverage check with thresholds
 pnpm typecheck      # TypeScript type checking
 ```
 
@@ -358,8 +422,8 @@ Upcoming improvements, optimizations, and known limitations, sorted by priority:
 ### Feature Enhancements
 
 - [ ] **(High priority) Per-load timeout / `retry.timeout`** — removed unimplemented `RetryOptions.timeout` from public types. Need to implement "fail after N ms" across all load paths (Observer, `__RF__.load`, webpack chunk, etc.); optionally with `fetch`+`AbortSignal` or HEAD preflight; classic `<script>` has no native timeout API, needs careful design.
-- [ ] **Service Worker interception mode** — intercept all resource requests via SW `fetch` events for more reliable full coverage, especially for CSS `@import`, `url()` references, font files, etc.
-- [ ] **Image/font resource support** — currently only covers `<script>` and `<link rel="stylesheet">`; `<img>`, `<video>`, `@font-face` etc. are not handled
+- [x] **Hybrid Service Worker interception mode (opt-in)** — SW owns `image`, `font`, `media`, CSS `url()`, and controlled CSS `@import`; existing Observer/Vite/Webpack/SystemJS adapters continue to own scripts and build-tool semantics
+- [x] **Image/font resource support (SW mode)** — Hybrid SW covers `<img>`, `@font-face`, CSS background images, and media resources; browser CORS/MIME/SRI policies still apply
 - [ ] **Vite dev mode support** — Vite dev uses native ESM; dynamic import failures cannot be intercepted
 - [ ] **Per-rule circuit breaker** — currently all rules share one circuit breaker instance; cannot configure different thresholds per rule
 - [ ] **Dynamic rule updates** — `install()` is one-shot; cannot add/modify rules at runtime. Consider adding `addRule()` / `removeRule()` API
@@ -369,7 +433,7 @@ Upcoming improvements, optimizations, and known limitations, sorted by priority:
 ### Reliability
 
 - [ ] **Sync script execution order guarantee** — current replacement after sync `<script>` failure cannot guarantee execution order with subsequent scripts, may break dependency chains
-- [ ] **CSS `@import` cascade failures** — Observer only handles top-level `<link>`; CSS internal `@import` failures are invisible
+- [x] **CSS `@import` cascade failures (controlled cases)** — Hybrid SW handles them when `includeStyleImports` is enabled and the CSS referrer matches the manifest; first visits not yet controlled by SW are still not guaranteed
 - [ ] **Worker / SharedWorker resource loading** — runtime depends on DOM APIs, cannot work in Worker environments
 
 ### Developer Experience

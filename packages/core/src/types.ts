@@ -84,6 +84,10 @@ export interface RuntimeConfig {
   rules: FallbackRule[];
   defaults?: { retry?: RetryOptions; circuit?: CircuitOptions };
   hooks?: RuntimeHooks;
+  /** Service Worker hybrid 资源回退配置。默认关闭。 */
+  serviceWorker?: boolean | ServiceWorkerOptions;
+  /** 构建期生成的资源 manifest，仅在 Service Worker 模式下使用。 */
+  serviceWorkerManifest?: ResourceFallbackManifest;
   /** 除 `__RF_DISABLE__` 外额外检查的全局 kill-switch 变量名。 */
   disableGlobals?: string[];
   /** 设为 `off` 时禁用运行时的 URL 查询参数名。默认 `__rf`。 */
@@ -109,6 +113,51 @@ export interface HtmlTag {
   voidTag?: boolean;
   attributes: HtmlTagAttributes;
   innerHTML?: string;
+}
+
+export interface ServiceWorkerOptions {
+  /** 是否启用 Hybrid Service Worker。默认 false。 */
+  enabled?: boolean;
+  /** Service Worker 文件 URL。默认跟随 scope：`/` → `/sw.js`，`/app/` → `/app/sw.js`。 */
+  path?: string;
+  /** Service Worker scope。默认 `/`。 */
+  scope?: string;
+  /** 是否允许通过 CSS referrer 接管受控 `@import`。默认 true。 */
+  includeStyleImports?: boolean;
+  /** 是否把跨源 opaque response 视为失败继续 fallback。默认 false。 */
+  fallbackOnOpaque?: boolean;
+  /** Cache API 策略。默认仅缓存 fallback 成功的非 opaque 2xx 响应。 */
+  cache?: {
+    enabled?: boolean;
+    cacheOpaque?: boolean;
+  };
+}
+
+export interface NormalizedServiceWorkerOptions {
+  enabled: boolean;
+  path: string;
+  scope: string;
+  includeStyleImports: boolean;
+  fallbackOnOpaque: boolean;
+  cache: {
+    enabled: boolean;
+    cacheOpaque: boolean;
+  };
+}
+
+export type ResourceFallbackAssetType = 'script' | 'style' | 'image' | 'font' | 'media' | 'asset';
+export type ResourceFallbackAssetOwner = 'page' | 'sw';
+
+export interface ResourceFallbackManifestAsset {
+  url: string;
+  type: ResourceFallbackAssetType;
+  owner: ResourceFallbackAssetOwner;
+}
+
+export interface ResourceFallbackManifest {
+  version: string;
+  rules: FallbackRule[];
+  assets: ResourceFallbackManifestAsset[];
 }
 
 /**
