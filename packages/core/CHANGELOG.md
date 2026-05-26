@@ -1,5 +1,11 @@
 # @resource-fallback/core
 
+## 0.1.1
+
+### Patch Changes
+
+- fix img cors error
+
 ## 0.1.0
 
 ### Minor Changes

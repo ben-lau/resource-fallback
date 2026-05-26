@@ -1,5 +1,13 @@
 # @resource-fallback/webpack-plugin
 
+## 0.1.1
+
+### Patch Changes
+
+- fix img cors error
+- Updated dependencies
+  - @resource-fallback/core@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes

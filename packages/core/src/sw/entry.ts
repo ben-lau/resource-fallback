@@ -91,13 +91,31 @@ sw.addEventListener('fetch', (event: unknown) => {
     if (type === 'error') emittedError = true;
     void postSwEventToClient(sw.clients, ev.clientId, { type: 'RF_SW_EVENT', event: type, payload });
   };
+  const upgradeCors = serviceWorkerOptions.fallbackOnOpaque === true;
   const response = fetchWithFallback(ev.request, {
     manifest,
     runtimeConfig,
     cache: serviceWorkerOptions.cache,
-    fallbackOnOpaque: serviceWorkerOptions.fallbackOnOpaque,
+    // When cors upgrade is active, the fetcher itself validates response
+    // status via the cors response; disable the opaque check in core so
+    // a no-cors fallback (CORS unavailable) is accepted as best-effort.
+    fallbackOnOpaque: false,
     caches: typeof caches === 'undefined' ? undefined : caches as unknown as Parameters<typeof fetchWithFallback>[1]['caches'],
-    fetcher: (request) => fetch(request as Request),
+    fetcher: async (request) => {
+      const req = request as Request;
+      if (upgradeCors && req.mode === 'no-cors') {
+        try {
+          // Try cors to get an inspectable response with real status code.
+          return await fetch(new Request(req, { mode: 'cors' }));
+        } catch {
+          // CORS unavailable (no Access-Control-Allow-Origin header).
+          // Fall back to no-cors: an opaque response means the server IS
+          // reachable; a throw means a real network failure.
+          return fetch(req);
+        }
+      }
+      return fetch(req);
+    },
     emit: emitEvent,
   });
   ev.respondWith(resolveSwResponseWithErrorBoundary(

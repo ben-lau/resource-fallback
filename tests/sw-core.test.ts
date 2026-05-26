@@ -245,6 +245,104 @@ describe('sw core', () => {
     expect(deleted).toEqual([old]);
   });
 
+  /**
+   * Simulates the entry.ts cors-upgrade fetcher pattern:
+   * try cors fetch → if CORS error, fall back to no-cors fetch.
+   */
+  function createCorsUpgradeFetcher(
+    onCors: (url: string) => Promise<Response>,
+    onNoCors: (url: string) => Promise<Response>,
+  ) {
+    return async (request: { url: string }) => {
+      try {
+        return await onCors(request.url);
+      } catch (err) {
+        return onNoCors(request.url);
+      }
+    };
+  }
+
+  it('cors upgrade: uses cors 200 directly when CDN supports CORS', async () => {
+    const fetcher = createCorsUpgradeFetcher(
+      async () => new Response('cdn-image', { status: 200 }),
+      async () => { throw new Error('should not reach no-cors'); },
+    );
+
+    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+      manifest,
+      cache: { enabled: false, cacheOpaque: false },
+      fallbackOnOpaque: false,
+      fetcher,
+      emit: () => {},
+    });
+
+    expect(await response.text()).toBe('cdn-image');
+  });
+
+  it('cors upgrade: detects HTTP 502 via cors and triggers fallback', async () => {
+    const events: string[] = [];
+    const fetcher = createCorsUpgradeFetcher(
+      async (url) => {
+        if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
+        return new Response('Bad Gateway', { status: 502 });
+      },
+      async () => { throw new Error('should not reach no-cors'); },
+    );
+
+    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+      manifest,
+      cache: { enabled: false, cacheOpaque: false },
+      fallbackOnOpaque: false,
+      fetcher,
+      emit: (type) => events.push(type),
+    });
+
+    expect(await response.text()).toBe('fallback-image');
+    expect(events).toContain('fallback');
+  });
+
+  it('cors upgrade: accepts opaque when CORS unavailable but server reachable', async () => {
+    const opaque = new Response(null, { status: 200 });
+    Object.defineProperty(opaque, 'type', { value: 'opaque' });
+
+    const fetcher = createCorsUpgradeFetcher(
+      async () => { throw new TypeError('CORS error'); },
+      async () => opaque,
+    );
+
+    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+      manifest,
+      cache: { enabled: false, cacheOpaque: false },
+      fallbackOnOpaque: false,
+      fetcher,
+      emit: () => {},
+    });
+
+    expect(response.type).toBe('opaque');
+  });
+
+  it('cors upgrade: falls back when both cors and no-cors fail (server unreachable)', async () => {
+    const events: string[] = [];
+    const fetcher = createCorsUpgradeFetcher(
+      async (url) => {
+        if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
+        throw new TypeError('network error');
+      },
+      async () => { throw new TypeError('network error'); },
+    );
+
+    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+      manifest,
+      cache: { enabled: false, cacheOpaque: false },
+      fallbackOnOpaque: false,
+      fetcher,
+      emit: (type) => events.push(type),
+    });
+
+    expect(await response.text()).toBe('fallback-image');
+    expect(events).toContain('fallback');
+  });
+
   it('keeps sw circuit breaker in memory even when page defaults share across tabs', async () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem');
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
