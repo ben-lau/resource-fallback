@@ -1,5 +1,13 @@
 # @resource-fallback/webpack-plugin
 
+## 0.1.2
+
+### Patch Changes
+
+- 修复 opaque 场景
+- Updated dependencies
+  - @resource-fallback/core@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
