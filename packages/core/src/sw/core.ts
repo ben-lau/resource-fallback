@@ -135,7 +135,11 @@ export async function fetchWithFallback(
   for (;;) {
     try {
       const response = await options.fetcher(currentRequest);
-      if (isUsableNetworkResponse(response, currentRequest.url, options.fallbackOnOpaque === true)) {
+      // Only enforce fallbackOnOpaque for the primary CDN (non-fallback).
+      // Fallback CDNs without CORS return opaque responses that should be
+      // accepted as best-effort; rejecting them would cascade endlessly.
+      const effectiveFallbackOnOpaque = !isFallback && options.fallbackOnOpaque === true;
+      if (isUsableNetworkResponse(response, currentRequest.url, effectiveFallbackOnOpaque)) {
         resolver.recordSuccess(currentRequest.url);
         options.emit('success', { url: currentRequest.url, attempts: attempt });
         if (usedFallback) await putFallbackCache(request, response, options);
@@ -143,6 +147,11 @@ export async function fetchWithFallback(
       }
       lastResponse = response;
       lastError = new Error('HTTP ' + response.status);
+      // Opaque responses cannot improve on retry (same no-cors → same opaque);
+      // skip directly to fallback by exhausting the retry budget.
+      if (response.type === 'opaque' && effectiveFallbackOnOpaque) {
+        attempt = Infinity;
+      }
     } catch (err) {
       lastError = err;
     }

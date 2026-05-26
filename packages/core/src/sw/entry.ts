@@ -96,10 +96,7 @@ sw.addEventListener('fetch', (event: unknown) => {
     manifest,
     runtimeConfig,
     cache: serviceWorkerOptions.cache,
-    // When cors upgrade is active, the fetcher itself validates response
-    // status via the cors response; disable the opaque check in core so
-    // a no-cors fallback (CORS unavailable) is accepted as best-effort.
-    fallbackOnOpaque: false,
+    fallbackOnOpaque: serviceWorkerOptions.fallbackOnOpaque,
     caches: typeof caches === 'undefined' ? undefined : caches as unknown as Parameters<typeof fetchWithFallback>[1]['caches'],
     fetcher: async (request) => {
       const req = request as Request;
