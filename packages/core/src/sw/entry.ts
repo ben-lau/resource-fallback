@@ -45,6 +45,7 @@ interface FetchEventLike {
 }
 
 const sw = self as unknown as ServiceWorkerLike;
+const swNoCorsHosts = new Set<string>();
 
 let manifest: ResourceFallbackManifest | null = null;
 let runtimeConfig: RuntimeConfig | null = null;
@@ -91,25 +92,31 @@ sw.addEventListener('fetch', (event: unknown) => {
     if (type === 'error') emittedError = true;
     void postSwEventToClient(sw.clients, ev.clientId, { type: 'RF_SW_EVENT', event: type, payload });
   };
+  // fallbackOnOpaque enables cors probe: try cors first to get inspectable
+  // status codes, fall back to no-cors when CORS is unavailable.
   const upgradeCors = serviceWorkerOptions.fallbackOnOpaque === true;
+  const noCorsHosts = swNoCorsHosts;
   const response = fetchWithFallback(ev.request, {
     manifest,
     runtimeConfig,
     cache: serviceWorkerOptions.cache,
-    fallbackOnOpaque: serviceWorkerOptions.fallbackOnOpaque,
+    // HTTP error detection is handled by the cors-upgrade fetcher (cors mode
+    // exposes real status codes). Core sees false so that an opaque response
+    // from the no-cors fallback path is accepted as "server reachable".
+    fallbackOnOpaque: false,
     caches: typeof caches === 'undefined' ? undefined : caches as unknown as Parameters<typeof fetchWithFallback>[1]['caches'],
     fetcher: async (request) => {
       const req = request as Request;
       if (upgradeCors && req.mode === 'no-cors') {
-        try {
-          // Try cors to get an inspectable response with real status code.
-          return await fetch(new Request(req, { mode: 'cors' }));
-        } catch {
-          // CORS unavailable (no Access-Control-Allow-Origin header).
-          // Fall back to no-cors: an opaque response means the server IS
-          // reachable; a throw means a real network failure.
-          return fetch(req);
+        const host = new URL(req.url).host;
+        if (!noCorsHosts.has(host)) {
+          try {
+            return await fetch(new Request(req, { mode: 'cors', credentials: 'omit' }));
+          } catch {
+            noCorsHosts.add(host);
+          }
         }
+        return fetch(req);
       }
       return fetch(req);
     },

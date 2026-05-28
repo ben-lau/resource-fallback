@@ -124,7 +124,18 @@ export interface ServiceWorkerOptions {
   scope?: string;
   /** 是否允许通过 CSS referrer 接管受控 `@import`。默认 true。 */
   includeStyleImports?: boolean;
-  /** 是否把跨源 opaque response 视为失败继续 fallback。默认 false。 */
+  /**
+   * 启用 CORS 探测以检测跨源 HTTP 错误（如 502/503）。默认 false。
+   *
+   * 开启后，SW 对 `no-cors` 请求先尝试 `cors` 模式（credentials: omit），
+   * 如果 CDN 返回了 `Access-Control-Allow-Origin` 头，就能拿到真实状态码，
+   * 非 2xx 响应会触发 retry/fallback。
+   *
+   * 如果 CDN 不支持 CORS，会自动降级回 `no-cors`（opaque 响应被接受）；
+   * 此时仅网络级故障（DNS/连接失败）能触发 fallback，HTTP 错误无法检测。
+   *
+   * 建议在 CDN 配置了 `Access-Control-Allow-Origin` 头时开启。
+   */
   fallbackOnOpaque?: boolean;
   /** Cache API 策略。默认仅缓存 fallback 成功的非 opaque 2xx 响应。 */
   cache?: {

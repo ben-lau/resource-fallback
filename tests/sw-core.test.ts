@@ -301,64 +301,7 @@ describe('sw core', () => {
     expect(events).toContain('fallback');
   });
 
-  it('cors upgrade: opaque on primary CDN triggers fallback when fallbackOnOpaque is true', async () => {
-    const opaque = new Response(null, { status: 200 });
-    Object.defineProperty(opaque, 'type', { value: 'opaque' });
-    const events: string[] = [];
-
-    const fetcher = createCorsUpgradeFetcher(
-      async (url) => {
-        if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
-        throw new TypeError('CORS error');
-      },
-      async (url) => {
-        if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
-        return opaque;
-      },
-    );
-
-    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
-      manifest,
-      cache: { enabled: false, cacheOpaque: false },
-      fallbackOnOpaque: true,
-      fetcher,
-      emit: (type) => events.push(type),
-    });
-
-    expect(await response.text()).toBe('fallback-image');
-    expect(events).toContain('fallback');
-  });
-
-  it('cors upgrade: opaque on fallback CDN is accepted as best-effort', async () => {
-    const opaque = new Response(null, { status: 200 });
-    Object.defineProperty(opaque, 'type', { value: 'opaque' });
-    const events: string[] = [];
-
-    const fetcher = createCorsUpgradeFetcher(
-      async () => { throw new TypeError('CORS error'); },
-      async (url) => {
-        if (url.startsWith(origin)) {
-          const fb = new Response(null, { status: 200 });
-          Object.defineProperty(fb, 'type', { value: 'opaque' });
-          return fb;
-        }
-        return opaque;
-      },
-    );
-
-    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
-      manifest,
-      cache: { enabled: false, cacheOpaque: false },
-      fallbackOnOpaque: true,
-      fetcher,
-      emit: (type) => events.push(type),
-    });
-
-    expect(response.type).toBe('opaque');
-    expect(events).toContain('fallback');
-  });
-
-  it('cors upgrade: accepts opaque when fallbackOnOpaque is false', async () => {
+  it('cors upgrade: accepts opaque when CORS unavailable but server reachable', async () => {
     const opaque = new Response(null, { status: 200 });
     Object.defineProperty(opaque, 'type', { value: 'opaque' });
 
