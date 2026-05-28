@@ -1,5 +1,13 @@
 # @resource-fallback/vite-plugin
 
+## 0.1.3
+
+### Patch Changes
+
+- fix sw
+- Updated dependencies
+  - @resource-fallback/core@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
