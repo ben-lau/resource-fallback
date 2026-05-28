@@ -10,7 +10,7 @@ describe('service worker options', () => {
   it('normalizes boolean opt-in to the hybrid defaults', () => {
     expect(normalizeServiceWorkerOptions(true)).toEqual({
       enabled: true,
-      path: '/sw.js',
+      path: '/rf-sw.js',
       scope: '/',
       includeStyleImports: true,
       fallbackOnOpaque: false,
@@ -27,8 +27,8 @@ describe('service worker options', () => {
   });
 
   it('derives the default service worker path from the configured scope', () => {
-    expect(normalizeServiceWorkerOptions({ scope: '/app/' }).path).toBe('/app/sw.js');
-    expect(normalizeServiceWorkerOptions({ scope: '/nested' }).path).toBe('/nested/sw.js');
+    expect(normalizeServiceWorkerOptions({ scope: '/app/' }).path).toBe('/app/rf-sw.js');
+    expect(normalizeServiceWorkerOptions({ scope: '/nested' }).path).toBe('/nested/rf-sw.js');
   });
 
   it('builds a manifest with page-owned scripts and sw-owned subresources', () => {
@@ -72,7 +72,7 @@ describe('service worker options', () => {
       assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image' }],
     });
 
-    expect(assets?.path).toBe('/sw.js');
+    expect(assets?.path).toBe('/rf-sw.js');
     expect(assets?.scope).toBe('/');
     expect(assets?.code).toContain('RF_SW_CONFIG');
     expect(assets?.code).toContain('__RF_SW_PRELOAD__');

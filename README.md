@@ -247,7 +247,7 @@ resourceFallback({
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true`（对象配置时） | 设为 `false` 可在对象配置中关闭 |
-| `path` | `string` | 跟随 `scope`，如 `/` → `/sw.js`、`/app/` → `/app/sw.js` | SW 文件路径。默认与 scope 同层，避免依赖 `Service-Worker-Allowed` 响应头 |
+| `path` | `string` | 跟随 `scope`，如 `/` → `/rf-sw.js`、`/app/` → `/app/rf-sw.js` | SW 文件路径。默认与 scope 同层，避免依赖 `Service-Worker-Allowed` 响应头 |
 | `scope` | `string` | `'/'` | SW 控制范围 |
 | `includeStyleImports` | `boolean` | `true` | 允许 SW 在 `request.destination === 'style'` 且 referrer 命中 CSS manifest 时接管 CSS `@import` |
 | `fallbackOnOpaque` | `boolean` | `false` | 将跨源 opaque response 视为失败继续 fallback。适合 CDN 错误被浏览器隐藏成 opaque 的图片/CSS 子资源场景；开启后可能跳过本来可用的 opaque CDN 响应 |

@@ -10,7 +10,7 @@ Service Worker 能显著扩展资源回退的覆盖面，尤其适合 `img`、`v
 
 Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。
 
-默认 SW path 跟随 scope 派生，避免把 `Service-Worker-Allowed` 响应头变成默认心智负担：`scope: '/'` 时输出 `/sw.js`，`scope: '/app/'` 时输出 `/app/sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed`。
+默认 SW path 跟随 scope 派生，避免把 `Service-Worker-Allowed` 响应头变成默认心智负担：`scope: '/'` 时输出 `/rf-sw.js`，`scope: '/app/'` 时输出 `/app/rf-sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed`。
 
 图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败，以避免跳过本来可用的跨源图片；示例项目为了演示假 CDN 失败后的视觉 fallback，显式启用了 `serviceWorker.fallbackOnOpaque`。
 

@@ -7,7 +7,7 @@ import type {
   RuntimeConfig,
   SuccessEvent,
 } from '../types';
-import { createResolver } from '../runtime/resolver';
+import { createResolver, type Resolver } from '../runtime/resolver';
 
 type SwEventType = 'retry' | 'fallback' | 'success' | 'error';
 type SwEvent = RetryEvent | FallbackEvent | SuccessEvent | ErrorEvent;
@@ -50,6 +50,7 @@ export interface FetchWithFallbackOptions {
   fetcher: (request: SwRequestLike) => Promise<Response>;
   caches?: CacheStorageLike;
   emit: (type: SwEventType, event: SwEvent) => void;
+  resolver?: Resolver;
 }
 
 export function createFallbackCacheName(manifest: ResourceFallbackManifest): string {
@@ -91,6 +92,33 @@ export async function resolveSwResponseWithErrorBoundary(
   }
 }
 
+export interface ManifestLookupSets {
+  swOwnedUrls: Set<string>;
+  cssReferrerUrls: Set<string>;
+}
+
+export function buildManifestLookupSets(manifest: ResourceFallbackManifest): ManifestLookupSets {
+  const swOwnedUrls = new Set<string>();
+  const cssReferrerUrls = new Set<string>();
+  for (const asset of manifest.assets) {
+    const url = stripHash(asset.url);
+    if (asset.owner === 'sw') swOwnedUrls.add(url);
+    if (asset.type === 'style') cssReferrerUrls.add(url);
+  }
+  return { swOwnedUrls, cssReferrerUrls };
+}
+
+const manifestLookupCache = new WeakMap<ResourceFallbackManifest, ManifestLookupSets>();
+
+function getManifestLookup(manifest: ResourceFallbackManifest): ManifestLookupSets {
+  let sets = manifestLookupCache.get(manifest);
+  if (!sets) {
+    sets = buildManifestLookupSets(manifest);
+    manifestLookupCache.set(manifest, sets);
+  }
+  return sets;
+}
+
 export function shouldHandleSwRequest(
   request: SwRequestLike,
   manifest: ResourceFallbackManifest,
@@ -101,30 +129,39 @@ export function shouldHandleSwRequest(
   if (destination === 'script' || destination === 'worker' || destination === 'sharedworker') {
     return false;
   }
+  const lookup = getManifestLookup(manifest);
   if (destination === 'image' || destination === 'font' || destination === 'video' || destination === 'audio' || destination === 'track') {
-    return isSwOwnedAsset(request.url, manifest);
+    return lookup.swOwnedUrls.has(stripHash(request.url));
   }
   if (destination === 'style') {
-    return !!options.includeStyleImports && isCssManifestReferrer(request.referrer || '', manifest);
+    const referrer = request.referrer || '';
+    return !!options.includeStyleImports && !!referrer && lookup.cssReferrerUrls.has(stripHash(referrer));
   }
   return false;
+}
+
+export function createSwResolver(
+  manifest: ResourceFallbackManifest,
+  runtimeConfig?: Omit<RuntimeConfig, 'rules'>,
+): Resolver {
+  return createResolver({
+    ...runtimeConfig,
+    rules: forceMemoryCircuit(manifest.rules),
+    defaults: {
+      ...runtimeConfig?.defaults,
+      circuit: {
+        ...runtimeConfig?.defaults?.circuit,
+        shareAcrossTabs: false,
+      },
+    },
+  });
 }
 
 export async function fetchWithFallback(
   request: SwRequestLike,
   options: FetchWithFallbackOptions,
 ): Promise<Response> {
-  const resolver = createResolver({
-    ...options.runtimeConfig,
-    rules: forceMemoryCircuit(options.manifest.rules),
-    defaults: {
-      ...options.runtimeConfig?.defaults,
-      circuit: {
-        ...options.runtimeConfig?.defaults?.circuit,
-        shareAcrossTabs: false,
-      },
-    },
-  });
+  const resolver = options.resolver ?? createSwResolver(options.manifest, options.runtimeConfig);
   let currentRequest = request;
   let attempt = 1;
   let isFallback = false;
@@ -185,10 +222,6 @@ export async function cleanupOldFallbackCaches(
   );
 }
 
-function isSwOwnedAsset(url: string, manifest: ResourceFallbackManifest): boolean {
-  return manifest.assets.some((asset) => asset.owner === 'sw' && sameUrl(asset.url, url));
-}
-
 function forceMemoryCircuit(rules: FallbackRule[]): FallbackRule[] {
   return rules.map((rule) => ({
     ...rule,
@@ -197,15 +230,6 @@ function forceMemoryCircuit(rules: FallbackRule[]): FallbackRule[] {
       shareAcrossTabs: false,
     },
   }));
-}
-
-function isCssManifestReferrer(referrer: string, manifest: ResourceFallbackManifest): boolean {
-  if (!referrer) return false;
-  return manifest.assets.some((asset) => asset.type === 'style' && sameUrl(asset.url, referrer));
-}
-
-function sameUrl(left: string, right: string): boolean {
-  return stripHash(left) === stripHash(right);
 }
 
 function stripHash(url: string): string {

@@ -38,6 +38,40 @@ describe('sw adapter', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('unregisters stale SW when serviceWorker is disabled', async () => {
+    const unregister = vi.fn(async () => true);
+    const getRegistrations = vi.fn(async () => [
+      { active: { scriptURL: 'https://example.com/rf-sw.js', postMessage: vi.fn() }, unregister },
+      { active: { scriptURL: 'https://example.com/other-worker.js', postMessage: vi.fn() }, unregister: vi.fn() },
+    ]);
+    Object.defineProperty(window, 'navigator', {
+      value: {
+        serviceWorker: {
+          register: vi.fn(),
+          getRegistrations,
+          addEventListener: () => {},
+        },
+      },
+      configurable: true,
+    });
+
+    installSwAdapter({
+      config: {
+        rules: manifest.rules,
+        serviceWorker: false,
+        serviceWorkerManifest: manifest,
+      },
+      bus: createHookBus({}, createLogger(false)),
+      log: createLogger(false),
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getRegistrations).toHaveBeenCalled();
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
   it('registers with normalized path/scope and posts manifest config', async () => {
     const postMessage = vi.fn();
     const register = vi.fn(async () => ({ active: { postMessage } }));
@@ -55,11 +89,11 @@ describe('sw adapter', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
+    expect(register).toHaveBeenCalledWith('/rf-sw.js', { scope: '/', updateViaCache: 'none' });
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: 'RF_SW_CONFIG',
       manifest,
-      serviceWorker: expect.objectContaining({ enabled: true, path: '/sw.js' }),
+      serviceWorker: expect.objectContaining({ enabled: true, path: '/rf-sw.js' }),
     }));
   });
 

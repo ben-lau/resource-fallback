@@ -6,11 +6,13 @@ import type {
 import { normalizeServiceWorkerOptions } from '../service-worker';
 import {
   cleanupOldFallbackCaches,
+  createSwResolver,
   fetchWithFallback,
   postSwEventToClient,
   resolveSwResponseWithErrorBoundary,
   shouldHandleSwRequest,
 } from './core';
+import type { Resolver } from '../runtime/resolver';
 
 interface SwConfigMessage {
   type: 'RF_SW_CONFIG';
@@ -45,17 +47,25 @@ interface FetchEventLike {
 }
 
 const sw = self as unknown as ServiceWorkerLike;
-const swNoCorsHosts = new Set<string>();
+const corsVerifiedHosts = new Set<string>();
 
 let manifest: ResourceFallbackManifest | null = null;
 let runtimeConfig: RuntimeConfig | null = null;
 let serviceWorkerOptions: NormalizedServiceWorkerOptions = normalizeServiceWorkerOptions(false);
+let sharedResolver: Resolver | null = null;
+
+function rebuildResolver(): void {
+  if (manifest && runtimeConfig) {
+    sharedResolver = createSwResolver(manifest, runtimeConfig);
+  }
+}
 
 const preload = (self as unknown as { __RF_SW_PRELOAD__?: Partial<SwConfigMessage> }).__RF_SW_PRELOAD__;
 if (preload?.manifest && preload.runtimeConfig) {
   manifest = preload.manifest;
   runtimeConfig = preload.runtimeConfig;
   serviceWorkerOptions = preload.serviceWorker || normalizeServiceWorkerOptions(true);
+  rebuildResolver();
 }
 
 sw.addEventListener('install', (event: unknown) => {
@@ -80,6 +90,7 @@ sw.addEventListener('message', (event: unknown) => {
   manifest = data.manifest;
   runtimeConfig = data.runtimeConfig;
   serviceWorkerOptions = data.serviceWorker || normalizeServiceWorkerOptions(true);
+  rebuildResolver();
 });
 
 sw.addEventListener('fetch', (event: unknown) => {
@@ -95,10 +106,10 @@ sw.addEventListener('fetch', (event: unknown) => {
   // fallbackOnOpaque enables cors probe: try cors first to get inspectable
   // status codes, fall back to no-cors when CORS is unavailable.
   const upgradeCors = serviceWorkerOptions.fallbackOnOpaque === true;
-  const noCorsHosts = swNoCorsHosts;
   const response = fetchWithFallback(ev.request, {
     manifest,
     runtimeConfig,
+    resolver: sharedResolver ?? undefined,
     cache: serviceWorkerOptions.cache,
     // HTTP error detection is handled by the cors-upgrade fetcher (cors mode
     // exposes real status codes). Core sees false so that an opaque response
@@ -109,14 +120,16 @@ sw.addEventListener('fetch', (event: unknown) => {
       const req = request as Request;
       if (upgradeCors && req.mode === 'no-cors') {
         const host = new URL(req.url).host;
-        if (!noCorsHosts.has(host)) {
-          try {
-            return await fetch(new Request(req, { mode: 'cors', credentials: 'omit' }));
-          } catch {
-            noCorsHosts.add(host);
-          }
+        if (corsVerifiedHosts.has(host)) {
+          return fetch(new Request(req, { mode: 'cors', credentials: 'omit' }));
         }
-        return fetch(req);
+        try {
+          const res = await fetch(new Request(req, { mode: 'cors', credentials: 'omit' }));
+          corsVerifiedHosts.add(host);
+          return res;
+        } catch {
+          return fetch(req);
+        }
       }
       return fetch(req);
     },

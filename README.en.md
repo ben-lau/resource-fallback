@@ -245,7 +245,7 @@ resourceFallback({
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` for object config | Set to `false` to disable from an object config |
-| `path` | `string` | Derived from `scope`, e.g. `/` → `/sw.js`, `/app/` → `/app/sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header |
+| `path` | `string` | Derived from `scope`, e.g. `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header |
 | `scope` | `string` | `'/'` | SW control scope |
 | `includeStyleImports` | `boolean` | `true` | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset |
 | `fallbackOnOpaque` | `boolean` | `false` | Treat cross-origin opaque responses as failures and continue fallback. Useful when CDN errors are hidden by the browser as opaque responses; may skip otherwise usable opaque CDN responses |

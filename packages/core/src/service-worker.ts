@@ -64,7 +64,7 @@ export function buildServiceWorkerAssets(
 ): ServiceWorkerAssets | null {
   const serviceWorker = normalizeServiceWorkerOptions(options.serviceWorker);
   if (!serviceWorker.enabled) return null;
-  const manifest = buildResourceFallbackManifest({
+  const fullManifest = buildResourceFallbackManifest({
     versionSeed: input.versionSeed,
     rules: options.rules,
     assets: input.assets,
@@ -73,6 +73,12 @@ export function buildServiceWorkerAssets(
       fallbackOnOpaque: serviceWorker.fallbackOnOpaque,
     },
   });
+  // Strip assets that SW never uses (scripts, source maps, etc.) to reduce
+  // preload size. Keep image/font/media (sw-owned) and style (CSS @import).
+  const manifest: ResourceFallbackManifest = {
+    ...fullManifest,
+    assets: fullManifest.assets.filter((a) => a.owner === 'sw' || a.type === 'style'),
+  };
   return {
     path: serviceWorker.path,
     scope: serviceWorker.scope,
@@ -117,7 +123,7 @@ function normalizeScope(scope: string): string {
 }
 
 function defaultPathForScope(scope: string): string {
-  return scope === '/' ? '/sw.js' : scope + 'sw.js';
+  return scope === '/' ? '/rf-sw.js' : scope + 'rf-sw.js';
 }
 
 function withPreloadedConfig(

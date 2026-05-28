@@ -440,7 +440,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 - **页面 `postMessage` 配置太晚**：图片、背景图和字体可能在页面 runtime 完成注册并 `postMessage` manifest 之前就发起请求；SW 若没有配置，只能 pass-through，视觉上就像“SW 没效果”。
 - **图片/CSS 背景图常是 `no-cors` 请求**：SW 看到的是 opaque response，无法读取真实 status。某些本地/代理环境中，假 CDN 的错误响应会变成 opaque，若默认当成功返回，浏览器拿到的仍是坏资源。
 - **本地 IP 不是 secure context**：`http://localhost` / `http://127.0.0.1` 可注册 SW，但 `http://192.168.x.x` 这类局域网 IP 默认不能注册。Webpack example 的 `http-server` 会展示 LAN IP，很容易误以为也能测试 SW。
-- **Service Worker 持久存在**：rebuild 后旧 SW 可能继续控制当前页面；磁盘 `dist/sw.js` 已经是新的，不代表浏览器当前 controller 就是新的。
+- **Service Worker 持久存在**：rebuild 后旧 SW 可能继续控制当前页面；磁盘 `dist/rf-sw.js` 已经是新的，不代表浏览器当前 controller 就是新的。
 - **测试“元素可见”不等于资源生效**：`<img>` 元素可见、背景块可见，只说明 DOM 渲染了；必须检查 `naturalWidth`、`document.fonts.check()`、SW 事件和 request/response，才能证明图片/字体真正 fallback 成功。
 
 #### 思考过程
@@ -458,10 +458,10 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 1. **默认 path 跟随 scope 派生**
 
-   `normalizeServiceWorkerOptions()` 中不再默认 `/__rf/sw.js`，而是：
+   `normalizeServiceWorkerOptions()` 中不再默认 `/__rf/sw.js`，而是跟随 scope 派生带库名前缀的路径：
 
-   - `scope: '/'` → `path: '/sw.js'`
-   - `scope: '/app/'` → `path: '/app/sw.js'`
+   - `scope: '/'` → `path: '/rf-sw.js'`
+   - `scope: '/app/'` → `path: '/app/rf-sw.js'`
 
    只有用户显式把 `path` 配到 scope 目录之外时，才需要自己配置 `Service-Worker-Allowed`。这样默认配置能在普通静态服务器上直接跑通。
 
@@ -489,7 +489,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 5. **Webpack/Vite 插件都 emit SW asset + manifest**
 
    - Vite：`generateBundle` 收集 bundle 输出，`transformIndexHtml` 使用 `post` 阶段，确保有最终 bundle 可生成非空 manifest。
-   - Webpack：从 `compilation.getAssets()` 与 HtmlWebpackPlugin tags 收集资源，输出 `sw.js` 和 `manifest.json`，并把 manifest 注入页面安装配置。
+   - Webpack：从 `compilation.getAssets()` 与 HtmlWebpackPlugin tags 收集资源，输出 `rf-sw.js` 和 `manifest.json`，并把 manifest 注入页面安装配置。
 
 6. **事件与错误路径加固**
 
@@ -516,7 +516,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
   navigator.serviceWorker.controller?.scriptURL
   ```
 
-  `dist/sw.js` 已更新，不代表当前 tab 已由它控制。
+  `dist/rf-sw.js` 已更新，不代表当前 tab 已由它控制。
 
 - **验证视觉资源不要只用 `toBeVisible()`**：
 
@@ -574,7 +574,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 10. **SystemJS 与 Observer必须登记 URL 互斥**。  
 11. **Resolver `isFallback` 才允许 urls-prefix 命中**，避免误判；**熔断与首轮 match语义**拆开；**duplicate match 后来者胜**。  
 12. **`rf:error` ≠ 一定走了回退**：展示与告警要拆开 **no-match**。  
-13. **SW 默认路径必须与 scope 对齐**：默认 `scope: '/'` 就输出 `/sw.js`，不要把 `Service-Worker-Allowed` 变成默认部署负担。  
+13. **SW 默认路径必须与 scope 对齐**：默认 `scope: '/'` 就输出 `/rf-sw.js`，不要把 `Service-Worker-Allowed` 变成默认部署负担。  
 14. **SW 配置不要只靠页面 `postMessage`**：早期图片/字体/CSS 子资源可能先于消息发生，构建期应把 manifest 预置进 SW 文件。  
 15. **opaque response 是策略问题，不是实现细节**：默认保守不当失败；若要演示或业务确认“跨源 opaque 错误也继续回源”，用显式 `fallbackOnOpaque`。  
 16. **SW 本地调试必须看 origin**：`localhost`、`127.0.0.1`、局域网 IP 是不同 origin；局域网 IP 的 HTTP 不是 secure context，SW 不会注册。  

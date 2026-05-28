@@ -41,7 +41,7 @@ export default defineConfig([
   },
   // 3) Service Worker runtime: separate bundle because SW has no window/document.
   {
-    entry: { sw: 'src/sw/entry.ts' },
+    entry: { 'rf-sw': 'src/sw/entry.ts' },
     format: ['iife'],
     target: 'es2018',
     outDir: 'dist',

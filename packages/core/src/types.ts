@@ -118,7 +118,7 @@ export interface HtmlTag {
 export interface ServiceWorkerOptions {
   /** 是否启用 Hybrid Service Worker。默认 false。 */
   enabled?: boolean;
-  /** Service Worker 文件 URL。默认跟随 scope：`/` → `/sw.js`，`/app/` → `/app/sw.js`。 */
+  /** Service Worker 文件 URL。默认跟随 scope：`/` → `/rf-sw.js`，`/app/` → `/app/rf-sw.js`。 */
   path?: string;
   /** Service Worker scope。默认 `/`。 */
   scope?: string;

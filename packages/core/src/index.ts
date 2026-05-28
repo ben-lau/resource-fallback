@@ -91,8 +91,8 @@ export function getServiceWorkerPath(): string {
     here = typeof cjsDirname === 'string' ? cjsDirname : process.cwd();
   }
   const candidates = [
-    resolve(here, 'sw.js'),
-    resolve(here, '..', 'dist', 'sw.js'),
+    resolve(here, 'rf-sw.js'),
+    resolve(here, '..', 'dist', 'rf-sw.js'),
   ];
   for (const c of candidates) {
     try {
