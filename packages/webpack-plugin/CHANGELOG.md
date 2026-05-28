@@ -1,5 +1,13 @@
 # @resource-fallback/webpack-plugin
 
+## 0.1.4
+
+### Patch Changes
+
+- sw fix
+- Updated dependencies
+  - @resource-fallback/core@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes

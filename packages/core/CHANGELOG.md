@@ -1,5 +1,11 @@
 # @resource-fallback/core
 
+## 0.1.4
+
+### Patch Changes
+
+- sw fix
+
 ## 0.1.3
 
 ### Patch Changes
