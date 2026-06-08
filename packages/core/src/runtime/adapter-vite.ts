@@ -24,8 +24,8 @@ interface VitePreloadErrorEvent extends Event {
  *
  * `__RF__.url` 可选，用于外部代码将 filename 解析为完整 URL。
  */
-export function installViteAdapter(deps: AdapterDeps): void {
-  if (typeof window === 'undefined') return;
+export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
+  if (typeof window === 'undefined') return { dispose() {} };
   const w = window as unknown as Record<string, unknown> & { __RF__?: Record<string, unknown> };
 
   if (!w.__RF__) w.__RF__ = {};
@@ -79,7 +79,7 @@ export function installViteAdapter(deps: AdapterDeps): void {
     }
   };
 
-  window.addEventListener('vite:preloadError', (event: Event) => {
+  function onPreloadError(event: Event) {
     // Vite 的 __vitePreload 在 CSS 预加载失败时调用:
     //   const e = new Event('vite:preloadError', { cancelable: true });
     //   e.payload = error;
@@ -98,7 +98,15 @@ export function installViteAdapter(deps: AdapterDeps): void {
     }
     deps.bus.emitFallback({ from: url, to: '<deferred>', reason: 'vite-preload-failure' });
     deps.resolver.recordFailure(url);
-  });
+  }
+
+  window.addEventListener('vite:preloadError', onPreloadError);
+
+  return {
+    dispose() {
+      window.removeEventListener('vite:preloadError', onPreloadError);
+    },
+  };
 }
 
 function extractUrlFromError(reason: unknown): string | null {

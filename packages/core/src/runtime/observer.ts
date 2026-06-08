@@ -24,10 +24,12 @@ interface ObserverDeps {
  * 已知限制（README 中已说明）：同步 `<script>` 标签如果已执行了后续依赖代码，
  * 替换后无法重排序；此时触发 `onError`，由消费者决定如何处理（如刷新页面）。
  */
-export function installObserver(deps: ObserverDeps): void {
+export function installObserver(deps: ObserverDeps): { dispose(): void } {
   const { resolver, bus, log, sri } = deps;
 
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return { dispose() {} };
+  }
 
   window.addEventListener('error', onError, true);
   window.addEventListener('load', onLoad, true);
@@ -103,6 +105,13 @@ export function installObserver(deps: ObserverDeps): void {
     if (delay > 0) setTimeout(swap, delay);
     else swap();
   }
+
+  return {
+    dispose() {
+      window.removeEventListener('error', onError, true);
+      window.removeEventListener('load', onLoad, true);
+    },
+  };
 }
 
 function isManagedTag(el: HTMLElement): el is HTMLScriptElement | HTMLLinkElement {

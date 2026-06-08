@@ -18,6 +18,8 @@ interface RfGlobal {
   install: (config: InstallOptions) => void;
   url: (filename: string) => string;
   resolver?: ReturnType<typeof createResolver>;
+  /** 卸载运行时：移除所有监听器、清理全局状态。 */
+  dispose: () => void;
   /** 标记位，供消费者/测试检测是否已安装。 */
   installed: boolean;
   /** 版本号，用于诊断。 */
@@ -38,12 +40,13 @@ function noop(): string {
   return '';
 }
 
-function ensureGlobal(): RfGlobal {
-  if (!w) throw new Error('resource-fallback runtime requires a browser environment');
+function ensureGlobal(): RfGlobal | null {
+  if (!w) return null;
   if (!w.__RF__) {
     w.__RF__ = {
       install,
       url: noop,
+      dispose() {},
       installed: false,
       version: RUNTIME_VERSION,
     };
@@ -54,7 +57,7 @@ function ensureGlobal(): RfGlobal {
 export function install(config: InstallOptions): void {
   if (!w) return; // SSR / Worker 环境——静默跳过
 
-  const g = ensureGlobal();
+  const g = ensureGlobal()!;
   if (g.installed) {
     // 幂等：第二次 install()（例如 HMR 触发的）直接跳过
     return;
@@ -73,7 +76,7 @@ export function install(config: InstallOptions): void {
   const bus = createHookBus(config.hooks, log);
 
   installSwAdapter({ config, bus, log });
-  installObserver({
+  const observerCtl = installObserver({
     resolver,
     bus,
     log,
@@ -85,12 +88,21 @@ export function install(config: InstallOptions): void {
     log,
     chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
   });
-  installViteAdapter({ resolver, bus, log });
+  const viteCtl = installViteAdapter({ resolver, bus, log });
   installSystemJSAdapter({ resolver, bus, log });
 
   g.url = (filename) => resolver.resolveBuiltUrl(filename);
   g.resolver = resolver;
   g.installed = true;
+  g.dispose = () => {
+    observerCtl.dispose();
+    viteCtl.dispose();
+    // webpack adapter 的 setTimeout 轮询为一次性且短暂（最多 1s），不需清理。
+    // systemjs adapter 覆写了 System.constructor.prototype，无法安全还原。
+    // sw adapter 的 message listener 绑定在 navigator.serviceWorker 上，
+    // 页面卸载时自动回收。
+    if (w) delete w.__RF__;
+  };
 
   log.info('installed', {
     version: RUNTIME_VERSION,
@@ -121,4 +133,5 @@ function warnDuplicateRules(rules: FallbackRule[] | undefined, log: Logger): voi
 
 // 让 install 函数在 IIFE 运行时即可访问——即使嵌入的 `install(...)` 调用
 // 尚未执行（该调用来自插件添加的兄弟表达式）。
+// 非浏览器环境下 ensureGlobal() 直接返回 null，无副作用。
 ensureGlobal();
