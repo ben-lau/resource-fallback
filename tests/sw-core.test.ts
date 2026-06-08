@@ -256,7 +256,7 @@ describe('sw core', () => {
     return async (request: { url: string }) => {
       try {
         return await onCors(request.url);
-      } catch (err) {
+      } catch {
         return onNoCors(request.url);
       }
     };

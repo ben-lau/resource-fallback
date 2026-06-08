@@ -82,7 +82,7 @@ describe('vite-adapter', () => {
 
     it('returns filename as-is when no rule matches', () => {
       setup();
-      const g = getGlobal();
+      const _g = getGlobal();
       // The match pattern is a string prefix (cdn1), and matchesFilename
       // returns true for all string patterns, so any filename matches.
       // Use a resolver with RegExp match that won't match arbitrary filenames.
@@ -134,7 +134,7 @@ describe('vite-adapter', () => {
     it('adds cache-bust param on retry attempts', async () => {
       let callCount = 0;
       const originalFunction = globalThis.Function;
-      const importMock = vi.fn().mockImplementation((url: string) => {
+      const importMock = vi.fn().mockImplementation((_url: string) => {
         callCount++;
         if (callCount <= 1) return Promise.reject(new Error('fail'));
         return Promise.resolve({ default: 'ok' });

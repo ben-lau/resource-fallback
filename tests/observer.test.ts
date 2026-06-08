@@ -5,7 +5,7 @@ import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
 import { createResolver } from '../packages/core/src/runtime/resolver';
 import { systemjsManagedUrls } from '../packages/core/src/runtime/adapter-systemjs';
-import type { ErrorEvent as RfErrorEvent, FallbackEvent, RetryEvent, SuccessEvent } from '../packages/core/src/types';
+import type { ErrorEvent as RfErrorEvent, FallbackEvent, RetryEvent } from '../packages/core/src/types';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
