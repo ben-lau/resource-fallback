@@ -1,6 +1,6 @@
 import type { HtmlTagDescriptor, Plugin, UserConfig } from 'vite';
 import { posix, join } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { init, parse } from 'es-module-lexer';
 import MagicString from 'magic-string';
 
@@ -9,6 +9,7 @@ import {
   buildServiceWorkerAssets,
   getServiceWorkerCode,
   inferResourceFallbackAssetType,
+  joinAssetPrefix,
   normalizeServiceWorkerOptions,
   type HtmlTag,
   type PluginOptions,
@@ -29,6 +30,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
   let shouldRewriteUrls = true;
   let base = '/';
   let serviceWorkerManifest: ResourceFallbackManifest | undefined;
+  const lexerReady = init;
   const injectTo: HtmlTagDescriptor['injectTo'] =
     options.htmlInject === 'head-append' ? 'head' : 'head-prepend';
 
@@ -41,14 +43,17 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
 
     config(userConfig): UserConfig {
       base = typeof userConfig?.base === 'string' ? userConfig.base : '/';
+      return {};
+    },
+
+    configResolved(resolvedConfig) {
+      base = resolvedConfig.base;
       shouldRewriteUrls = options.rules.some((r) => {
         if (typeof r.match === 'string') return base === r.match;
         if (r.match instanceof RegExp) return r.match.test(base);
         if (typeof r.match === 'function') return r.match(base);
         return false;
       });
-
-      return {};
     },
 
     generateBundle(_outputOptions, bundle) {
@@ -76,9 +81,10 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
     async writeBundle(options, bundle) {
       if (!shouldRewriteUrls) return;
 
-      await init;
+      await lexerReady;
 
-      const outDir = options.dir!;
+      const outDir = options.dir;
+      if (!outDir) return;
 
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
@@ -87,7 +93,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
         const dynamicChunks = new Set(chunk.dynamicImports);
         const chunkDir = posix.dirname(chunk.fileName);
         const filePath = join(outDir, chunk.fileName);
-        const code = readFileSync(filePath, 'utf8');
+        const code = await readFile(filePath, 'utf8');
 
         const [imports] = parse(code);
         const s = new MagicString(code);
@@ -110,7 +116,7 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
         }
 
         if (modified) {
-          writeFileSync(filePath, s.toString());
+          await writeFile(filePath, s.toString());
         }
       }
     },
@@ -168,12 +174,6 @@ function manifestFileName(swPath: string): string {
   const parts = stripLeadingSlash(swPath).split('/');
   parts[parts.length - 1] = 'manifest.json';
   return parts.join('/');
-}
-
-function joinAssetPrefix(prefix: string, filename: string): string {
-  if (/^https?:\/\//.test(filename) || filename[0] === '/') return filename;
-  const sep = /[/\\]$/.test(prefix) ? '' : '/';
-  return `${prefix}${sep}${filename}`;
 }
 
 function toViteTag(tag: HtmlTag, injectTo: HtmlTagDescriptor['injectTo']): HtmlTagDescriptor {

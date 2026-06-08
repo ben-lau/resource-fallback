@@ -188,6 +188,21 @@ export function serialiseConfig(cfg: RuntimeConfig & { webpackChunkLoadingGlobal
   return stringify(cfg);
 }
 
+/**
+ * 拼接 asset 前缀与文件名。
+ *
+ *  - 绝对 URL（`https?://` 或 `/` 开头）直接返回 filename
+ *  - 空 filename 返回 prefix（标准化尾部斜杠）
+ *  - 去掉 filename 的前导 `/`，确保 prefix 与 filename 之间恰好一个 `/`
+ */
+export function joinAssetPrefix(prefix: string, filename: string): string {
+  if (!filename) return prefix.replace(/\/?$/, '') || '/';
+  if (/^https?:\/\//.test(filename) || filename[0] === '/') return filename;
+  const name = filename.replace(/^\/+/, '');
+  const sep = /[/\\]$/.test(prefix) ? '' : '/';
+  return `${prefix}${sep}${name}`;
+}
+
 /** 剥离仅供插件使用的字段后再序列化。 */
 function stripPluginOnlyFields(opts: ExtendedPluginOptions): RuntimeConfig & { webpackChunkLoadingGlobals?: string[] } {
   const {
@@ -234,5 +249,5 @@ function stringify(value: unknown): string {
     }
     return '{' + parts.join(',') + '}';
   }
-  return JSON.stringify(value);
+  return JSON.stringify(value).replace(/</g, '\\x3c');
 }

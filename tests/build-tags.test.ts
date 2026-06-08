@@ -90,6 +90,18 @@ describe('buildInjectedTags', () => {
     expect(script?.innerHTML).toContain('/^https:\\/\\/cdn\\d+\\//');
   });
 
+  it('escapes </script> in config strings to prevent HTML injection', () => {
+    const tags = buildInjectedTags(
+      defineConfig({
+        rules: [{ match: '</script><script>alert(1)</script>', urls: ['https://x/'] }],
+        injectPreconnect: false,
+      }),
+    );
+    const script = tags.find((t) => t.tagName === 'script' && t.innerHTML?.includes('install('));
+    expect(script?.innerHTML).toContain('\\x3c');
+    expect(script?.innerHTML).not.toContain('</script><script>');
+  });
+
   it('serialises service worker manifest into the install config when provided', () => {
     const tags = buildInjectedTags(
       defineConfig({

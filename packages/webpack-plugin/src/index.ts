@@ -5,6 +5,7 @@ import {
   buildServiceWorkerAssets,
   getServiceWorkerCode,
   inferResourceFallbackAssetType,
+  joinAssetPrefix,
   normalizeServiceWorkerOptions,
   type HtmlTag,
   type PluginOptions,
@@ -167,11 +168,6 @@ function resolvePublicPath(compilation: Compilation, compiler: Compiler): string
   return typeof publicPath === 'string' && publicPath !== 'auto' ? publicPath : '/';
 }
 
-function joinAssetPrefix(prefix: string, filename: string): string {
-  if (/^https?:\/\//.test(filename) || filename[0] === '/') return filename;
-  const sep = /[/\\]$/.test(prefix) ? '' : '/';
-  return `${prefix}${sep}${filename}`;
-}
 
 const warnedNoHtml = new WeakSet<Compiler>();
 
