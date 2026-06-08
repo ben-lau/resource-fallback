@@ -94,9 +94,9 @@ flowchart TD
 
 | Package                                                        | Description                                   | Version |
 | -------------------------------------------------------------- | --------------------------------------------- | ------- |
-| [`@resource-fallback/core`](packages/core)                     | Browser IIFE runtime + Node utility functions | `0.0.1` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ plugin                                | `0.0.1` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin                             | `0.0.1` |
+| [`@resource-fallback/core`](packages/core)                     | Browser IIFE runtime + Node utility functions | `0.1.5` |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ plugin                                | `0.1.5` |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin                             | `0.1.5` |
 
 ## Quick Start
 
@@ -408,13 +408,17 @@ pnpm --filter @resource-fallback-example/vite-vue test:e2e
 pnpm --filter @resource-fallback-example/webpack-react test:e2e
 ```
 
-### Release (changesets)
+### Release (release-please)
+
+This project uses [release-please](https://github.com/googleapis/release-please) for fully automated version management and changelogs:
+
+1. Push commits to `main` using conventional commits format
+2. release-please automatically creates/updates a **Release PR** (with version bump + CHANGELOG)
+3. Merge the Release PR when ready → automatically creates GitHub Release + git tag
+4. Publish to npm:
 
 ```bash
-pnpm changeset              # Generate changeset
-pnpm changeset version      # Bump version + CHANGELOG
-pnpm build                  # Rebuild
-pnpm changeset publish      # Publish to npm
+pnpm release                # build + publish all packages to npm
 ```
 
 ## TODO

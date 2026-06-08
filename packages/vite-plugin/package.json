@@ -23,6 +23,7 @@
     "README.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -37,6 +38,9 @@
         "default": "./dist/index.cjs"
       }
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
@@ -53,5 +57,8 @@
   },
   "peerDependencies": {
     "vite": ">=4"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

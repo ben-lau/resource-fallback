@@ -5,6 +5,7 @@
   "description": "Frontend resource fallback monorepo: retry + multi-CDN + origin recovery for Webpack & Vite",
   "homepage": "https://github.com/ben-lau/resource-fallback#readme",
   "bugs": "https://github.com/ben-lau/resource-fallback/issues",
+  "license": "MIT",
   "author": "ben-lau <408736066@qq.com>",
   "repository": {
     "type": "git",

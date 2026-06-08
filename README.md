@@ -96,9 +96,9 @@ flowchart TD
 
 | 包                                                             | 说明                                 | 版本    |
 | -------------------------------------------------------------- | ------------------------------------ | ------- |
-| [`@resource-fallback/core`](packages/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.0.1` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ 插件                         | `0.0.1` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件                      | `0.0.1` |
+| [`@resource-fallback/core`](packages/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.1.5` |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ 插件                         | `0.1.5` |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件                      | `0.1.5` |
 
 ## 快速上手
 
@@ -410,13 +410,17 @@ pnpm --filter @resource-fallback-example/vite-vue test:e2e
 pnpm --filter @resource-fallback-example/webpack-react test:e2e
 ```
 
-### 发布流程（changesets）
+### 发布流程（release-please）
+
+本项目使用 [release-please](https://github.com/googleapis/release-please) 全自动管理版本号和 changelog：
+
+1. 正常提交代码到 `main`（使用 conventional commits 格式）
+2. release-please 自动创建/更新一个 **Release PR**（包含版本号 bump + CHANGELOG 更新）
+3. 想要发版时，合并该 Release PR → 自动创建 GitHub Release + git tag
+4. npm 发布：
 
 ```bash
-pnpm changeset              # 生成 changeset
-pnpm changeset version      # bump 版本 + CHANGELOG
-pnpm build                  # 重新构建
-pnpm changeset publish      # 推 npm
+pnpm release                # build + publish 所有包到 npm
 ```
 
 ## TODO
