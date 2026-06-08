@@ -39,4 +39,36 @@ describe('kill-switch', () => {
     document.cookie = '__rf_disable=1; path=/';
     expect(isDisabled({ rules: [] })).toBe(true);
   });
+
+  it('does NOT disable for __rf_disable=10 (exact match)', () => {
+    document.cookie = '__rf_disable=10; path=/';
+    expect(isDisabled({ rules: [] })).toBe(false);
+  });
+
+  it('matches cookie among multiple cookies', () => {
+    document.cookie = 'other=val';
+    document.cookie = '__rf_disable=1';
+    document.cookie = 'another=val2';
+    expect(isDisabled({ rules: [] })).toBe(true);
+  });
+
+  it('does NOT disable for string "false" global', () => {
+    (window as unknown as Record<string, unknown>).__RF_DISABLE__ = 'false';
+    expect(isDisabled({ rules: [] })).toBe(false);
+  });
+
+  it('disables for string "true" global', () => {
+    (window as unknown as Record<string, unknown>).__RF_DISABLE__ = 'true';
+    expect(isDisabled({ rules: [] })).toBe(true);
+  });
+
+  it('disables for numeric 1 global', () => {
+    (window as unknown as Record<string, unknown>).__RF_DISABLE__ = 1;
+    expect(isDisabled({ rules: [] })).toBe(true);
+  });
+
+  it('does NOT disable for object {} global', () => {
+    (window as unknown as Record<string, unknown>).__RF_DISABLE__ = {};
+    expect(isDisabled({ rules: [] })).toBe(false);
+  });
 });

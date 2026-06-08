@@ -17,7 +17,7 @@ export function isDisabled(cfg: RuntimeConfig): boolean {
 
   for (let i = 0; i < globals.length; i++) {
     const v = (window as unknown as Record<string, unknown>)[globals[i]];
-    if (v) return true;
+    if (v === true || v === 1 || v === '1' || v === 'true') return true;
   }
 
   try {
@@ -38,7 +38,7 @@ export function isDisabled(cfg: RuntimeConfig): boolean {
       const parts = cookies.split(';');
       for (let i = 0; i < parts.length; i++) {
         const trimmed = parts[i].replace(/^\s+/, '');
-        if (trimmed.indexOf(ck + '=1') === 0) return true;
+        if (trimmed === ck + '=1') return true;
       }
     }
   } catch {
