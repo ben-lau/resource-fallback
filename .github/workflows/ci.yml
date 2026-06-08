@@ -99,7 +99,7 @@ jobs:
 
       - run: pnpm test:coverage
 
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v7
         if: matrix.node-version == 22
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
