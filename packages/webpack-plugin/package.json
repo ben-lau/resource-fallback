@@ -1,6 +1,6 @@
 {
   "name": "@resource-fallback/webpack-plugin",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Webpack 5 plugin that wires @resource-fallback/core into your build (HTML injection + chunkLoadingGlobal forwarding)",
   "author": "ben-lau <408736066@qq.com>",
   "type": "module",

@@ -1,10 +1,18 @@
 # @resource-fallback/webpack-plugin
 
+## 0.1.5
+
+### Patch Changes
+
+- `joinAssetPrefix` 改为从 `@resource-fallback/core` 导入，移除插件内的重复实现
+- Updated dependencies
+  - @resource-fallback/core@0.1.5
+
 ## 0.1.4
 
 ### Patch Changes
 
-- sw fix
+- SW 共享 resolver、优化查找逻辑、精简 manifest 并重命名为 `rf-sw`
 - Updated dependencies
   - @resource-fallback/core@0.1.4
 
@@ -12,7 +20,7 @@
 
 ### Patch Changes
 
-- fix sw
+- 修复 SW CORS 探测请求的 credentials 问题
 - Updated dependencies
   - @resource-fallback/core@0.1.3
 
@@ -20,7 +28,7 @@
 
 ### Patch Changes
 
-- 修复 opaque 场景
+- 修复 Service Worker 意外覆盖 opaque 响应的场景
 - Updated dependencies
   - @resource-fallback/core@0.1.2
 
@@ -28,7 +36,7 @@
 
 ### Patch Changes
 
-- fix img cors error
+- 修复图片等资源在 CORS 场景下的加载问题
 - Updated dependencies
   - @resource-fallback/core@0.1.1
 
@@ -36,9 +44,10 @@
 
 ### Minor Changes
 
-- 207f03f: Add opt-in Hybrid Service Worker fallback support for non-script resources.
-
-  This release adds manifest-based Service Worker interception for images, fonts, media, CSS subresources, and controlled CSS imports while keeping script loading owned by the existing page-side adapters. It also emits SW assets from both Vite and Webpack plugins, preloads SW configuration to avoid first-load races, hardens SW event delivery and error handling, and documents the new behavior with examples and tests.
+- 新增 Hybrid Service Worker 资源回退能力
+  - 插件在 `compilation.hooks.processAssets` 中生成 `rf-sw.js` 资产文件和 manifest
+  - 通过 `RuntimeModule` 注入 SW 预加载脚本，避免首次加载竞态
+  - 支持 `chunkLoadingGlobal` 配置转发
 
 ### Patch Changes
 
@@ -49,7 +58,7 @@
 
 ### Patch Changes
 
-- fix the lack deps of css bundles
+- 修复异步模块中包含 CSS 时丢失依赖关系的问题
 - Updated dependencies
   - @resource-fallback/core@0.0.4
 
@@ -57,8 +66,7 @@
 
 ### Patch Changes
 
-- db39ae0: fix vite bug
-- fix the asset path join bug
+- 修复资源路径拼接问题
 - Updated dependencies [db39ae0]
 - Updated dependencies
   - @resource-fallback/core@0.0.3
@@ -67,13 +75,10 @@
 
 ### Patch Changes
 
-- 7927832: initial version
-- 95e33ca: Initial 0.0.1 release.
-
-  - `@resource-fallback/core`: ES5 IIFE runtime, resolver / retry / circuit-breaker / observer / kill-switch, `defineConfig` + `getRuntimeCode` + `buildInjectedTags` Node helpers.
-  - `@resource-fallback/webpack-plugin`: Webpack 5+ plugin with `RuntimeModule` injection patching `__webpack_require__.l`, html-webpack-plugin integration, automatic `chunkLoadingGlobal` forwarding.
-  - `@resource-fallback/vite-plugin`: Vite 4+ plugin wiring `experimental.renderBuiltUrl` to `__RF__.url()` and listening to `vite:preloadError`.
-
+- 初始版本发布
+  - Webpack 5+ 插件，通过 `RuntimeModule` 注入 patch `__webpack_require__.l` 实现运行时 fallback
+  - 集成 `html-webpack-plugin`，自动注入 `<script>` / `<link rel="preconnect">` 标签
+  - 自动转发 `chunkLoadingGlobal` 配置到运行时
 - Updated dependencies [7927832]
 - Updated dependencies [95e33ca]
   - @resource-fallback/core@0.0.2
