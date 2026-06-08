@@ -94,9 +94,7 @@ test('event ordering: retries before fallbacks for each resource', async ({ page
   expect(events.length).toBeGreaterThan(0);
 
   // Check that retries come before fallbacks for each URL
-  const retryIndices = events
-    .map((e, i) => (e.type === 'retry' ? i : -1))
-    .filter((i) => i >= 0);
+  const retryIndices = events.map((e, i) => (e.type === 'retry' ? i : -1)).filter((i) => i >= 0);
   const fallbackIndices = events
     .map((e, i) => (e.type === 'fallback' ? i : -1))
     .filter((i) => i >= 0);
@@ -152,7 +150,9 @@ test('manual external script status is scoped to the clicked URL', async ({ page
   await expect(page.getByText('已被 Observer 拦截并回退')).toBeVisible({ timeout: 30_000 });
 
   await page.click('button:has-text("加载不匹配规则的脚本")');
-  await expect(page.getByText('未被拦截（预期行为，不匹配任何规则）')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('未被拦截（预期行为，不匹配任何规则）')).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText('被拦截了（不应该）')).not.toBeVisible();
 });
 
@@ -163,7 +163,10 @@ test('manual external script retries do not poison async chunk fallback', async 
   for (let i = 0; i < 3; i++) {
     const before = await page.evaluate(() => ((window as any).__RF_EVENTS__ || []).length);
     await page.click('button:has-text("加载匹配规则的脚本")');
-    await page.waitForFunction((count) => ((window as any).__RF_EVENTS__ || []).length > count, before);
+    await page.waitForFunction(
+      (count) => ((window as any).__RF_EVENTS__ || []).length > count,
+      before,
+    );
     await expect(page.getByText('已被 Observer 拦截并回退')).toBeVisible({ timeout: 30_000 });
   }
 
@@ -171,7 +174,9 @@ test('manual external script retries do not poison async chunk fallback', async 
   await expect(page.getByTestId('lazy-c-loaded')).toBeVisible({ timeout: 30_000 });
 });
 
-test('hybrid service worker falls back image and css subresources after activation', async ({ page }) => {
+test('hybrid service worker falls back image and css subresources after activation', async ({
+  page,
+}) => {
   const events = await setupEventRecording(page);
 
   await reloadUnderServiceWorker(page);

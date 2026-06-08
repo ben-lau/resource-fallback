@@ -5,7 +5,11 @@ import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
 import { createResolver } from '../packages/core/src/runtime/resolver';
 import { systemjsManagedUrls } from '../packages/core/src/runtime/adapter-systemjs';
-import type { ErrorEvent as RfErrorEvent, FallbackEvent, RetryEvent } from '../packages/core/src/types';
+import type {
+  ErrorEvent as RfErrorEvent,
+  FallbackEvent,
+  RetryEvent,
+} from '../packages/core/src/types';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
@@ -150,9 +154,7 @@ describe('observer', () => {
     original.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 5));
 
-    const retry = Array.from(document.head.querySelectorAll('script')).find(
-      (s) => s !== original,
-    )!;
+    const retry = Array.from(document.head.querySelectorAll('script')).find((s) => s !== original)!;
     retry.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 5));
 
@@ -244,9 +246,7 @@ describe('observer', () => {
     // data-webpack attribute, so observer must continue to manage them.
     const original = fireScriptError(cdn1 + 'main.js');
     await new Promise((r) => setTimeout(r, 5));
-    const retry = Array.from(document.head.querySelectorAll('script')).find(
-      (s) => s !== original,
-    )!;
+    const retry = Array.from(document.head.querySelectorAll('script')).find((s) => s !== original)!;
     expect(retry).toBeTruthy();
     retry.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 5));
@@ -275,7 +275,9 @@ describe('observer', () => {
 
   it('skips URLs in systemjsManagedUrls (SystemJS adapter coordination)', async () => {
     let retried = false;
-    setup(undefined, () => { retried = true; });
+    setup(undefined, () => {
+      retried = true;
+    });
 
     systemjsManagedUrls.add(cdn1 + 'systemjs-chunk.js');
 
@@ -309,7 +311,14 @@ describe('observer', () => {
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
     });
-    const bus = createHookBus({ onFallback: (e) => { to = String(e.to); } }, log);
+    const bus = createHookBus(
+      {
+        onFallback: (e) => {
+          to = String(e.to);
+        },
+      },
+      log,
+    );
     installObserver({ resolver, bus, log, sri: 'strip' });
 
     const link = document.createElement('link');
@@ -321,7 +330,9 @@ describe('observer', () => {
 
     expect(to).toBe(cssBackup + 'style.css');
     const links = Array.from(document.head.querySelectorAll('link'));
-    const replacement = links.find((l) => l !== link && l.getAttribute('href')?.includes('style.css'));
+    const replacement = links.find(
+      (l) => l !== link && l.getAttribute('href')?.includes('style.css'),
+    );
     expect(replacement).toBeTruthy();
     expect(replacement!.getAttribute('href')).toBe(cssBackup + 'style.css');
   });
@@ -368,9 +379,12 @@ describe('observer', () => {
       ],
       defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
     });
-    const bus = createHookBus({
-      onRetry: (e) => retries.push((e as RetryEvent).url),
-    }, log);
+    const bus = createHookBus(
+      {
+        onRetry: (e) => retries.push((e as RetryEvent).url),
+      },
+      log,
+    );
     installObserver({ resolver, bus, log, sri: 'strip' });
 
     const s1 = document.createElement('script');
@@ -393,7 +407,9 @@ describe('observer', () => {
 
   it('ignores modulepreload link errors', async () => {
     let errored = false;
-    setup(() => { errored = true; });
+    setup(() => {
+      errored = true;
+    });
 
     const link = document.createElement('link');
     link.rel = 'modulepreload';
@@ -407,7 +423,9 @@ describe('observer', () => {
 
   it('ignores dns-prefetch link errors', async () => {
     let errored = false;
-    setup(() => { errored = true; });
+    setup(() => {
+      errored = true;
+    });
 
     const link = document.createElement('link');
     link.rel = 'dns-prefetch';
@@ -480,7 +498,9 @@ describe('observer', () => {
 
   it('ignores errors on non-script/non-link elements', async () => {
     let retried = false;
-    setup(undefined, () => { retried = true; });
+    setup(undefined, () => {
+      retried = true;
+    });
 
     const img = document.createElement('img');
     (img as HTMLImageElement).src = cdn1 + 'logo.png';

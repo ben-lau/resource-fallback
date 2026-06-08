@@ -1,5 +1,11 @@
 # resource-fallback
 
+[![npm](https://img.shields.io/npm/v/@resource-fallback/core)](https://www.npmjs.com/package/@resource-fallback/core)
+[![npm](https://img.shields.io/npm/v/@resource-fallback/vite-plugin?label=vite-plugin)](https://www.npmjs.com/package/@resource-fallback/vite-plugin)
+[![npm](https://img.shields.io/npm/v/@resource-fallback/webpack-plugin?label=webpack-plugin)](https://www.npmjs.com/package/@resource-fallback/webpack-plugin)
+[![CI](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml/badge.svg)](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ben-lau/resource-fallback/graph/badge.svg)](https://codecov.io/gh/ben-lau/resource-fallback)
+
 > **[中文](README.md)** | English
 
 Zero-mental-overhead frontend resource fallback solution. Provides runtime **retry → multi-CDN fallback → origin** capabilities for Webpack and Vite build outputs (sync / async JS, CSS) — no changes to business code required.
@@ -86,11 +92,11 @@ flowchart TD
 
 ## Packages
 
-| Package | Description | Version |
-| --- | --- | --- |
-| [`@resource-fallback/core`](packages/core) | Browser IIFE runtime + Node utility functions | `0.0.1` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin) | Vite 4+ plugin | `0.0.1` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin | `0.0.1` |
+| Package                                                        | Description                                   | Version |
+| -------------------------------------------------------------- | --------------------------------------------- | ------- |
+| [`@resource-fallback/core`](packages/core)                     | Browser IIFE runtime + Node utility functions | `0.0.1` |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ plugin                                | `0.0.1` |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin                             | `0.0.1` |
 
 ## Quick Start
 
@@ -127,7 +133,7 @@ export default defineConfig({
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
-            '/',  // origin fallback
+            '/', // origin fallback
           ],
           retry: { max: 2, baseDelay: 300 },
           circuit: { threshold: 3, cooldown: 30000 },
@@ -155,11 +161,7 @@ module.exports = {
       rules: [
         {
           match: 'https://cdn1.example.com/',
-          urls: [
-            'https://cdn2.example.com/',
-            'https://backup.example.com/',
-            '/',
-          ],
+          urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
     }),
@@ -181,50 +183,50 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### PluginOptions
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `rules` | `FallbackRule[]` | **Required** | Fallback rule array, matched in order; last match wins for duplicates |
-| `defaults` | `{ retry?, circuit? }` | — | Default retry/circuit config for all rules |
-| `debug` | `boolean \| 'auto'` | `'auto'` | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__` |
-| `sri` | `'strip' \| 'keep' \| 'strict'` | `'strip'` | Strategy for handling `integrity` attribute during fallback |
-| `enableDev` | `boolean` | `false` | Whether to activate in dev mode |
-| `nonce` | `string` | — | CSP nonce appended to the injected `<script>` tag |
-| `externalRuntime` | `boolean` | `false` | Load runtime as external script instead of inline |
-| `externalRuntimePath` | `string` | `'/__rf/runtime.js'` | Path for the external runtime script |
-| `injectPreconnect` | `boolean` | `true` | Inject `<link rel="preconnect">` for each fallback domain |
-| `htmlInject` | `'head-prepend' \| 'head-append` | `'head-prepend'` | Position in `<head>` for injection |
-| `serviceWorker` | `boolean \| ServiceWorkerOptions` | `false` | Enable Hybrid SW for non-script subresources and controlled CSS `@import` |
-| `hooks` | `RuntimeHooks` | — | JS function hooks (only available in `externalRuntime` mode) |
-| `disableGlobals` | `string[]` | `['__RF_DISABLE__']` | Additional kill-switch global variable names |
-| `disableQueryParam` | `string` | `'__rf'` | Query param name that disables runtime when set to `off` |
-| `disableCookie` | `string` | `'__rf_disable'` | Cookie name that disables runtime when set to `1` |
+| Field                 | Type                              | Default              | Description                                                               |
+| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array, matched in order; last match wins for duplicates     |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`   |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback               |
+| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                           |
+| `nonce`               | `string`                          | —                    | CSP nonce appended to the injected `<script>` tag                         |
+| `externalRuntime`     | `boolean`                         | `false`              | Load runtime as external script instead of inline                         |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                      |
+| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                 |
+| `htmlInject`          | `'head-prepend' \| 'head-append`  | `'head-prepend'`     | Position in `<head>` for injection                                        |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import` |
+| `hooks`               | `RuntimeHooks`                    | —                    | JS function hooks (only available in `externalRuntime` mode)              |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                              |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                  |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                         |
 
 ### FallbackRule
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `match` | `string \| RegExp \| (url) => boolean` | **Required** | URL matching pattern. String uses prefix matching |
-| `urls` | `string[]` | **Required** | Ordered candidate URL prefix list. Last one is typically the origin |
-| `retry` | `RetryOptions` | See below | Override retry config for this rule |
-| `circuit` | `CircuitOptions` | See below | Override circuit breaker config for this rule |
+| Field     | Type                                   | Default      | Description                                                         |
+| --------- | -------------------------------------- | ------------ | ------------------------------------------------------------------- |
+| `match`   | `string \| RegExp \| (url) => boolean` | **Required** | URL matching pattern. String uses prefix matching                   |
+| `urls`    | `string[]`                             | **Required** | Ordered candidate URL prefix list. Last one is typically the origin |
+| `retry`   | `RetryOptions`                         | See below    | Override retry config for this rule                                 |
+| `circuit` | `CircuitOptions`                       | See below    | Override circuit breaker config for this rule                       |
 
 ### RetryOptions
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `max` | `number` | `2` | Max retries per URL |
-| `baseDelay` | `number` | `300` | Initial retry delay (ms) |
-| `maxDelay` | `number` | `3000` | Exponential backoff delay cap (ms) |
-| `jitter` | `boolean` | `true` | Add ±25% random jitter to delay |
+| Field       | Type      | Default | Description                        |
+| ----------- | --------- | ------- | ---------------------------------- |
+| `max`       | `number`  | `2`     | Max retries per URL                |
+| `baseDelay` | `number`  | `300`   | Initial retry delay (ms)           |
+| `maxDelay`  | `number`  | `3000`  | Exponential backoff delay cap (ms) |
+| `jitter`    | `boolean` | `true`  | Add ±25% random jitter to delay    |
 
 ### CircuitOptions
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `threshold` | `number` | `5` | Consecutive failures on the same host before tripping the circuit |
-| `cooldown` | `number` | `30000` | Cooldown duration after circuit trip (ms), then retry |
-| `shareAcrossTabs` | `boolean` | `true` | Share circuit state across tabs via `localStorage` |
-| `storageTtl` | `number` | `120000` | TTL for circuit entries in localStorage (ms) |
+| Field             | Type      | Default  | Description                                                       |
+| ----------------- | --------- | -------- | ----------------------------------------------------------------- |
+| `threshold`       | `number`  | `5`      | Consecutive failures on the same host before tripping the circuit |
+| `cooldown`        | `number`  | `30000`  | Cooldown duration after circuit trip (ms), then retry             |
+| `shareAcrossTabs` | `boolean` | `true`   | Share circuit state across tabs via `localStorage`                |
+| `storageTtl`      | `number`  | `120000` | TTL for circuit entries in localStorage (ms)                      |
 
 ### ServiceWorkerOptions
 
@@ -242,15 +244,15 @@ resourceFallback({
 });
 ```
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `enabled` | `boolean` | `true` for object config | Set to `false` to disable from an object config |
-| `path` | `string` | Derived from `scope`, e.g. `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header |
-| `scope` | `string` | `'/'` | SW control scope |
-| `includeStyleImports` | `boolean` | `true` | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset |
-| `fallbackOnOpaque` | `boolean` | `false` | Treat cross-origin opaque responses as failures and continue fallback. Useful when CDN errors are hidden by the browser as opaque responses; may skip otherwise usable opaque CDN responses |
-| `cache.enabled` | `boolean` | `true` | Write to Cache API after a fallback network response succeeds |
-| `cache.cacheOpaque` | `boolean` | `false` | Whether to cache opaque responses. Disabled by default |
+| Field                 | Type      | Default                                                                 | Description                                                                                                                                                                                 |
+| --------------------- | --------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`             | `boolean` | `true` for object config                                                | Set to `false` to disable from an object config                                                                                                                                             |
+| `path`                | `string`  | Derived from `scope`, e.g. `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header                                                                              |
+| `scope`               | `string`  | `'/'`                                                                   | SW control scope                                                                                                                                                                            |
+| `includeStyleImports` | `boolean` | `true`                                                                  | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset                                                                        |
+| `fallbackOnOpaque`    | `boolean` | `false`                                                                 | Treat cross-origin opaque responses as failures and continue fallback. Useful when CDN errors are hidden by the browser as opaque responses; may skip otherwise usable opaque CDN responses |
+| `cache.enabled`       | `boolean` | `true`                                                                  | Write to Cache API after a fallback network response succeeds                                                                                                                               |
+| `cache.cacheOpaque`   | `boolean` | `false`                                                                 | Whether to cache opaque responses. Disabled by default                                                                                                                                      |
 
 The SW cache policy is intentionally conservative: only readable 2xx responses from a successful fallback are cached; the current manifest-version cache is read only after all network retry/fallback attempts are exhausted; old `resource-fallback-*` caches are cleaned when a new manifest version activates. The manifest version includes resources, fallback rules, and key SW cache policy so rule/cache changes do not keep using stale caches.
 
@@ -260,26 +262,26 @@ The SW resolver always uses an isolated in-memory circuit breaker. Even if page-
 
 ### Events
 
-| Event | When Fired | Detail |
-| --- | --- | --- |
-| `rf:retry` | Same URL retried | `{ url, attempt }` |
-| `rf:fallback` | Switched to next candidate URL | `{ from, to, reason? }` |
-| `rf:success` | Resource loaded successfully (after at least one retry/fallback) | `{ url, attempts }` |
-| `rf:error` | All candidate URLs exhausted | `{ url, reason? }` |
+| Event         | When Fired                                                       | Detail                  |
+| ------------- | ---------------------------------------------------------------- | ----------------------- |
+| `rf:retry`    | Same URL retried                                                 | `{ url, attempt }`      |
+| `rf:fallback` | Switched to next candidate URL                                   | `{ from, to, reason? }` |
+| `rf:success`  | Resource loaded successfully (after at least one retry/fallback) | `{ url, attempts }`     |
+| `rf:error`    | All candidate URLs exhausted                                     | `{ url, reason? }`      |
 
 Application code can listen via `window.addEventListener('rf:fallback', (e) => { ... })`.
 
 ### Sync/Async Coverage Matrix
 
-| Scenario | Webpack | Vite (build/preview) | Vite (dev) |
-| --- | --- | --- | --- |
-| Sync `<script>` / `<link>` | ✓ Observer | ✓ Observer | ✓ Observer |
-| Async chunk (`import()`) | ✓ `__webpack_require__.l` hook | ✓ `__RF__.load` + `renderDynamicImport` | ✗ |
-| CSS dynamic injection | ✓ Observer | ✓ Observer | ✓ Observer |
-| SystemJS (legacy bundle) | ✓ `instantiate` hook | ✓ `instantiate` hook | — |
-| Images / fonts / media | ✓ Hybrid SW (opt-in, controlled pages) | ✓ Hybrid SW (opt-in, controlled pages) | ✗ |
-| CSS `url()` / `@font-face` | ✓ Hybrid SW (opt-in, controlled pages) | ✓ Hybrid SW (opt-in, controlled pages) | ✗ |
-| CSS `@import` | ✓ Hybrid SW (CSS referrer must match manifest) | ✓ Hybrid SW (CSS referrer must match manifest) | ✗ |
+| Scenario                   | Webpack                                        | Vite (build/preview)                           | Vite (dev) |
+| -------------------------- | ---------------------------------------------- | ---------------------------------------------- | ---------- |
+| Sync `<script>` / `<link>` | ✓ Observer                                     | ✓ Observer                                     | ✓ Observer |
+| Async chunk (`import()`)   | ✓ `__webpack_require__.l` hook                 | ✓ `__RF__.load` + `renderDynamicImport`        | ✗          |
+| CSS dynamic injection      | ✓ Observer                                     | ✓ Observer                                     | ✓ Observer |
+| SystemJS (legacy bundle)   | ✓ `instantiate` hook                           | ✓ `instantiate` hook                           | —          |
+| Images / fonts / media     | ✓ Hybrid SW (opt-in, controlled pages)         | ✓ Hybrid SW (opt-in, controlled pages)         | ✗          |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW (opt-in, controlled pages)         | ✓ Hybrid SW (opt-in, controlled pages)         | ✗          |
+| CSS `@import`              | ✓ Hybrid SW (CSS referrer must match manifest) | ✓ Hybrid SW (CSS referrer must match manifest) | ✗          |
 
 > Vite dev mode uses native ESM — dynamic import failures cannot be intercepted. Use `vite preview` or a production build to verify fallback behavior.
 > The SW cannot guarantee control over the very first page load. Early requests issued during initial HTML parsing still rely on the page runtime/adapters.
@@ -306,11 +308,11 @@ For external mode, deploy `runtime.js` yourself — use `getRuntimeCode()` to ge
 
 ## SRI Strategies
 
-| Strategy | Behavior |
-| --- | --- |
+| Strategy          | Behavior                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
 | `strip` (default) | Remove `integrity` attribute on fallback, since different CDNs typically produce different hashes |
-| `keep` | Preserve the attribute; browser verification failure triggers error, continues to next fallback |
-| `strict` | Same as `keep`, with more explicit semantics |
+| `keep`            | Preserve the attribute; browser verification failure triggers error, continues to next fallback   |
+| `strict`          | Same as `keep`, with more explicit semantics                                                      |
 
 > To preserve SRI across all CDNs, ensure **the same file produces the same hash on all CDNs** (recommended: sync build artifacts to multiple object storage buckets).
 
@@ -318,11 +320,11 @@ For external mode, deploy `runtime.js` yourself — use `getRuntimeCode()` to ge
 
 Three ways to disable the runtime without a new release:
 
-| Method | Example | Use Case |
-| --- | --- | --- |
-| Global variable | `window.__RF_DISABLE__ = true` | Inline before the runtime `<script>` |
-| Query parameter | Visit `?__rf=off` | Temporary debugging |
-| Cookie | `__rf_disable=1` | Gateway-level disable per session/user |
+| Method          | Example                        | Use Case                               |
+| --------------- | ------------------------------ | -------------------------------------- |
+| Global variable | `window.__RF_DISABLE__ = true` | Inline before the runtime `<script>`   |
+| Query parameter | Visit `?__rf=off`              | Temporary debugging                    |
+| Cookie          | `__rf_disable=1`               | Gateway-level disable per session/user |
 
 ## Sync Script Limitations
 

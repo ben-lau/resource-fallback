@@ -64,6 +64,7 @@ pnpm --filter @resource-fallback-example/vite-vue start
 Open http://127.0.0.1:4174 and switch between routes to observe async chunk fallback behavior.
 
 Open DevTools → Network panel to see:
+
 1. Requests to `cdn-primary.example.invalid` fail
 2. Runtime retries → switches to `cdn-secondary` → then `cdn-backup` → finally origin `/`
 3. Origin fallback succeeds, page renders normally
@@ -83,6 +84,7 @@ pnpm --filter @resource-fallback-example/vite-vue test:e2e
 ```
 
 Test coverage:
+
 - Full retry → fallback → origin chain for entry scripts
 - Async chunk fallback on route switches
 - Event order verification (retry → fallback → success)

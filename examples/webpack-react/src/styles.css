@@ -6,7 +6,10 @@
   --rf-accent: #0366d6;
 }
 
-* { box-sizing: border-box; margin: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
 
 body {
   font-family: var(--rf-font);
@@ -15,7 +18,11 @@ body {
   line-height: 1.5;
 }
 
-.rf-app { max-width: 960px; margin: 0 auto; padding: 24px; }
+.rf-app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
 
 .rf-card {
   background: var(--rf-card);
@@ -32,8 +39,14 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
-.rf-badge--open { background: #fdd; color: #b00020; }
-.rf-badge--closed { background: #dfd; color: #0f7d2a; }
+.rf-badge--open {
+  background: #fdd;
+  color: #b00020;
+}
+.rf-badge--closed {
+  background: #dfd;
+  color: #0f7d2a;
+}
 
 .rf-btn {
   padding: 6px 16px;
@@ -43,8 +56,14 @@ body {
   cursor: pointer;
   font-size: 14px;
 }
-.rf-btn:disabled { opacity: .5; cursor: default; }
-.rf-btn:hover:not(:disabled) { background: #f0f4ff; border-color: var(--rf-accent); }
+.rf-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rf-btn:hover:not(:disabled) {
+  background: #f0f4ff;
+  border-color: var(--rf-accent);
+}
 
 .rf-banner {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

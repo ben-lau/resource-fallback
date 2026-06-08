@@ -53,7 +53,9 @@ function setup(opts?: {
   const bus = createHookBus(
     {
       onRetry: opts?.onRetry as ((e: { url: string; attempt: number }) => void) | undefined,
-      onFallback: opts?.onFallback as ((e: { from: string; to: string; reason?: unknown }) => void) | undefined,
+      onFallback: opts?.onFallback as
+        | ((e: { from: string; to: string; reason?: unknown }) => void)
+        | undefined,
       onError: opts?.onError as ((e: { url: string; reason?: unknown }) => void) | undefined,
       onSuccess: opts?.onSuccess as ((e: { url: string; attempts: number }) => void) | undefined,
     },

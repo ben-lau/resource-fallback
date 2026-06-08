@@ -1,41 +1,63 @@
 {
   "name": "resource-fallback",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "description": "Frontend resource fallback monorepo: retry + multi-CDN + origin recovery for Webpack & Vite",
+  "homepage": "https://github.com/ben-lau/resource-fallback#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues",
   "author": "ben-lau <408736066@qq.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/ben-lau/resource-fallback.git"
   },
-  "homepage": "https://github.com/ben-lau/resource-fallback#readme",
-  "bugs": "https://github.com/ben-lau/resource-fallback/issues",
   "type": "module",
   "scripts": {
     "build": "pnpm -r --filter='./packages/*' run build",
     "build:core": "pnpm --filter @resource-fallback/core run build",
     "lint": "oxlint --deny-warnings",
     "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "pnpm -r --filter='./packages/*' run typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules/.cache",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "publint": "pnpm -r --filter='./packages/*' exec publint",
+    "attw": "pnpm -r --filter='./packages/*' exec attw --pack --entrypoints .",
+    "size": "size-limit",
+    "size:check": "size-limit --limit",
+    "release": "pnpm build && pnpm -r --filter='./packages/*' publish",
+    "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.10",
+    "@arethetypeswrong/cli": "^0.18.3",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@size-limit/file": "^12.1.0",
     "@swc/core": "^1.10.0",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^2.1.8",
     "jsdom": "^25.0.1",
+    "lefthook": "^2.1.9",
+    "oxfmt": "^0.53.0",
     "oxlint": "^1.68.0",
+    "publint": "^0.3.21",
+    "size-limit": "^12.1.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
+  "size-limit": [
+    {
+      "path": "packages/core/dist/runtime.iife.js",
+      "limit": "30 kB"
+    },
+    {
+      "path": "packages/core/dist/rf-sw.js",
+      "limit": "5 kB"
+    }
+  ],
   "engines": {
     "node": ">=18"
   },

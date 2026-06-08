@@ -11,9 +11,10 @@ import type { RuntimeConfig } from '../types';
 export function isDisabled(cfg: RuntimeConfig): boolean {
   if (typeof window === 'undefined') return true;
 
-  const globals = cfg.disableGlobals && cfg.disableGlobals.length
-    ? cfg.disableGlobals.concat(['__RF_DISABLE__'])
-    : ['__RF_DISABLE__'];
+  const globals =
+    cfg.disableGlobals && cfg.disableGlobals.length
+      ? cfg.disableGlobals.concat(['__RF_DISABLE__'])
+      : ['__RF_DISABLE__'];
 
   for (let i = 0; i < globals.length; i++) {
     const v = (window as unknown as Record<string, unknown>)[globals[i]];

@@ -84,11 +84,7 @@ export function installSystemJSAdapter(deps: AdapterDeps): void {
 function hookInstantiate(proto: SystemJSProto, deps: AdapterDeps): void {
   const origInstantiate = proto.instantiate;
 
-  proto.instantiate = function (
-    this: SystemJSLike,
-    url: string,
-    parentUrl?: string,
-  ) {
+  proto.instantiate = function (this: SystemJSLike, url: string, parentUrl?: string) {
     if (!deps.resolver.findRule(url)) {
       return origInstantiate.call(this, url, parentUrl);
     }

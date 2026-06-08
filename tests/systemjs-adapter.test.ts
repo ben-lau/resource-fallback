@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
-import { installSystemJSAdapter, systemjsManagedUrls } from '../packages/core/src/runtime/adapter-systemjs';
+import {
+  installSystemJSAdapter,
+  systemjsManagedUrls,
+} from '../packages/core/src/runtime/adapter-systemjs';
 import { createResolver } from '../packages/core/src/runtime/resolver';
 
 const cdn1 = 'https://cdn1.example.com/';
@@ -75,7 +78,9 @@ function setup(opts?: {
   const bus = createHookBus(
     {
       onRetry: opts?.onRetry as ((e: { url: string; attempt: number }) => void) | undefined,
-      onFallback: opts?.onFallback as ((e: { from: string; to: string; reason?: unknown }) => void) | undefined,
+      onFallback: opts?.onFallback as
+        | ((e: { from: string; to: string; reason?: unknown }) => void)
+        | undefined,
       onError: opts?.onError as ((e: { url: string; reason?: unknown }) => void) | undefined,
       onSuccess: opts?.onSuccess as ((e: { url: string; attempts: number }) => void) | undefined,
     },

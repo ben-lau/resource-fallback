@@ -38,7 +38,8 @@ describe('buildInjectedTags', () => {
     expect(preconnects[0].attributes['href']).toBe('https://cdn1.example.com');
     expect(
       tags.find(
-        (t) => t.attributes['rel'] === 'preconnect' && t.attributes['href'] === 'http://dummy.local',
+        (t) =>
+          t.attributes['rel'] === 'preconnect' && t.attributes['href'] === 'http://dummy.local',
       ),
     ).toBeUndefined();
   });

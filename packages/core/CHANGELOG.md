@@ -60,7 +60,6 @@
 - 新增 Hybrid Service Worker 资源回退能力
 
   通过 manifest 驱动 Service Worker 拦截非脚本资源（图片、字体、媒体、CSS 子资源及受控 `@import`），脚本加载仍由页面侧 adapter 负责。
-
   - `fetchWithFallback` 核心回退循环：支持 retry → fallback → cache fallback 全链路
   - `shouldHandleSwRequest` 按 destination 过滤，仅处理 manifest 中声明的资源
   - SW 通过 `__RF_SW_PRELOAD__` 预加载配置，避免首次 fetch 时 manifest 尚未就绪的竞态

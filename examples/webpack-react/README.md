@@ -78,6 +78,7 @@ pnpm --filter @resource-fallback-example/webpack-react start
 打开 http://127.0.0.1:4173，点击 "Load Lazy Module" 按钮观察异步 chunk 的回退行为。
 
 打开 DevTools → Network 面板可以看到：
+
 1. 入口脚本对 `cdn-primary.example.invalid` 的请求失败
 2. Webpack adapter 重试 → 切换到 `cdn-secondary` → 再到 `cdn-backup` → 最后回源 `/`
 3. 回源成功，React 应用正常渲染
@@ -96,6 +97,7 @@ pnpm --filter @resource-fallback-example/webpack-react test:e2e
 ```
 
 测试覆盖：
+
 - 入口脚本的完整重试→回退→回源链路
 - 多个 `React.lazy()` 组件的顺序加载与回退
 - 事件顺序验证

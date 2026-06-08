@@ -4,10 +4,7 @@
  *  - `RegExp` 对 URL 做正则测试
  *  - 函数针对每个 URL 自行决定
  */
-export type MatchPattern =
-  | string
-  | RegExp
-  | ((url: string) => boolean);
+export type MatchPattern = string | RegExp | ((url: string) => boolean);
 
 export interface RetryOptions {
   /** 同一 URL 的重试预算。超过此次数后切换到下一个 URL。默认 2。 */

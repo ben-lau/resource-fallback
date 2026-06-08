@@ -70,21 +70,35 @@ function createMemoryCaches(seed?: Response) {
 
 describe('sw core', () => {
   it('handles only sw-owned subresources and controlled css imports', () => {
-    expect(shouldHandleSwRequest(requestLike(cdn + 'assets/logo.png', 'image'), manifest, {
-      includeStyleImports: true,
-    })).toBe(true);
-    expect(shouldHandleSwRequest(requestLike(cdn + 'assets/font.woff2', 'font'), manifest, {
-      includeStyleImports: true,
-    })).toBe(true);
-    expect(shouldHandleSwRequest(requestLike(cdn + 'assets/app.js', 'script'), manifest, {
-      includeStyleImports: true,
-    })).toBe(false);
-    expect(shouldHandleSwRequest(requestLike(cdn + 'assets/import.css', 'style', cdn + 'assets/app.css'), manifest, {
-      includeStyleImports: true,
-    })).toBe(true);
-    expect(shouldHandleSwRequest(requestLike(cdn + 'assets/import.css', 'style'), manifest, {
-      includeStyleImports: true,
-    })).toBe(false);
+    expect(
+      shouldHandleSwRequest(requestLike(cdn + 'assets/logo.png', 'image'), manifest, {
+        includeStyleImports: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldHandleSwRequest(requestLike(cdn + 'assets/font.woff2', 'font'), manifest, {
+        includeStyleImports: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldHandleSwRequest(requestLike(cdn + 'assets/app.js', 'script'), manifest, {
+        includeStyleImports: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldHandleSwRequest(
+        requestLike(cdn + 'assets/import.css', 'style', cdn + 'assets/app.css'),
+        manifest,
+        {
+          includeStyleImports: true,
+        },
+      ),
+    ).toBe(true);
+    expect(
+      shouldHandleSwRequest(requestLike(cdn + 'assets/import.css', 'style'), manifest, {
+        includeStyleImports: true,
+      }),
+    ).toBe(false);
   });
 
   it('falls back over the network and caches only the fallback success response', async () => {
@@ -229,18 +243,21 @@ describe('sw core', () => {
     const current = createFallbackCacheName(manifest);
     const old = 'resource-fallback-rf-old';
 
-    await cleanupOldFallbackCaches({
-      async open() {
-        throw new Error('not used');
+    await cleanupOldFallbackCaches(
+      {
+        async open() {
+          throw new Error('not used');
+        },
+        async keys() {
+          return [current, old, 'other-cache'];
+        },
+        async delete(name: string) {
+          deleted.push(name);
+          return true;
+        },
       },
-      async keys() {
-        return [current, old, 'other-cache'];
-      },
-      async delete(name: string) {
-        deleted.push(name);
-        return true;
-      },
-    }, manifest);
+      manifest,
+    );
 
     expect(deleted).toEqual([old]);
   });
@@ -265,7 +282,9 @@ describe('sw core', () => {
   it('cors upgrade: uses cors 200 directly when CDN supports CORS', async () => {
     const fetcher = createCorsUpgradeFetcher(
       async () => new Response('cdn-image', { status: 200 }),
-      async () => { throw new Error('should not reach no-cors'); },
+      async () => {
+        throw new Error('should not reach no-cors');
+      },
     );
 
     const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
@@ -286,7 +305,9 @@ describe('sw core', () => {
         if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
         return new Response('Bad Gateway', { status: 502 });
       },
-      async () => { throw new Error('should not reach no-cors'); },
+      async () => {
+        throw new Error('should not reach no-cors');
+      },
     );
 
     const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
@@ -306,7 +327,9 @@ describe('sw core', () => {
     Object.defineProperty(opaque, 'type', { value: 'opaque' });
 
     const fetcher = createCorsUpgradeFetcher(
-      async () => { throw new TypeError('CORS error'); },
+      async () => {
+        throw new TypeError('CORS error');
+      },
       async () => opaque,
     );
 
@@ -328,7 +351,9 @@ describe('sw core', () => {
         if (url.startsWith(origin)) return new Response('fallback-image', { status: 200 });
         throw new TypeError('network error');
       },
-      async () => { throw new TypeError('network error'); },
+      async () => {
+        throw new TypeError('network error');
+      },
     );
 
     const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
@@ -348,22 +373,24 @@ describe('sw core', () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
     const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
 
-    await expect(fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
-      manifest,
-      runtimeConfig: {
-        defaults: {
-          circuit: {
-            threshold: 1,
-            shareAcrossTabs: true,
+    await expect(
+      fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+        manifest,
+        runtimeConfig: {
+          defaults: {
+            circuit: {
+              threshold: 1,
+              shareAcrossTabs: true,
+            },
           },
         },
-      },
-      cache: { enabled: false, cacheOpaque: false },
-      fetcher: vi.fn(async () => {
-        throw new TypeError('offline');
+        cache: { enabled: false, cacheOpaque: false },
+        fetcher: vi.fn(async () => {
+          throw new TypeError('offline');
+        }),
+        emit: () => {},
       }),
-      emit: () => {},
-    })).rejects.toThrow('offline');
+    ).rejects.toThrow('offline');
 
     expect(getItem).not.toHaveBeenCalled();
     expect(setItem).not.toHaveBeenCalled();

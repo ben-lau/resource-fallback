@@ -28,8 +28,7 @@ interface RfGlobal {
 
 declare const __RF_VERSION__: string;
 
-const RUNTIME_VERSION =
-  typeof __RF_VERSION__ === 'string' ? __RF_VERSION__ : '0.0.1';
+const RUNTIME_VERSION = typeof __RF_VERSION__ === 'string' ? __RF_VERSION__ : '0.0.1';
 
 const w =
   typeof window !== 'undefined'

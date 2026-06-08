@@ -26,7 +26,7 @@ export default defineConfig({
           match: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
-            '/',  // origin fallback
+            '/', // origin fallback
           ],
         },
       ],
@@ -44,6 +44,7 @@ The plugin does three things at build time:
 ### 1. HTML Injection
 
 Via the `transformIndexHtml` hook, injects into `<head>`:
+
 - `<link rel="preconnect">` tags (pre-build connections for each fallback domain)
 - `<script>` with inlined runtime IIFE + `install(config)` call
 
@@ -53,10 +54,10 @@ Uses Vite's `experimental.renderBuiltUrl` hook to rewrite JS asset URLs for runt
 
 ```js
 // Original output
-import('/assets/chunk-abc.js')
+import('/assets/chunk-abc.js');
 
 // Rewritten (in build output)
-window.__RF__.url('assets/chunk-abc.js')
+window.__RF__.url('assets/chunk-abc.js');
 // → 'https://cdn.example.com/assets/chunk-abc.js' (or skips unavailable host due to circuit breaker)
 ```
 
@@ -66,13 +67,14 @@ Uses Rollup's `renderDynamicImport` hook to wrap dynamic `import()` into a loadi
 
 ```js
 // Original code
-const mod = await import('./Lazy.vue')
+const mod = await import('./Lazy.vue');
 
 // After build
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'))
+const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
 ```
 
 `__RF__.load` internally executes the full retry → fallback loop:
+
 1. Determines initial request URL via `resolveBuiltUrl`
 2. Attempts `import(url)`
 3. On failure, retries per config (exponential backoff + jitter)
@@ -96,21 +98,17 @@ resourceFallback({
   rules: [
     {
       match: 'https://cdn.example.com/',
-      urls: [
-        'https://cdn-backup.example.com/',
-        'https://static.mysite.com/',
-        '/',
-      ],
+      urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
     },
   ],
-  debug: 'auto',            // controlled via localStorage.__RF_DEBUG__
-  sri: 'strip',             // remove integrity on fallback
-  nonce: 'my-csp-nonce',    // CSP nonce
-  injectPreconnect: true,   // inject <link rel="preconnect">
+  debug: 'auto', // controlled via localStorage.__RF_DEBUG__
+  sri: 'strip', // remove integrity on fallback
+  nonce: 'my-csp-nonce', // CSP nonce
+  injectPreconnect: true, // inject <link rel="preconnect">
   htmlInject: 'head-prepend', // inject at top of <head>
-})
+});
 ```
 
 ### With @vitejs/plugin-legacy
@@ -127,7 +125,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/', ] }],
+      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

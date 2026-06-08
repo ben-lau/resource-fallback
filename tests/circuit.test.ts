@@ -238,10 +238,7 @@ describe('circuit', () => {
   });
 
   it('mergeCircuit picks rule over defaults over CIRCUIT_DEFAULTS', () => {
-    const result = mergeCircuit(
-      { threshold: 10, cooldown: 5000 },
-      { threshold: 3 },
-    );
+    const result = mergeCircuit({ threshold: 10, cooldown: 5000 }, { threshold: 3 });
     expect(result.threshold).toBe(3);
     expect(result.cooldown).toBe(5000);
     expect(result.shareAcrossTabs).toBe(CIRCUIT_DEFAULTS.shareAcrossTabs);

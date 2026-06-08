@@ -27,7 +27,10 @@ interface ServiceWorkerLike {
   clients?: {
     claim?: () => Promise<void>;
     get?: (id: string) => Promise<{ postMessage: (message: unknown) => void } | undefined>;
-    matchAll?: (options?: { type?: string; includeUncontrolled?: boolean }) => Promise<Array<{ postMessage: (message: unknown) => void }>>;
+    matchAll?: (options?: {
+      type?: string;
+      includeUncontrolled?: boolean;
+    }) => Promise<Array<{ postMessage: (message: unknown) => void }>>;
   };
   registration?: unknown;
 }
@@ -60,7 +63,8 @@ function rebuildResolver(): void {
   }
 }
 
-const preload = (self as unknown as { __RF_SW_PRELOAD__?: Partial<SwConfigMessage> }).__RF_SW_PRELOAD__;
+const preload = (self as unknown as { __RF_SW_PRELOAD__?: Partial<SwConfigMessage> })
+  .__RF_SW_PRELOAD__;
 if (preload?.manifest && preload.runtimeConfig) {
   manifest = preload.manifest;
   runtimeConfig = preload.runtimeConfig;
@@ -75,12 +79,17 @@ sw.addEventListener('install', (event: unknown) => {
 
 sw.addEventListener('activate', (event: unknown) => {
   const ev = event as ExtendableEventLike;
-  ev.waitUntil((async () => {
-    if (manifest && typeof caches !== 'undefined') {
-      await cleanupOldFallbackCaches(caches as unknown as Parameters<typeof cleanupOldFallbackCaches>[0], manifest);
-    }
-    if (sw.clients?.claim) await sw.clients.claim();
-  })());
+  ev.waitUntil(
+    (async () => {
+      if (manifest && typeof caches !== 'undefined') {
+        await cleanupOldFallbackCaches(
+          caches as unknown as Parameters<typeof cleanupOldFallbackCaches>[0],
+          manifest,
+        );
+      }
+      if (sw.clients?.claim) await sw.clients.claim();
+    })(),
+  );
 });
 
 sw.addEventListener('message', (event: unknown) => {
@@ -101,7 +110,11 @@ sw.addEventListener('fetch', (event: unknown) => {
   let emittedError = false;
   const emitEvent = (type: 'retry' | 'fallback' | 'success' | 'error', payload: unknown) => {
     if (type === 'error') emittedError = true;
-    void postSwEventToClient(sw.clients, ev.clientId, { type: 'RF_SW_EVENT', event: type, payload });
+    void postSwEventToClient(sw.clients, ev.clientId, {
+      type: 'RF_SW_EVENT',
+      event: type,
+      payload,
+    });
   };
   // fallbackOnOpaque enables cors probe: try cors first to get inspectable
   // status codes, fall back to no-cors when CORS is unavailable.
@@ -115,7 +128,10 @@ sw.addEventListener('fetch', (event: unknown) => {
     // exposes real status codes). Core sees false so that an opaque response
     // from the no-cors fallback path is accepted as "server reachable".
     fallbackOnOpaque: false,
-    caches: typeof caches === 'undefined' ? undefined : caches as unknown as Parameters<typeof fetchWithFallback>[1]['caches'],
+    caches:
+      typeof caches === 'undefined'
+        ? undefined
+        : (caches as unknown as Parameters<typeof fetchWithFallback>[1]['caches']),
     fetcher: async (request) => {
       const req = request as Request;
       if (upgradeCors && req.mode === 'no-cors') {
@@ -135,10 +151,12 @@ sw.addEventListener('fetch', (event: unknown) => {
     },
     emit: emitEvent,
   });
-  ev.respondWith(resolveSwResponseWithErrorBoundary(
-    ev.request,
-    response,
-    (_type, payload) => emitEvent('error', payload),
-    () => emittedError,
-  ));
+  ev.respondWith(
+    resolveSwResponseWithErrorBoundary(
+      ev.request,
+      response,
+      (_type, payload) => emitEvent('error', payload),
+      () => emittedError,
+    ),
+  );
 });

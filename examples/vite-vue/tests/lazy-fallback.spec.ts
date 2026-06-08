@@ -134,7 +134,9 @@ test('no console errors from resource-fallback runtime', async ({ page }) => {
   expect(consoleErrors).toHaveLength(0);
 });
 
-test('hybrid service worker falls back image and css subresources after activation', async ({ page }) => {
+test('hybrid service worker falls back image and css subresources after activation', async ({
+  page,
+}) => {
   const events = await setupEventRecording(page);
 
   await reloadUnderServiceWorker(page);

@@ -56,21 +56,29 @@ describe('service worker options', () => {
   });
 
   it('builds service worker assets only when enabled', () => {
-    expect(buildServiceWorkerAssets({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
-      serviceWorker: false,
-    }, {
-      versionSeed: 'build-1',
-      assets: [],
-    })).toBeNull();
+    expect(
+      buildServiceWorkerAssets(
+        {
+          rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+          serviceWorker: false,
+        },
+        {
+          versionSeed: 'build-1',
+          assets: [],
+        },
+      ),
+    ).toBeNull();
 
-    const assets = buildServiceWorkerAssets({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
-      serviceWorker: true,
-    }, {
-      versionSeed: 'build-1',
-      assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image' }],
-    });
+    const assets = buildServiceWorkerAssets(
+      {
+        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+        serviceWorker: true,
+      },
+      {
+        versionSeed: 'build-1',
+        assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image' }],
+      },
+    );
 
     expect(assets?.path).toBe('/rf-sw.js');
     expect(assets?.scope).toBe('/');
@@ -85,13 +93,18 @@ describe('service worker options', () => {
   });
 
   it('preserves RegExp rules in the preloaded service worker config', () => {
-    const assets = buildServiceWorkerAssets({
-      rules: [{ match: /^https:\/\/cdn\d+\.example\.com\//, urls: ['https://cdn1.example.com/', '/'] }],
-      serviceWorker: true,
-    }, {
-      versionSeed: 'build-1',
-      assets: [{ url: 'https://cdn1.example.com/logo.png', type: 'image' }],
-    });
+    const assets = buildServiceWorkerAssets(
+      {
+        rules: [
+          { match: /^https:\/\/cdn\d+\.example\.com\//, urls: ['https://cdn1.example.com/', '/'] },
+        ],
+        serviceWorker: true,
+      },
+      {
+        versionSeed: 'build-1',
+        assets: [{ url: 'https://cdn1.example.com/logo.png', type: 'image' }],
+      },
+    );
 
     expect(assets?.code).toContain('"match":/^https:\\/\\/cdn\\d+\\.example\\.com\\//');
     expect(assets?.code).not.toContain('"match":{}');
@@ -102,18 +115,27 @@ describe('service worker options', () => {
       versionSeed: 'same-build',
       assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image' as const }],
     };
-    const first = buildServiceWorkerAssets({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
-      serviceWorker: { cache: { enabled: true } },
-    }, input);
-    const changedRule = buildServiceWorkerAssets({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/b/'] }],
-      serviceWorker: { cache: { enabled: true } },
-    }, input);
-    const changedCache = buildServiceWorkerAssets({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
-      serviceWorker: { cache: { enabled: false } },
-    }, input);
+    const first = buildServiceWorkerAssets(
+      {
+        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
+        serviceWorker: { cache: { enabled: true } },
+      },
+      input,
+    );
+    const changedRule = buildServiceWorkerAssets(
+      {
+        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/b/'] }],
+        serviceWorker: { cache: { enabled: true } },
+      },
+      input,
+    );
+    const changedCache = buildServiceWorkerAssets(
+      {
+        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
+        serviceWorker: { cache: { enabled: false } },
+      },
+      input,
+    );
 
     expect(changedRule?.manifest.version).not.toBe(first?.manifest.version);
     expect(changedCache?.manifest.version).not.toBe(first?.manifest.version);

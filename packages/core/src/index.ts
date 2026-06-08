@@ -90,10 +90,7 @@ export function getServiceWorkerPath(): string {
     const cjsDirname = (globalThis as { __dirname?: string }).__dirname;
     here = typeof cjsDirname === 'string' ? cjsDirname : process.cwd();
   }
-  const candidates = [
-    resolve(here, 'rf-sw.js'),
-    resolve(here, '..', 'dist', 'rf-sw.js'),
-  ];
+  const candidates = [resolve(here, 'rf-sw.js'), resolve(here, '..', 'dist', 'rf-sw.js')];
   for (const c of candidates) {
     try {
       readFileSync(c);
@@ -184,7 +181,9 @@ export function buildInjectedTags(opts: ExtendedPluginOptions): HtmlTag[] {
  * 将运行时配置序列化为 JSON，其中 `RegExp` 实例会被渲染为原生正则字面量，
  * 以便运行时直接使用。
  */
-export function serialiseConfig(cfg: RuntimeConfig & { webpackChunkLoadingGlobals?: string[] }): string {
+export function serialiseConfig(
+  cfg: RuntimeConfig & { webpackChunkLoadingGlobals?: string[] },
+): string {
   return stringify(cfg);
 }
 
@@ -204,7 +203,9 @@ export function joinAssetPrefix(prefix: string, filename: string): string {
 }
 
 /** 剥离仅供插件使用的字段后再序列化。 */
-function stripPluginOnlyFields(opts: ExtendedPluginOptions): RuntimeConfig & { webpackChunkLoadingGlobals?: string[] } {
+function stripPluginOnlyFields(
+  opts: ExtendedPluginOptions,
+): RuntimeConfig & { webpackChunkLoadingGlobals?: string[] } {
   const {
     enableDev: _enableDev,
     nonce: _nonce,

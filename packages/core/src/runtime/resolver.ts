@@ -1,9 +1,4 @@
-import type {
-  FallbackRule,
-  MatchPattern,
-  ResolveResult,
-  RuntimeConfig,
-} from '../types';
+import type { FallbackRule, MatchPattern, ResolveResult, RuntimeConfig } from '../types';
 import { backoff, mergeRetry } from './retry';
 import { createCircuitBreaker, hostOf, mergeCircuit } from './circuit';
 
@@ -160,7 +155,8 @@ export function createResolver(config: RuntimeConfig): Resolver {
         if (matchesFilename(pr.raw.match, filename)) {
           if (typeof pr.raw.match === 'string') return joinAssetPrefix(pr.raw.match, filename);
           for (let i = 0; i < pr.raw.urls.length; i++) {
-            if (!pr.breaker.isOpen(hostOf(pr.raw.urls[i]))) return joinAssetPrefix(pr.raw.urls[i], filename);
+            if (!pr.breaker.isOpen(hostOf(pr.raw.urls[i])))
+              return joinAssetPrefix(pr.raw.urls[i], filename);
           }
           return joinAssetPrefix(pr.raw.urls[0], filename);
         }

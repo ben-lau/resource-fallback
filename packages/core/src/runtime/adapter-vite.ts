@@ -46,9 +46,8 @@ export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
         // 对同一 URL 的后续 import() 直接返回缓存的失败，不发网络请求。
         // 添加 cache-busting 参数（与 observer 的 appendRetryParam 格式一致）
         // 强制浏览器将其视为新的 module record。
-        const importUrl = totalAttempts > 0
-          ? appendRetryParam(currentUrl, totalAttempts)
-          : currentUrl;
+        const importUrl =
+          totalAttempts > 0 ? appendRetryParam(currentUrl, totalAttempts) : currentUrl;
         const mod = await dynamicImport(importUrl);
         deps.resolver.recordSuccess(currentUrl);
         deps.bus.emitSuccess({ url: currentUrl, attempts: attempt });
@@ -68,12 +67,16 @@ export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
         } else {
           isFallback = true;
           attempt = 1;
-          deps.bus.emitFallback({ from: result.from, to: result.url, reason: 'retry-budget-exhausted' });
+          deps.bus.emitFallback({
+            from: result.from,
+            to: result.url,
+            reason: 'retry-budget-exhausted',
+          });
         }
 
         currentUrl = result.url;
         if (result.delay > 0) {
-          await new Promise<void>(r => setTimeout(r, result.delay));
+          await new Promise<void>((r) => setTimeout(r, result.delay));
         }
       }
     }

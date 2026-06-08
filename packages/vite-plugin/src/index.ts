@@ -138,7 +138,11 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
   };
 }
 
-function buildInlineManifest(bundle: OutputBundleLike | undefined, base: string, options: ViteResourceFallbackOptions): ResourceFallbackManifest | undefined {
+function buildInlineManifest(
+  bundle: OutputBundleLike | undefined,
+  base: string,
+  options: ViteResourceFallbackOptions,
+): ResourceFallbackManifest | undefined {
   const serviceWorker = normalizeServiceWorkerOptions(options.serviceWorker);
   if (!serviceWorker.enabled) return undefined;
   const swAssets = buildServiceWorkerAssets(options, {
@@ -154,16 +158,18 @@ function collectBundleAssets(bundle: OutputBundleLike, base: string) {
     const fileName = item.fileName;
     return {
       url: joinAssetPrefix(base, fileName),
-      type: item.type === 'chunk' ? 'script' as const : inferResourceFallbackAssetType(fileName),
+      type: item.type === 'chunk' ? ('script' as const) : inferResourceFallbackAssetType(fileName),
     };
   });
 }
 
 function createVersionSeed(bundle: OutputBundleLike): string {
-  return Object.values(bundle)
-    .map((item) => item.fileName)
-    .sort()
-    .join('|') || 'vite';
+  return (
+    Object.values(bundle)
+      .map((item) => item.fileName)
+      .sort()
+      .join('|') || 'vite'
+  );
 }
 
 function stripLeadingSlash(path: string): string {

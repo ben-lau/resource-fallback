@@ -130,12 +130,20 @@ export function shouldHandleSwRequest(
     return false;
   }
   const lookup = getManifestLookup(manifest);
-  if (destination === 'image' || destination === 'font' || destination === 'video' || destination === 'audio' || destination === 'track') {
+  if (
+    destination === 'image' ||
+    destination === 'font' ||
+    destination === 'video' ||
+    destination === 'audio' ||
+    destination === 'track'
+  ) {
     return lookup.swOwnedUrls.has(stripHash(request.url));
   }
   if (destination === 'style') {
     const referrer = request.referrer || '';
-    return !!options.includeStyleImports && !!referrer && lookup.cssReferrerUrls.has(stripHash(referrer));
+    return (
+      !!options.includeStyleImports && !!referrer && lookup.cssReferrerUrls.has(stripHash(referrer))
+    );
   }
   return false;
 }
@@ -172,7 +180,9 @@ export async function fetchWithFallback(
   for (;;) {
     try {
       const response = await options.fetcher(currentRequest);
-      if (isUsableNetworkResponse(response, currentRequest.url, options.fallbackOnOpaque === true)) {
+      if (
+        isUsableNetworkResponse(response, currentRequest.url, options.fallbackOnOpaque === true)
+      ) {
         resolver.recordSuccess(currentRequest.url);
         options.emit('success', { url: currentRequest.url, attempts: attempt });
         if (usedFallback) await putFallbackCache(request, response, options);
@@ -190,7 +200,9 @@ export async function fetchWithFallback(
       const cached = await readFallbackCache(request, options);
       if (cached) return cached;
       if (lastResponse) return lastResponse;
-      throw lastError instanceof Error ? lastError : new Error(String(lastError || 'resource failed'));
+      throw lastError instanceof Error
+        ? lastError
+        : new Error(String(lastError || 'resource failed'));
     }
 
     if (result.kind === 'retry') {
@@ -200,7 +212,11 @@ export async function fetchWithFallback(
       usedFallback = true;
       isFallback = true;
       attempt = 1;
-      options.emit('fallback', { from: result.from, to: result.url, reason: 'retry-budget-exhausted' });
+      options.emit('fallback', {
+        from: result.from,
+        to: result.url,
+        reason: 'retry-budget-exhausted',
+      });
     }
 
     if (result.delay > 0) await new Promise((resolve) => setTimeout(resolve, result.delay));
@@ -237,7 +253,11 @@ function stripHash(url: string): string {
   return idx === -1 ? url : url.slice(0, idx);
 }
 
-function isUsableNetworkResponse(response: Response, url: string, fallbackOnOpaque: boolean): boolean {
+function isUsableNetworkResponse(
+  response: Response,
+  url: string,
+  fallbackOnOpaque: boolean,
+): boolean {
   if (response.type === 'opaque') return !(fallbackOnOpaque && !isSameOriginUrl(url));
   return response.ok;
 }

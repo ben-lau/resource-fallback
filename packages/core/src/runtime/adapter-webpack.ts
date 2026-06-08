@@ -118,7 +118,12 @@ function wrapRequire(req: WebpackRequireLike, deps: AdapterDeps): void {
   }
 
   const origL = req.l;
-  const wrapped = function (url: string, done: (event?: Event | { type: string }) => void, key?: string, chunkId?: string | number) {
+  const wrapped = function (
+    url: string,
+    done: (event?: Event | { type: string }) => void,
+    key?: string,
+    chunkId?: string | number,
+  ) {
     let attempt = 1;
     let isFallback = false;
     // 跟踪当前尝试的 URL。如果闭包捕获 `url` 不变，resolver 会始终基于
@@ -146,7 +151,11 @@ function wrapRequire(req: WebpackRequireLike, deps: AdapterDeps): void {
       } else {
         isFallback = true;
         attempt = 1;
-        deps.bus.emitFallback({ from: result.from, to: result.url, reason: 'retry-budget-exhausted' });
+        deps.bus.emitFallback({
+          from: result.from,
+          to: result.url,
+          reason: 'retry-budget-exhausted',
+        });
       }
       currentUrl = result.url;
       retryWith(result.url, result.delay, key, chunkId, onComplete);

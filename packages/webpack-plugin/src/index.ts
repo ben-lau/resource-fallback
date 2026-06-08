@@ -31,7 +31,8 @@ export class ResourceFallbackWebpackPlugin {
     const isDev = compiler.options.mode === 'development';
     if (isDev && !this.options.enableDev) return;
 
-    const webpack = (compiler.webpack || (compiler as unknown as { webpack: typeof import('webpack') }).webpack);
+    const webpack =
+      compiler.webpack || (compiler as unknown as { webpack: typeof import('webpack') }).webpack;
     if (webpack && typeof webpack.RuntimeModule === 'function') {
       injectRuntimeModule(compiler, webpack);
     }
@@ -51,8 +52,9 @@ export class ResourceFallbackWebpackPlugin {
         return;
       }
       const ctor = HtmlPlugin as unknown as { getHooks?: (c: unknown) => HtmlPluginHooks };
-      const getHooks = (HtmlPlugin as { constructor?: { getHooks?: (c: unknown) => HtmlPluginHooks } })
-        .constructor?.getHooks ?? ctor.getHooks;
+      const getHooks =
+        (HtmlPlugin as { constructor?: { getHooks?: (c: unknown) => HtmlPluginHooks } }).constructor
+          ?.getHooks ?? ctor.getHooks;
       if (typeof getHooks !== 'function') {
         compilation.warnings.push(
           new Error(`${PLUGIN}: html-webpack-plugin 版本过低（需要 v4+）。`) as unknown as Error,
@@ -68,7 +70,10 @@ export class ResourceFallbackWebpackPlugin {
       const hooks = getHooks(compilation);
       hooks.alterAssetTagGroups.tapAsync(
         PLUGIN,
-        (data: AlterAssetTagGroupsData, cb: (err: Error | null, data: AlterAssetTagGroupsData) => void) => {
+        (
+          data: AlterAssetTagGroupsData,
+          cb: (err: Error | null, data: AlterAssetTagGroupsData) => void,
+        ) => {
           const order = pluginOptions.htmlInject || 'head-prepend';
           const swAssets = buildWebpackServiceWorkerAssets(
             compiler,
@@ -79,7 +84,12 @@ export class ResourceFallbackWebpackPlugin {
           if (swAssets && !emittedServiceWorker) {
             emittedServiceWorker = true;
             emitTextAsset(compiler, compilation, swAssets.path, swAssets.code);
-            emitTextAsset(compiler, compilation, manifestFileName(swAssets.path), JSON.stringify(swAssets.manifest));
+            emitTextAsset(
+              compiler,
+              compilation,
+              manifestFileName(swAssets.path),
+              JSON.stringify(swAssets.manifest),
+            );
           }
           const tags = buildInjectedTags({
             ...pluginOptions,
@@ -147,8 +157,9 @@ function emitTextAsset(
   source: string,
 ): void {
   const fileName = stripLeadingSlash(path);
-  const RawSource = (compiler.webpack || (compiler as unknown as { webpack: typeof import('webpack') }).webpack)
-    .sources.RawSource;
+  const RawSource = (
+    compiler.webpack || (compiler as unknown as { webpack: typeof import('webpack') }).webpack
+  ).sources.RawSource;
   compilation.emitAsset(fileName, new RawSource(source));
 }
 
@@ -163,11 +174,11 @@ function stripLeadingSlash(path: string): string {
 }
 
 function resolvePublicPath(compilation: Compilation, compiler: Compiler): string {
-  const output = (compilation.outputOptions as Compiler['options']['output']) || compiler.options.output;
+  const output =
+    (compilation.outputOptions as Compiler['options']['output']) || compiler.options.output;
   const publicPath = output?.publicPath;
   return typeof publicPath === 'string' && publicPath !== 'auto' ? publicPath : '/';
 }
-
 
 const warnedNoHtml = new WeakSet<Compiler>();
 
@@ -337,30 +348,27 @@ function injectRuntimeModule(compiler: Compiler, webpack: typeof import('webpack
   ].join('\n');
 
   compiler.hooks.thisCompilation.tap(PLUGIN, (compilation: Compilation) => {
-    compilation.hooks.runtimeRequirementInTree.for('__webpack_require__.l').tap(
-      PLUGIN,
-      (chunk) => {
-        class RfRuntimeModule extends RuntimeModuleCtor {
-          constructor() {
-            // 更高的 stage = 在运行时模板中更*晚*生成，这样到我们的包装执行时，
-            // webpack 的 LoadScriptRuntimeModule 已经安装了 `__webpack_require__.l`。
-            // STAGE_TRIGGER 是定义的最高阶段，RuntimePlugin 用它来注册
-            // 依赖模块——在此使用是安全的。
-            super('resource-fallback hook', stage);
-          }
-          override generate(): string {
-            return runtimeSource;
-          }
+    compilation.hooks.runtimeRequirementInTree.for('__webpack_require__.l').tap(PLUGIN, (chunk) => {
+      class RfRuntimeModule extends RuntimeModuleCtor {
+        constructor() {
+          // 更高的 stage = 在运行时模板中更*晚*生成，这样到我们的包装执行时，
+          // webpack 的 LoadScriptRuntimeModule 已经安装了 `__webpack_require__.l`。
+          // STAGE_TRIGGER 是定义的最高阶段，RuntimePlugin 用它来注册
+          // 依赖模块——在此使用是安全的。
+          super('resource-fallback hook', stage);
         }
-        compilation.addRuntimeModule(chunk, new RfRuntimeModule());
-        // 重要：不要返回 `true`。`runtimeRequirementInTree` 是 SyncBailHook——
-        // 返回真值会短路整个链，阻止 webpack 自身的 `RuntimePlugin` 注册
-        // `LoadScriptRuntimeModule`（也就是定义 `__webpack_require__.l` 的模块）。
-        // 没有它我们的包装找不到 `.l`，页面在请求异步 chunk 时会抛出
-        // "t.l is not a function"。
-        return undefined;
-      },
-    );
+        override generate(): string {
+          return runtimeSource;
+        }
+      }
+      compilation.addRuntimeModule(chunk, new RfRuntimeModule());
+      // 重要：不要返回 `true`。`runtimeRequirementInTree` 是 SyncBailHook——
+      // 返回真值会短路整个链，阻止 webpack 自身的 `RuntimePlugin` 注册
+      // `LoadScriptRuntimeModule`（也就是定义 `__webpack_require__.l` 的模块）。
+      // 没有它我们的包装找不到 `.l`，页面在请求异步 chunk 时会抛出
+      // "t.l is not a function"。
+      return undefined;
+    });
   });
 }
 

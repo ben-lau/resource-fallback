@@ -26,7 +26,10 @@ describe('resolver', () => {
 
   it('returns no-match when no rule applies', () => {
     const r = build();
-    expect(r.resolve('https://other.example/x.js', 1)).toEqual({ kind: 'giveup', reason: 'no-match' });
+    expect(r.resolve('https://other.example/x.js', 1)).toEqual({
+      kind: 'giveup',
+      reason: 'no-match',
+    });
   });
 
   it('retries the same URL until budget exhausted', () => {

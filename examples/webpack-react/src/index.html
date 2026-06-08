@@ -1,27 +1,28 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>Resource Fallback Demo (Webpack + React)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <title>Resource Fallback Demo (Webpack + React)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
   事件缓冲：runtime 的 CustomEvent 在 app 脚本之前触发。
   这段内联脚本在 runtime 注入之后、entry 脚本之前执行，
   把所有 rf:* 事件缓存到 window.__RF_EVENTS__ 供 app 读取。
 -->
-<script>
-(function(){
-  var E = window.__RF_EVENTS__ = [];
-  var T = ['rf:retry','rf:fallback','rf:success','rf:error'];
-  for (var i = 0; i < T.length; i++) (function(t){
-    window.addEventListener(t, function(e){
-      E.push({ ts: Date.now(), type: t.slice(3), detail: e.detail });
-    });
-  })(T[i]);
-})();
-</script>
-</head>
-<body>
-<div id="root"></div>
-</body>
+    <script>
+      (function () {
+        var E = (window.__RF_EVENTS__ = []);
+        var T = ['rf:retry', 'rf:fallback', 'rf:success', 'rf:error'];
+        for (var i = 0; i < T.length; i++)
+          (function (t) {
+            window.addEventListener(t, function (e) {
+              E.push({ ts: Date.now(), type: t.slice(3), detail: e.detail });
+            });
+          })(T[i]);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

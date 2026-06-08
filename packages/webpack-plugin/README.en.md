@@ -31,7 +31,7 @@ module.exports = {
           match: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
-            '/',  // origin fallback
+            '/', // origin fallback
           ],
         },
       ],
@@ -51,6 +51,7 @@ The plugin does two things at build time, with dual-layer runtime protection:
 #### 1. HTML Injection
 
 Via `html-webpack-plugin`'s `alterAssetTagGroups` hook, injects into `<head>`:
+
 - `<link rel="preconnect">` tags (pre-build connections for each fallback domain)
 - `<script>` with inlined runtime IIFE + `install(config)` call
 
@@ -84,6 +85,7 @@ Each retry/fallback creates a brand new `<script>` element (with `data-webpack` 
 #### Layer 2: Observer
 
 Observer acts as a safety net, handling scenarios not covered by `__webpack_require__.l`:
+
 - **Entry scripts** (no `data-webpack` attribute)
 - **CSS chunks** (`<link>` tags output by `mini-css-extract-plugin`, which also have `data-webpack` but aren't handled by the webpack adapter)
 - **Other external `<script>` tags**
@@ -105,11 +107,7 @@ new ResourceFallbackWebpackPlugin({
   rules: [
     {
       match: 'https://cdn.example.com/',
-      urls: [
-        'https://cdn-backup.example.com/',
-        'https://static.mysite.com/',
-        '/',
-      ],
+      urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
     },
@@ -118,7 +116,7 @@ new ResourceFallbackWebpackPlugin({
   sri: 'strip',
   nonce: 'my-csp-nonce',
   injectPreconnect: true,
-})
+});
 ```
 
 ## Notes
@@ -155,7 +153,7 @@ class ChunkErrorBoundary extends React.Component<
   <Suspense fallback={<Loading />}>
     <LazyComponent />
   </Suspense>
-</ChunkErrorBoundary>
+</ChunkErrorBoundary>;
 ```
 
 ### Entry Script Fallback
@@ -164,7 +162,7 @@ If all fallbacks fail for the entry script, React/Vue won't initialize and the p
 
 ```html
 <script>
-  window.addEventListener('rf:error', function() {
+  window.addEventListener('rf:error', function () {
     document.body.innerHTML = '<p>Resource loading failed, please refresh the page</p>';
   });
 </script>

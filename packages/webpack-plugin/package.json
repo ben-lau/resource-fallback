@@ -2,22 +2,42 @@
   "name": "@resource-fallback/webpack-plugin",
   "version": "0.1.5",
   "description": "Webpack 5 plugin that wires @resource-fallback/core into your build (HTML injection + chunkLoadingGlobal forwarding)",
+  "keywords": [
+    "cdn",
+    "fallback",
+    "retry",
+    "webpack",
+    "webpack-plugin"
+  ],
+  "homepage": "https://github.com/ben-lau/resource-fallback/tree/main/packages/webpack-plugin#readme",
+  "bugs": "https://github.com/ben-lau/resource-fallback/issues",
+  "license": "MIT",
   "author": "ben-lau <408736066@qq.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ben-lau/resource-fallback.git",
+    "directory": "packages/webpack-plugin"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -26,26 +46,11 @@
   "dependencies": {
     "@resource-fallback/core": "workspace:*"
   },
+  "devDependencies": {
+    "html-webpack-plugin": "^5.6.3",
+    "webpack": "^5.97.1"
+  },
   "peerDependencies": {
     "webpack": ">=5"
-  },
-  "devDependencies": {
-    "webpack": "^5.97.1",
-    "html-webpack-plugin": "^5.6.3"
-  },
-  "keywords": [
-    "webpack",
-    "webpack-plugin",
-    "cdn",
-    "fallback",
-    "retry"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ben-lau/resource-fallback.git",
-    "directory": "packages/webpack-plugin"
-  },
-  "homepage": "https://github.com/ben-lau/resource-fallback/tree/main/packages/webpack-plugin#readme",
-  "bugs": "https://github.com/ben-lau/resource-fallback/issues"
+  }
 }

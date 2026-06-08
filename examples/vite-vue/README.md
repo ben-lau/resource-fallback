@@ -64,6 +64,7 @@ pnpm --filter @resource-fallback-example/vite-vue start
 打开 http://127.0.0.1:4174，在路由间切换可观察异步 chunk 的回退行为。
 
 打开 DevTools → Network 面板可以看到：
+
 1. 对 `cdn-primary.example.invalid` 的请求失败
 2. 运行时重试 → 切换到 `cdn-secondary` → 再到 `cdn-backup` → 最后回源 `/`
 3. 回源成功，页面正常渲染
@@ -83,6 +84,7 @@ pnpm --filter @resource-fallback-example/vite-vue test:e2e
 ```
 
 测试覆盖：
+
 - 入口脚本的完整重试→回退→回源链路
 - 路由切换时异步 chunk 的回退
 - 事件顺序验证（retry → fallback → success）

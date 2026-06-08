@@ -1,5 +1,11 @@
 # resource-fallback
 
+[![npm](https://img.shields.io/npm/v/@resource-fallback/core)](https://www.npmjs.com/package/@resource-fallback/core)
+[![npm](https://img.shields.io/npm/v/@resource-fallback/vite-plugin?label=vite-plugin)](https://www.npmjs.com/package/@resource-fallback/vite-plugin)
+[![npm](https://img.shields.io/npm/v/@resource-fallback/webpack-plugin?label=webpack-plugin)](https://www.npmjs.com/package/@resource-fallback/webpack-plugin)
+[![CI](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml/badge.svg)](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ben-lau/resource-fallback/graph/badge.svg)](https://codecov.io/gh/ben-lau/resource-fallback)
+
 > **[中文](README.md)** | [English](README.en.md)
 
 零心智负担的前端资源回退方案。为 Webpack 与 Vite 构建产物（同步 / 异步 JS、CSS）提供运行时 **重试 → 多 CDN 回退 → 回源** 能力，业务代码无需任何改动。
@@ -88,11 +94,11 @@ flowchart TD
 
 ## 包结构
 
-| 包 | 说明 | 版本 |
-| --- | --- | --- |
-| [`@resource-fallback/core`](packages/core) | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.0.1` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin) | Vite 4+ 插件 | `0.0.1` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件 | `0.0.1` |
+| 包                                                             | 说明                                 | 版本    |
+| -------------------------------------------------------------- | ------------------------------------ | ------- |
+| [`@resource-fallback/core`](packages/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.0.1` |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ 插件                         | `0.0.1` |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件                      | `0.0.1` |
 
 ## 快速上手
 
@@ -129,7 +135,7 @@ export default defineConfig({
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
-            '/',  // 回源
+            '/', // 回源
           ],
           retry: { max: 2, baseDelay: 300 },
           circuit: { threshold: 3, cooldown: 30000 },
@@ -157,11 +163,7 @@ module.exports = {
       rules: [
         {
           match: 'https://cdn1.example.com/',
-          urls: [
-            'https://cdn2.example.com/',
-            'https://backup.example.com/',
-            '/',
-          ],
+          urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
     }),
@@ -183,50 +185,50 @@ module.exports = {
 
 ### PluginOptions
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `rules` | `FallbackRule[]` | **必填** | 回退规则数组，按顺序匹配，重复 match 以最后一条为准 |
-| `defaults` | `{ retry?, circuit? }` | — | 所有规则的默认重试/熔断配置 |
-| `debug` | `boolean \| 'auto'` | `'auto'` | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
-| `sri` | `'strip' \| 'keep' \| 'strict'` | `'strip'` | fallback 时对 `integrity` 属性的处理策略 |
-| `enableDev` | `boolean` | `false` | 开发模式下是否启用 |
-| `nonce` | `string` | — | 附加到注入的 `<script>` 标签的 CSP nonce |
-| `externalRuntime` | `boolean` | `false` | 将运行时作为外链引入而非内联 |
-| `externalRuntimePath` | `string` | `'/__rf/runtime.js'` | 外链运行时的路径 |
-| `injectPreconnect` | `boolean` | `true` | 为每个 fallback 域名注入 `<link rel="preconnect">` |
-| `htmlInject` | `'head-prepend' \| 'head-append'` | `'head-prepend'` | 注入到 `<head>` 的位置 |
-| `serviceWorker` | `boolean \| ServiceWorkerOptions` | `false` | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import` |
-| `hooks` | `RuntimeHooks` | — | JS 函数钩子（仅 `externalRuntime` 模式可用） |
-| `disableGlobals` | `string[]` | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名 |
-| `disableQueryParam` | `string` | `'__rf'` | 值为 `off` 时禁用运行时的查询参数名 |
-| `disableCookie` | `string` | `'__rf_disable'` | 值为 `1` 时禁用运行时的 cookie 名 |
+| 字段                  | 类型                              | 默认值               | 说明                                                                |
+| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组，按顺序匹配，重复 match 以最后一条为准                 |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
+| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                  |
+| `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                            |
+| `externalRuntime`     | `boolean`                         | `false`              | 将运行时作为外链引入而非内联                                        |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                    |
+| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                  |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                              |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                |
+| `hooks`               | `RuntimeHooks`                    | —                    | JS 函数钩子（仅 `externalRuntime` 模式可用）                        |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                       |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                 |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                   |
 
 ### FallbackRule
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `match` | `string \| RegExp \| (url) => boolean` | **必填** | URL 匹配模式。string 为前缀匹配 |
-| `urls` | `string[]` | **必填** | 有序候选 URL 前缀列表。最后一个通常为回源地址 |
-| `retry` | `RetryOptions` | 见下表 | 覆盖该规则的重试配置 |
-| `circuit` | `CircuitOptions` | 见下表 | 覆盖该规则的熔断配置 |
+| 字段      | 类型                                   | 默认值   | 说明                                          |
+| --------- | -------------------------------------- | -------- | --------------------------------------------- |
+| `match`   | `string \| RegExp \| (url) => boolean` | **必填** | URL 匹配模式。string 为前缀匹配               |
+| `urls`    | `string[]`                             | **必填** | 有序候选 URL 前缀列表。最后一个通常为回源地址 |
+| `retry`   | `RetryOptions`                         | 见下表   | 覆盖该规则的重试配置                          |
+| `circuit` | `CircuitOptions`                       | 见下表   | 覆盖该规则的熔断配置                          |
 
 ### RetryOptions
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `max` | `number` | `2` | 同一 URL 的最大重试次数 |
-| `baseDelay` | `number` | `300` | 首次重试延迟（ms） |
-| `maxDelay` | `number` | `3000` | 指数退避的延迟上限（ms） |
-| `jitter` | `boolean` | `true` | 为延迟添加 ±25% 随机抖动 |
+| 字段        | 类型      | 默认值 | 说明                     |
+| ----------- | --------- | ------ | ------------------------ |
+| `max`       | `number`  | `2`    | 同一 URL 的最大重试次数  |
+| `baseDelay` | `number`  | `300`  | 首次重试延迟（ms）       |
+| `maxDelay`  | `number`  | `3000` | 指数退避的延迟上限（ms） |
+| `jitter`    | `boolean` | `true` | 为延迟添加 ±25% 随机抖动 |
 
 ### CircuitOptions
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `threshold` | `number` | `5` | 同一 host 连续失败多少次后触发熔断 |
-| `cooldown` | `number` | `30000` | 熔断后冷却时长（ms），到期后重新尝试 |
-| `shareAcrossTabs` | `boolean` | `true` | 通过 `localStorage` 跨标签页共享熔断状态 |
-| `storageTtl` | `number` | `120000` | localStorage 中熔断条目的存活时长（ms） |
+| 字段              | 类型      | 默认值   | 说明                                     |
+| ----------------- | --------- | -------- | ---------------------------------------- |
+| `threshold`       | `number`  | `5`      | 同一 host 连续失败多少次后触发熔断       |
+| `cooldown`        | `number`  | `30000`  | 熔断后冷却时长（ms），到期后重新尝试     |
+| `shareAcrossTabs` | `boolean` | `true`   | 通过 `localStorage` 跨标签页共享熔断状态 |
+| `storageTtl`      | `number`  | `120000` | localStorage 中熔断条目的存活时长（ms）  |
 
 ### ServiceWorkerOptions
 
@@ -244,15 +246,15 @@ resourceFallback({
 });
 ```
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `enabled` | `boolean` | `true`（对象配置时） | 设为 `false` 可在对象配置中关闭 |
-| `path` | `string` | 跟随 `scope`，如 `/` → `/rf-sw.js`、`/app/` → `/app/rf-sw.js` | SW 文件路径。默认与 scope 同层，避免依赖 `Service-Worker-Allowed` 响应头 |
-| `scope` | `string` | `'/'` | SW 控制范围 |
-| `includeStyleImports` | `boolean` | `true` | 允许 SW 在 `request.destination === 'style'` 且 referrer 命中 CSS manifest 时接管 CSS `@import` |
-| `fallbackOnOpaque` | `boolean` | `false` | 将跨源 opaque response 视为失败继续 fallback。适合 CDN 错误被浏览器隐藏成 opaque 的图片/CSS 子资源场景；开启后可能跳过本来可用的 opaque CDN 响应 |
-| `cache.enabled` | `boolean` | `true` | fallback 网络链路成功后写入 Cache API |
-| `cache.cacheOpaque` | `boolean` | `false` | 是否缓存 opaque response。默认不缓存 |
+| 字段                  | 类型      | 默认值                                                        | 说明                                                                                                                                             |
+| --------------------- | --------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`             | `boolean` | `true`（对象配置时）                                          | 设为 `false` 可在对象配置中关闭                                                                                                                  |
+| `path`                | `string`  | 跟随 `scope`，如 `/` → `/rf-sw.js`、`/app/` → `/app/rf-sw.js` | SW 文件路径。默认与 scope 同层，避免依赖 `Service-Worker-Allowed` 响应头                                                                         |
+| `scope`               | `string`  | `'/'`                                                         | SW 控制范围                                                                                                                                      |
+| `includeStyleImports` | `boolean` | `true`                                                        | 允许 SW 在 `request.destination === 'style'` 且 referrer 命中 CSS manifest 时接管 CSS `@import`                                                  |
+| `fallbackOnOpaque`    | `boolean` | `false`                                                       | 将跨源 opaque response 视为失败继续 fallback。适合 CDN 错误被浏览器隐藏成 opaque 的图片/CSS 子资源场景；开启后可能跳过本来可用的 opaque CDN 响应 |
+| `cache.enabled`       | `boolean` | `true`                                                        | fallback 网络链路成功后写入 Cache API                                                                                                            |
+| `cache.cacheOpaque`   | `boolean` | `false`                                                       | 是否缓存 opaque response。默认不缓存                                                                                                             |
 
 缓存策略固定为保守模式：只缓存 fallback 成功后的可读 2xx 响应；网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
 
@@ -262,26 +264,26 @@ SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 
 
 ### 事件
 
-| 事件名 | 触发时机 | detail |
-| --- | --- | --- |
-| `rf:retry` | 同一 URL 重试 | `{ url, attempt }` |
-| `rf:fallback` | 切换到下一个候选 URL | `{ from, to, reason? }` |
-| `rf:success` | 资源加载成功（经过至少一次重试/回退） | `{ url, attempts }` |
-| `rf:error` | 所有候选 URL 耗尽 | `{ url, reason? }` |
+| 事件名        | 触发时机                              | detail                  |
+| ------------- | ------------------------------------- | ----------------------- |
+| `rf:retry`    | 同一 URL 重试                         | `{ url, attempt }`      |
+| `rf:fallback` | 切换到下一个候选 URL                  | `{ from, to, reason? }` |
+| `rf:success`  | 资源加载成功（经过至少一次重试/回退） | `{ url, attempts }`     |
+| `rf:error`    | 所有候选 URL 耗尽                     | `{ url, reason? }`      |
 
 应用代码可通过 `window.addEventListener('rf:fallback', (e) => { ... })` 监听。
 
 ### 同步/异步覆盖矩阵
 
-| 场景 | Webpack | Vite (build/preview) | Vite (dev) |
-| --- | --- | --- | --- |
-| 同步 `<script>` / `<link>` | ✓ Observer | ✓ Observer | ✓ Observer |
-| 异步 chunk（`import()`） | ✓ `__webpack_require__.l` hook | ✓ `__RF__.load` + `renderDynamicImport` | ✗ |
-| CSS 动态注入 | ✓ Observer | ✓ Observer | ✓ Observer |
-| SystemJS（legacy bundle） | ✓ `instantiate` hook | ✓ `instantiate` hook | — |
-| 图片 / 字体 / 媒体资源 | ✓ Hybrid SW（opt-in，受控页面） | ✓ Hybrid SW（opt-in，受控页面） | ✗ |
-| CSS `url()` / `@font-face` | ✓ Hybrid SW（opt-in，受控页面） | ✓ Hybrid SW（opt-in，受控页面） | ✗ |
-| CSS `@import` | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✗ |
+| 场景                       | Webpack                                      | Vite (build/preview)                         | Vite (dev) |
+| -------------------------- | -------------------------------------------- | -------------------------------------------- | ---------- |
+| 同步 `<script>` / `<link>` | ✓ Observer                                   | ✓ Observer                                   | ✓ Observer |
+| 异步 chunk（`import()`）   | ✓ `__webpack_require__.l` hook               | ✓ `__RF__.load` + `renderDynamicImport`      | ✗          |
+| CSS 动态注入               | ✓ Observer                                   | ✓ Observer                                   | ✓ Observer |
+| SystemJS（legacy bundle）  | ✓ `instantiate` hook                         | ✓ `instantiate` hook                         | —          |
+| 图片 / 字体 / 媒体资源     | ✓ Hybrid SW（opt-in，受控页面）              | ✓ Hybrid SW（opt-in，受控页面）              | ✗          |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW（opt-in，受控页面）              | ✓ Hybrid SW（opt-in，受控页面）              | ✗          |
+| CSS `@import`              | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✗          |
 
 > Vite dev 模式使用原生 ESM，无法拦截动态 import 失败。请使用 `vite preview` 或生产构建验证回退逻辑。
 > SW 无法保证首次访问已经控制页面；首次 HTML 解析期间发出的早期请求仍依赖现有页面 runtime/adapter 兜底。
@@ -308,11 +310,11 @@ resourceFallback({
 
 ## SRI 策略
 
-| 策略 | 行为 |
-| --- | --- |
+| 策略            | 行为                                                                  |
+| --------------- | --------------------------------------------------------------------- |
 | `strip`（默认） | fallback 时移除 `integrity` 属性，因为不同 CDN 的文件 hash 通常不匹配 |
-| `keep` | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退 |
-| `strict` | 同 `keep`，语义化更明确 |
+| `keep`          | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退                |
+| `strict`        | 同 `keep`，语义化更明确                                               |
 
 > 若需在所有 CDN 上保留 SRI，请确保**同一文件在所有 CDN 上的 hash 一致**（推荐：将构建产物同步到多个对象存储桶）。
 
@@ -320,11 +322,11 @@ resourceFallback({
 
 三种方式可在不发版的情况下紧急禁用运行时：
 
-| 方式 | 示例 | 适用场景 |
-| --- | --- | --- |
+| 方式     | 示例                           | 适用场景                         |
+| -------- | ------------------------------ | -------------------------------- |
 | 全局变量 | `window.__RF_DISABLE__ = true` | 在运行时 `<script>` 之前内联设置 |
-| 查询参数 | 访问 `?__rf=off` | 临时排查问题 |
-| Cookie | `__rf_disable=1` | 网关按会话/用户维度禁用 |
+| 查询参数 | 访问 `?__rf=off`               | 临时排查问题                     |
+| Cookie   | `__rf_disable=1`               | 网关按会话/用户维度禁用          |
 
 ## 同步脚本限制
 

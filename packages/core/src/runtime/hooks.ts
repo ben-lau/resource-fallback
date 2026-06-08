@@ -1,10 +1,4 @@
-import type {
-  ErrorEvent,
-  FallbackEvent,
-  RetryEvent,
-  RuntimeHooks,
-  SuccessEvent,
-} from '../types';
+import type { ErrorEvent, FallbackEvent, RetryEvent, RuntimeHooks, SuccessEvent } from '../types';
 import type { Logger } from './logger';
 
 export interface HookBus {

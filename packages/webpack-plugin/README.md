@@ -31,7 +31,7 @@ module.exports = {
           match: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
-            '/',  // 回源
+            '/', // 回源
           ],
         },
       ],
@@ -51,6 +51,7 @@ module.exports = {
 #### 1. HTML 注入
 
 通过 `html-webpack-plugin` 的 `alterAssetTagGroups` 钩子在 `<head>` 中注入：
+
 - `<link rel="preconnect">` 标签（为每个 fallback 域名预建连接）
 - `<script>` 内联运行时 IIFE + `install(config)` 调用
 
@@ -84,6 +85,7 @@ chunk 加载请求
 #### 第二层：Observer
 
 Observer 作为安全网，处理 `__webpack_require__.l` 未覆盖的场景：
+
 - **入口脚本**（无 `data-webpack` 属性）
 - **CSS chunk**（`mini-css-extract-plugin` 输出的 `<link>` 标签，虽然也带 `data-webpack`，但 webpack adapter 不处理 CSS）
 - **其他外部 `<script>`**
@@ -105,11 +107,7 @@ new ResourceFallbackWebpackPlugin({
   rules: [
     {
       match: 'https://cdn.example.com/',
-      urls: [
-        'https://cdn-backup.example.com/',
-        'https://static.mysite.com/',
-        '/',
-      ],
+      urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
     },
@@ -118,7 +116,7 @@ new ResourceFallbackWebpackPlugin({
   sri: 'strip',
   nonce: 'my-csp-nonce',
   injectPreconnect: true,
-})
+});
 ```
 
 ## 注意事项
@@ -155,7 +153,7 @@ class ChunkErrorBoundary extends React.Component<
   <Suspense fallback={<Loading />}>
     <LazyComponent />
   </Suspense>
-</ChunkErrorBoundary>
+</ChunkErrorBoundary>;
 ```
 
 ### 入口脚本兜底
@@ -164,7 +162,7 @@ class ChunkErrorBoundary extends React.Component<
 
 ```html
 <script>
-  window.addEventListener('rf:error', function() {
+  window.addEventListener('rf:error', function () {
     document.body.innerHTML = '<p>资源加载失败，请刷新页面</p>';
   });
 </script>

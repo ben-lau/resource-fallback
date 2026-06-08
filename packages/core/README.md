@@ -24,13 +24,13 @@ import {
 } from '@resource-fallback/core';
 ```
 
-| 函数 | 说明 |
-| --- | --- |
-| `defineConfig(opts)` | 恒等辅助函数，提供类型安全的配置编写体验 |
-| `getRuntimePath()` | 返回 IIFE 运行时文件的绝对路径 |
-| `getRuntimeCode()` | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存） |
+| 函数                      | 说明                                                            |
+| ------------------------- | --------------------------------------------------------------- |
+| `defineConfig(opts)`      | 恒等辅助函数，提供类型安全的配置编写体验                        |
+| `getRuntimePath()`        | 返回 IIFE 运行时文件的绝对路径                                  |
+| `getRuntimeCode()`        | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）              |
 | `buildInjectedTags(opts)` | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组 |
-| `serialiseConfig(cfg)` | 将运行时配置序列化为 JSON 字符串，`RegExp` 保持为原生正则字面量 |
+| `serialiseConfig(cfg)`    | 将运行时配置序列化为 JSON 字符串，`RegExp` 保持为原生正则字面量 |
 
 ### defineConfig
 
@@ -78,7 +78,7 @@ const tags = buildInjectedTags({
 interface RfGlobal {
   install(config: RuntimeConfig): void;
   url(filename: string): string;
-  load(filename: string): Promise<unknown>;  // Vite 专用
+  load(filename: string): Promise<unknown>; // Vite 专用
   resolver?: Resolver;
   installed: boolean;
   version: string;
@@ -87,19 +87,19 @@ interface RfGlobal {
 
 ### 运行时模块
 
-| 模块 | 职责 |
-| --- | --- |
-| **entry** | 初始化 `window.__RF__` 全局对象，调度各适配器安装 |
-| **observer** | 监听 `window` 上的 `error` 事件（捕获阶段），拦截 `<script>` 和 `<link rel="stylesheet">` 加载失败，原地替换为重试/回退 URL |
-| **resolver** | 规则匹配引擎，决定下一步操作（retry / fallback / giveup） |
-| **circuit** | per-host 熔断器，通过 `localStorage` 实现跨标签页状态共享 |
-| **retry** | 指数退避延迟计算（`baseDelay × 2^(attempt-1)`），可选 ±25% 抖动 |
-| **hooks** | 事件总线，同时分发 DOM `CustomEvent` 和 JS 函数钩子 |
-| **kill-switch** | 三重紧急开关检测（全局变量 / 查询参数 / Cookie） |
-| **logger** | 可选的日志输出，支持 `debug: 'auto'`（通过 `localStorage.__RF_DEBUG__` 控制） |
-| **adapter-vite** | Vite 动态 import 回退循环（`__RF__.load`）+ `vite:preloadError` 处理 |
-| **adapter-webpack** | 拦截 `chunkLoadingGlobal` 的 `push` 方法 + 包装 `__webpack_require__.l` |
-| **adapter-systemjs** | hook `System.constructor.prototype.instantiate`，为 legacy bundle 提供回退 |
+| 模块                 | 职责                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **entry**            | 初始化 `window.__RF__` 全局对象，调度各适配器安装                                                                           |
+| **observer**         | 监听 `window` 上的 `error` 事件（捕获阶段），拦截 `<script>` 和 `<link rel="stylesheet">` 加载失败，原地替换为重试/回退 URL |
+| **resolver**         | 规则匹配引擎，决定下一步操作（retry / fallback / giveup）                                                                   |
+| **circuit**          | per-host 熔断器，通过 `localStorage` 实现跨标签页状态共享                                                                   |
+| **retry**            | 指数退避延迟计算（`baseDelay × 2^(attempt-1)`），可选 ±25% 抖动                                                             |
+| **hooks**            | 事件总线，同时分发 DOM `CustomEvent` 和 JS 函数钩子                                                                         |
+| **kill-switch**      | 三重紧急开关检测（全局变量 / 查询参数 / Cookie）                                                                            |
+| **logger**           | 可选的日志输出，支持 `debug: 'auto'`（通过 `localStorage.__RF_DEBUG__` 控制）                                               |
+| **adapter-vite**     | Vite 动态 import 回退循环（`__RF__.load`）+ `vite:preloadError` 处理                                                        |
+| **adapter-webpack**  | 拦截 `chunkLoadingGlobal` 的 `push` 方法 + 包装 `__webpack_require__.l`                                                     |
+| **adapter-systemjs** | hook `System.constructor.prototype.instantiate`，为 legacy bundle 提供回退                                                  |
 
 ### Observer 行为细节
 
@@ -115,12 +115,12 @@ interface RfGlobal {
 
 运行时在每个决策点分发 DOM `CustomEvent`：
 
-| 事件 | 触发时机 | `event.detail` |
-| --- | --- | --- |
-| `rf:retry` | 同一 URL 重试 | `{ url: string, attempt: number }` |
-| `rf:fallback` | 切换到下一个候选 URL | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success` | 经过回退的资源加载成功 | `{ url: string, attempts: number }` |
-| `rf:error` | 所有候选耗尽（giveup） | `{ url: string, reason?: unknown }` |
+| 事件          | 触发时机               | `event.detail`                                   |
+| ------------- | ---------------------- | ------------------------------------------------ |
+| `rf:retry`    | 同一 URL 重试          | `{ url: string, attempt: number }`               |
+| `rf:fallback` | 切换到下一个候选 URL   | `{ from: string, to: string, reason?: unknown }` |
+| `rf:success`  | 经过回退的资源加载成功 | `{ url: string, attempts: number }`              |
+| `rf:error`    | 所有候选耗尽（giveup） | `{ url: string, reason?: unknown }`              |
 
 ## 导出
 
@@ -128,7 +128,7 @@ interface RfGlobal {
 // package.json exports
 {
   ".": "Node 端 API（defineConfig / buildInjectedTags / 类型等）",
-  "./runtime": "浏览器 IIFE 运行时文件（runtime.iife.js）"
+  "./runtime": "浏览器 IIFE 运行时文件（runtime.iife.js）",
 }
 ```
 

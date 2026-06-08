@@ -84,7 +84,13 @@ export function installObserver(deps: ObserverDeps): { dispose(): void } {
     bus.emitSuccess({ url, attempts });
   }
 
-  function scheduleReplace(el: HTMLElement, newUrl: string, nextAttempt: number, delay: number, isFallback?: boolean) {
+  function scheduleReplace(
+    el: HTMLElement,
+    newUrl: string,
+    nextAttempt: number,
+    delay: number,
+    isFallback?: boolean,
+  ) {
     const parent = el.parentNode;
     if (!parent) {
       log.warn('父节点不存在 - 无法替换', { url: newUrl });
@@ -122,7 +128,9 @@ function isManagedTag(el: HTMLElement): el is HTMLScriptElement | HTMLLinkElemen
 function isPreloadHint(el: HTMLElement): boolean {
   if (el.tagName !== 'LINK') return false;
   const rel = ((el as HTMLLinkElement).rel || '').toLowerCase();
-  return rel === 'preload' || rel === 'prefetch' || rel === 'modulepreload' || rel === 'dns-prefetch';
+  return (
+    rel === 'preload' || rel === 'prefetch' || rel === 'modulepreload' || rel === 'dns-prefetch'
+  );
 }
 
 /**
@@ -177,8 +185,27 @@ function readAttempt(el: HTMLElement): number {
 // 规范会保留 "already started" 标记——浏览器会拒绝 fetch/执行克隆体，即使
 // 其 `src` 与原始不同。通过 createElement 重新创建可以获得一个全新的、
 // "not started" 状态的脚本。
-const SCRIPT_FORWARDED_ATTRS = ['type', 'crossorigin', 'nonce', 'referrerpolicy', 'fetchpriority', 'async', 'defer', 'noModule'];
-const LINK_FORWARDED_ATTRS = ['rel', 'as', 'type', 'media', 'crossorigin', 'nonce', 'referrerpolicy', 'fetchpriority', 'disabled'];
+const SCRIPT_FORWARDED_ATTRS = [
+  'type',
+  'crossorigin',
+  'nonce',
+  'referrerpolicy',
+  'fetchpriority',
+  'async',
+  'defer',
+  'noModule',
+];
+const LINK_FORWARDED_ATTRS = [
+  'rel',
+  'as',
+  'type',
+  'media',
+  'crossorigin',
+  'nonce',
+  'referrerpolicy',
+  'fetchpriority',
+  'disabled',
+];
 
 function cloneTag(
   source: HTMLElement,

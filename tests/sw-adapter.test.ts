@@ -42,7 +42,10 @@ describe('sw adapter', () => {
     const unregister = vi.fn(async () => true);
     const getRegistrations = vi.fn(async () => [
       { active: { scriptURL: 'https://example.com/rf-sw.js', postMessage: vi.fn() }, unregister },
-      { active: { scriptURL: 'https://example.com/other-worker.js', postMessage: vi.fn() }, unregister: vi.fn() },
+      {
+        active: { scriptURL: 'https://example.com/other-worker.js', postMessage: vi.fn() },
+        unregister: vi.fn(),
+      },
     ]);
     Object.defineProperty(window, 'navigator', {
       value: {
@@ -90,18 +93,23 @@ describe('sw adapter', () => {
     await Promise.resolve();
 
     expect(register).toHaveBeenCalledWith('/rf-sw.js', { scope: '/', updateViaCache: 'none' });
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'RF_SW_CONFIG',
-      manifest,
-      serviceWorker: expect.objectContaining({ enabled: true, path: '/rf-sw.js' }),
-    }));
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'RF_SW_CONFIG',
+        manifest,
+        serviceWorker: expect.objectContaining({ enabled: true, path: '/rf-sw.js' }),
+      }),
+    );
   });
 
   it('bridges service worker messages to the existing hook bus', () => {
     let messageHandler: ((event: MessageEvent) => void) | undefined;
-    mockServiceWorkerNavigator(vi.fn(async () => ({ active: null })), (type, handler) => {
-      if (type === 'message') messageHandler = handler as (event: MessageEvent) => void;
-    });
+    mockServiceWorkerNavigator(
+      vi.fn(async () => ({ active: null })),
+      (type, handler) => {
+        if (type === 'message') messageHandler = handler as (event: MessageEvent) => void;
+      },
+    );
     const fallbacks: string[] = [];
 
     installSwAdapter({
@@ -110,7 +118,10 @@ describe('sw adapter', () => {
         serviceWorker: true,
         serviceWorkerManifest: manifest,
       },
-      bus: createHookBus({ onFallback: (event) => fallbacks.push(String(event.to)) }, createLogger(false)),
+      bus: createHookBus(
+        { onFallback: (event) => fallbacks.push(String(event.to)) },
+        createLogger(false),
+      ),
       log: createLogger(false),
     });
 

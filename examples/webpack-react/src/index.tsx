@@ -10,10 +10,7 @@ const LazyA = lazy(() => import(/* webpackChunkName: "lazy-a" */ './Lazy'));
 const LazyB = lazy(() => import(/* webpackChunkName: "lazy-b" */ './LazyB'));
 const LazyC = lazy(() => import(/* webpackChunkName: "lazy-c" */ './LazyC'));
 
-class ChunkErrorBoundary extends Component<
-  { children: ReactNode },
-  { error: Error | null }
-> {
+class ChunkErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
@@ -27,9 +24,19 @@ class ChunkErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 16, background: '#fff3f3', borderRadius: 8, border: '1px solid #ffcdd2', margin: '8px 0' }}>
+        <div
+          style={{
+            padding: 16,
+            background: '#fff3f3',
+            borderRadius: 8,
+            border: '1px solid #ffcdd2',
+            margin: '8px 0',
+          }}
+        >
           <p style={{ margin: 0, color: '#b00020', fontWeight: 600 }}>异步模块加载失败</p>
-          <p style={{ margin: '8px 0 0', fontSize: 13, color: '#555' }}>{this.state.error.message}</p>
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: '#555' }}>
+            {this.state.error.message}
+          </p>
           <button
             className="rf-btn"
             style={{ marginTop: 8, fontSize: 12 }}
@@ -44,10 +51,16 @@ class ChunkErrorBoundary extends Component<
   }
 }
 
-interface RfEvent { ts: number; type: string; detail: unknown }
+interface RfEvent {
+  ts: number;
+  type: string;
+  detail: unknown;
+}
 
 declare global {
-  interface Window { __RF_EVENTS__?: RfEvent[] }
+  interface Window {
+    __RF_EVENTS__?: RfEvent[];
+  }
 }
 
 const CIRCUIT_KEY = '__rf_circuit__';
@@ -85,15 +98,22 @@ function useCircuitState() {
     try {
       const raw = localStorage.getItem(CIRCUIT_KEY);
       setState(raw ? JSON.parse(raw) : {});
-    } catch { setState({}); }
+    } catch {
+      setState({});
+    }
   }, []);
 
   useEffect(() => {
     refresh();
-    const onStorage = (e: StorageEvent) => { if (e.key === CIRCUIT_KEY) refresh(); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === CIRCUIT_KEY) refresh();
+    };
     window.addEventListener('storage', onStorage);
     const timer = setInterval(refresh, 1000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   return { state, refresh };
@@ -103,7 +123,10 @@ function hasNewFallbackEventsFor(since: number, url: string): boolean {
   const all = window.__RF_EVENTS__ || [];
   for (let i = since; i < all.length; i++) {
     const event = all[i];
-    if ((event.type === 'retry' || event.type === 'fallback') && eventTouchesUrl(event.detail, url)) {
+    if (
+      (event.type === 'retry' || event.type === 'fallback') &&
+      eventTouchesUrl(event.detail, url)
+    ) {
       return true;
     }
   }
@@ -121,9 +144,9 @@ function sameResource(value: string, url: string): boolean {
   try {
     const target = new URL(url, window.location.href);
     const candidate = new URL(value, window.location.href);
-    return target.pathname === candidate.pathname && (
-      target.hostname === candidate.hostname ||
-      candidate.origin === window.location.origin
+    return (
+      target.pathname === candidate.pathname &&
+      (target.hostname === candidate.hostname || candidate.origin === window.location.origin)
     );
   } catch {
     return false;
@@ -141,11 +164,16 @@ function useExternalScript(url: string) {
     snapshotRef.current = (window.__RF_EVENTS__ || []).length;
     const s = document.createElement('script');
     s.src = url;
-    s.onload = () => { setLoading(false); setResult('success'); };
+    s.onload = () => {
+      setLoading(false);
+      setResult('success');
+    };
     s.onerror = () => {
       setTimeout(() => {
         setLoading(false);
-        setResult(hasNewFallbackEventsFor(snapshotRef.current, url) ? 'intercepted' : 'not-intercepted');
+        setResult(
+          hasNewFallbackEventsFor(snapshotRef.current, url) ? 'intercepted' : 'not-intercepted',
+        );
       }, 500);
     };
     document.head.appendChild(s);
@@ -163,7 +191,10 @@ function App() {
   const extMatched = useExternalScript('http://cdn-primary.example.invalid/external/lib.js');
   const extUnmatched = useExternalScript('http://other-domain.example.invalid/lib.js');
 
-  const clearCircuit = () => { localStorage.removeItem(CIRCUIT_KEY); refresh(); };
+  const clearCircuit = () => {
+    localStorage.removeItem(CIRCUIT_KEY);
+    refresh();
+  };
   const circuitEntries = Object.entries(circuit);
 
   return (
@@ -181,17 +212,45 @@ function App() {
         <strong>配置</strong>
         <table style={{ marginTop: 8, borderCollapse: 'collapse', width: '100%' }}>
           <tbody>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>Primary</td><td><code>http://cdn-primary.example.invalid/</code> — DNS 不存在</td></tr>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>Secondary</td><td><code>http://cdn-secondary.example.invalid/</code> — DNS 不存在</td></tr>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>Backup</td><td><code>http://cdn-backup.example.invalid/</code> — DNS 不存在</td></tr>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>Origin</td><td><code>/</code> — 同源</td></tr>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>每 URL 重试</td><td>1 次 · baseDelay 300ms</td></tr>
-            <tr><td style={{ padding: '2px 8px', color: '#888' }}>熔断器</td><td>threshold=2 · cooldown=15s · TTL=60s</td></tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>Primary</td>
+              <td>
+                <code>http://cdn-primary.example.invalid/</code> — DNS 不存在
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>Secondary</td>
+              <td>
+                <code>http://cdn-secondary.example.invalid/</code> — DNS 不存在
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>Backup</td>
+              <td>
+                <code>http://cdn-backup.example.invalid/</code> — DNS 不存在
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>Origin</td>
+              <td>
+                <code>/</code> — 同源
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>每 URL 重试</td>
+              <td>1 次 · baseDelay 300ms</td>
+            </tr>
+            <tr>
+              <td style={{ padding: '2px 8px', color: '#888' }}>熔断器</td>
+              <td>threshold=2 · cooldown=15s · TTL=60s</td>
+            </tr>
           </tbody>
         </table>
         <p style={{ marginTop: 8, color: '#555' }}>
-          打开 DevTools → Network 面板，可以看到 <code>.invalid</code> 域名的 DNS 失败 → 最终回退到 <code>/</code>。
-          <br/>本页加载了 <b>JS 入口 + CSS 样式表</b>，两者都走了完整的回退链。
+          打开 DevTools → Network 面板，可以看到 <code>.invalid</code> 域名的 DNS 失败 → 最终回退到{' '}
+          <code>/</code>。
+          <br />
+          本页加载了 <b>JS 入口 + CSS 样式表</b>，两者都走了完整的回退链。
         </p>
       </div>
 
@@ -203,9 +262,15 @@ function App() {
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <img src={swLogo} data-testid="sw-image" alt="SW fallback asset" width={48} height={48} />
-          <div className="sw-css-url" data-testid="sw-css-url">CSS url() 背景图</div>
-          <div className="sw-import-card" data-testid="sw-import-card">CSS @import 背景图</div>
-          <div className="sw-font-sample" data-testid="sw-font-sample">Font fallback sample</div>
+          <div className="sw-css-url" data-testid="sw-css-url">
+            CSS url() 背景图
+          </div>
+          <div className="sw-import-card" data-testid="sw-import-card">
+            CSS @import 背景图
+          </div>
+          <div className="sw-font-sample" data-testid="sw-font-sample">
+            Font fallback sample
+          </div>
         </div>
       </div>
 
@@ -213,8 +278,12 @@ function App() {
       <div className="rf-card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <strong>熔断器</strong>
-          <button className="rf-btn" onClick={clearCircuit} style={{ fontSize: 12 }}>清除</button>
-          <button className="rf-btn" onClick={refresh} style={{ fontSize: 12 }}>刷新</button>
+          <button className="rf-btn" onClick={clearCircuit} style={{ fontSize: 12 }}>
+            清除
+          </button>
+          <button className="rf-btn" onClick={refresh} style={{ fontSize: 12 }}>
+            刷新
+          </button>
         </div>
         {circuitEntries.length === 0 ? (
           <p style={{ color: '#888', fontSize: 13, marginTop: 8 }}>无记录</p>
@@ -234,10 +303,14 @@ function App() {
                 const isOpen = s.openedAt > 0;
                 return (
                   <tr key={host} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 12 }}>{host}</td>
+                    <td style={{ padding: '4px 8px', fontFamily: 'monospace', fontSize: 12 }}>
+                      {host}
+                    </td>
                     <td style={{ padding: '4px 8px' }}>{s.fails}</td>
                     <td style={{ padding: '4px 8px' }}>
-                      <span className={isOpen ? 'rf-badge rf-badge--open' : 'rf-badge rf-badge--closed'}>
+                      <span
+                        className={isOpen ? 'rf-badge rf-badge--open' : 'rf-badge rf-badge--closed'}
+                      >
                         {isOpen ? 'OPEN' : 'CLOSED'}
                       </span>
                     </td>
@@ -264,9 +337,13 @@ function App() {
             <button className="rf-btn" onClick={extMatched.load} disabled={extMatched.loading}>
               {extMatched.loading ? '加载中…' : '加载匹配规则的脚本'}
             </button>
-            <code style={{ fontSize: 11, color: '#888' }}>cdn-primary.example.invalid/external/lib.js</code>
+            <code style={{ fontSize: 11, color: '#888' }}>
+              cdn-primary.example.invalid/external/lib.js
+            </code>
             {extMatched.result === 'intercepted' && (
-              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>✓ 已被 Observer 拦截并回退</span>
+              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>
+                ✓ 已被 Observer 拦截并回退
+              </span>
             )}
             {extMatched.result === 'not-intercepted' && (
               <span style={{ color: '#b00020', fontSize: 13 }}>✗ 未拦截（异常）</span>
@@ -279,7 +356,9 @@ function App() {
             </button>
             <code style={{ fontSize: 11, color: '#888' }}>other-domain.example.invalid/lib.js</code>
             {extUnmatched.result === 'not-intercepted' && (
-              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>✓ 未被拦截（预期行为，不匹配任何规则）</span>
+              <span style={{ color: '#0f7d2a', fontSize: 13, fontWeight: 600 }}>
+                ✓ 未被拦截（预期行为，不匹配任何规则）
+              </span>
             )}
             {extUnmatched.result === 'intercepted' && (
               <span style={{ color: '#b00020', fontSize: 13 }}>✗ 被拦截了（不应该）</span>
@@ -292,12 +371,19 @@ function App() {
       <div className="rf-card">
         <strong>异步模块加载</strong>
         <p style={{ fontSize: 13, color: '#555', margin: '8px 0' }}>
-          逐个点击。Module A 会让 primary/backup 各累积 1 次失败；Module B 再累积 1 次，触发熔断（threshold=2）；Module C 会直接跳过已熔断的 CDN。
+          逐个点击。Module A 会让 primary/backup 各累积 1 次失败；Module B 再累积 1
+          次，触发熔断（threshold=2）；Module C 会直接跳过已熔断的 CDN。
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="rf-btn" onClick={() => setShowA(true)} disabled={showA}>Load Module A</button>
-          <button className="rf-btn" onClick={() => setShowB(true)} disabled={showB}>Load Module B</button>
-          <button className="rf-btn" onClick={() => setShowC(true)} disabled={showC}>Load Module C</button>
+          <button className="rf-btn" onClick={() => setShowA(true)} disabled={showA}>
+            Load Module A
+          </button>
+          <button className="rf-btn" onClick={() => setShowB(true)} disabled={showB}>
+            Load Module B
+          </button>
+          <button className="rf-btn" onClick={() => setShowC(true)} disabled={showC}>
+            Load Module C
+          </button>
         </div>
         <ChunkErrorBoundary>
           <Suspense fallback={<p style={{ padding: 12, color: '#888' }}>Loading…</p>}>
@@ -314,7 +400,16 @@ function App() {
         <p style={{ fontSize: 12, color: '#888', margin: '4px 0 8px' }}>
           包含页面加载时（先于 App 渲染）的事件 — 通过 window.__RF_EVENTS__ 缓冲捕获。
         </p>
-        <div style={{ background: '#f8f8f8', padding: 12, borderRadius: 6, fontSize: 12, maxHeight: 360, overflow: 'auto' }}>
+        <div
+          style={{
+            background: '#f8f8f8',
+            padding: 12,
+            borderRadius: 6,
+            fontSize: 12,
+            maxHeight: 360,
+            overflow: 'auto',
+          }}
+        >
           {events.length === 0 ? (
             <p style={{ color: '#888', margin: 0 }}>无事件</p>
           ) : (
@@ -330,7 +425,13 @@ function App() {
                 {events.map((e, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={{ padding: '2px 6px', color: '#aaa' }}>{i + 1}</td>
-                    <td style={{ padding: '2px 6px', fontWeight: 600, color: TYPE_COLORS[e.type] || '#333' }}>
+                    <td
+                      style={{
+                        padding: '2px 6px',
+                        fontWeight: 600,
+                        color: TYPE_COLORS[e.type] || '#333',
+                      }}
+                    >
                       {e.type.toUpperCase()}
                     </td>
                     <td style={{ padding: '2px 6px' }}>
@@ -348,14 +449,32 @@ function App() {
       <div className="rf-card" style={{ background: '#fffde7', fontSize: 13 }}>
         <strong>测试场景</strong>
         <ol style={{ paddingLeft: 20, margin: '8px 0 0' }}>
-          <li><b>JS + CSS 回退</b>：刷新页面，Network 面板可见 JS 和 CSS 都从 <code>.invalid</code> 失败 → 回退到 <code>/</code></li>
-          <li><b>外部脚本（匹配）</b>：点击「加载匹配规则的脚本」→ 应出现 ✓ 已被拦截，事件面板有新事件</li>
-          <li><b>外部脚本（不匹配）</b>：点击「加载不匹配规则的脚本」→ 应出现 ✓ 未被拦截，事件面板无新事件</li>
-          <li><b>熔断跳闸</b>：依次加载 A → B → C，观察 C 跳过已熔断的 CDN（Network 请求更少）</li>
-          <li><b>熔断冷却</b>：等 15 秒后加载新模块或刷新</li>
-          <li><b>TTL 过期</b>：60 秒后刷新，localStorage 条目自动清除</li>
-          <li><b>跨 Tab</b>：新 Tab 打开同一页面，熔断状态已共享</li>
-          <li><b>手动重置</b>：点「清除」后刷新</li>
+          <li>
+            <b>JS + CSS 回退</b>：刷新页面，Network 面板可见 JS 和 CSS 都从 <code>.invalid</code>{' '}
+            失败 → 回退到 <code>/</code>
+          </li>
+          <li>
+            <b>外部脚本（匹配）</b>：点击「加载匹配规则的脚本」→ 应出现 ✓ 已被拦截，事件面板有新事件
+          </li>
+          <li>
+            <b>外部脚本（不匹配）</b>：点击「加载不匹配规则的脚本」→ 应出现 ✓
+            未被拦截，事件面板无新事件
+          </li>
+          <li>
+            <b>熔断跳闸</b>：依次加载 A → B → C，观察 C 跳过已熔断的 CDN（Network 请求更少）
+          </li>
+          <li>
+            <b>熔断冷却</b>：等 15 秒后加载新模块或刷新
+          </li>
+          <li>
+            <b>TTL 过期</b>：60 秒后刷新，localStorage 条目自动清除
+          </li>
+          <li>
+            <b>跨 Tab</b>：新 Tab 打开同一页面，熔断状态已共享
+          </li>
+          <li>
+            <b>手动重置</b>：点「清除」后刷新
+          </li>
         </ol>
       </div>
     </div>

@@ -24,13 +24,13 @@ import {
 } from '@resource-fallback/core';
 ```
 
-| Function | Description |
-| --- | --- |
-| `defineConfig(opts)` | Identity helper for type-safe config authoring |
-| `getRuntimePath()` | Returns the absolute path to the IIFE runtime file |
-| `getRuntimeCode()` | Returns the IIFE runtime file as a string (cached after first call) |
-| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config |
-| `serialiseConfig(cfg)` | Serializes runtime config to a JSON string; `RegExp` preserved as native regex literals |
+| Function                  | Description                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                          |
+| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                      |
+| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                     |
+| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config    |
+| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string; `RegExp` preserved as native regex literals |
 
 ### defineConfig
 
@@ -78,7 +78,7 @@ The runtime is injected as an IIFE (~5KB gzip) and exposes its interface via `wi
 interface RfGlobal {
   install(config: RuntimeConfig): void;
   url(filename: string): string;
-  load(filename: string): Promise<unknown>;  // Vite only
+  load(filename: string): Promise<unknown>; // Vite only
   resolver?: Resolver;
   installed: boolean;
   version: string;
@@ -87,19 +87,19 @@ interface RfGlobal {
 
 ### Runtime Modules
 
-| Module | Responsibility |
-| --- | --- |
-| **entry** | Initializes the `window.__RF__` global object, dispatches adapter installation |
-| **observer** | Listens for `error` events on `window` (capture phase), intercepts `<script>` and `<link rel="stylesheet">` load failures, replaces with retry/fallback URLs in-place |
-| **resolver** | Rule matching engine, decides next action (retry / fallback / giveup) |
-| **circuit** | Per-host circuit breaker with `localStorage` cross-tab state sharing |
-| **retry** | Exponential backoff delay calculation (`baseDelay × 2^(attempt-1)`), optional ±25% jitter |
-| **hooks** | Event bus; dispatches both DOM `CustomEvent` and JS function hooks |
-| **kill-switch** | Triple kill-switch detection (global variable / query parameter / cookie) |
-| **logger** | Optional logging output, supports `debug: 'auto'` (controlled via `localStorage.__RF_DEBUG__`) |
-| **adapter-vite** | Vite dynamic import fallback loop (`__RF__.load`) + `vite:preloadError` handling |
-| **adapter-webpack** | Intercepts `chunkLoadingGlobal` `push` method + wraps `__webpack_require__.l` |
-| **adapter-systemjs** | Hooks `System.constructor.prototype.instantiate` for legacy bundle fallback |
+| Module               | Responsibility                                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **entry**            | Initializes the `window.__RF__` global object, dispatches adapter installation                                                                                        |
+| **observer**         | Listens for `error` events on `window` (capture phase), intercepts `<script>` and `<link rel="stylesheet">` load failures, replaces with retry/fallback URLs in-place |
+| **resolver**         | Rule matching engine, decides next action (retry / fallback / giveup)                                                                                                 |
+| **circuit**          | Per-host circuit breaker with `localStorage` cross-tab state sharing                                                                                                  |
+| **retry**            | Exponential backoff delay calculation (`baseDelay × 2^(attempt-1)`), optional ±25% jitter                                                                             |
+| **hooks**            | Event bus; dispatches both DOM `CustomEvent` and JS function hooks                                                                                                    |
+| **kill-switch**      | Triple kill-switch detection (global variable / query parameter / cookie)                                                                                             |
+| **logger**           | Optional logging output, supports `debug: 'auto'` (controlled via `localStorage.__RF_DEBUG__`)                                                                        |
+| **adapter-vite**     | Vite dynamic import fallback loop (`__RF__.load`) + `vite:preloadError` handling                                                                                      |
+| **adapter-webpack**  | Intercepts `chunkLoadingGlobal` `push` method + wraps `__webpack_require__.l`                                                                                         |
+| **adapter-systemjs** | Hooks `System.constructor.prototype.instantiate` for legacy bundle fallback                                                                                           |
 
 ### Observer Behavior Details
 
@@ -115,12 +115,12 @@ interface RfGlobal {
 
 The runtime dispatches DOM `CustomEvent` at each decision point:
 
-| Event | When Fired | `event.detail` |
-| --- | --- | --- |
-| `rf:retry` | Same URL retried | `{ url: string, attempt: number }` |
-| `rf:fallback` | Switched to next candidate URL | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success` | Resource loaded after fallback | `{ url: string, attempts: number }` |
-| `rf:error` | All candidates exhausted (giveup) | `{ url: string, reason?: unknown }` |
+| Event         | When Fired                        | `event.detail`                                   |
+| ------------- | --------------------------------- | ------------------------------------------------ |
+| `rf:retry`    | Same URL retried                  | `{ url: string, attempt: number }`               |
+| `rf:fallback` | Switched to next candidate URL    | `{ from: string, to: string, reason?: unknown }` |
+| `rf:success`  | Resource loaded after fallback    | `{ url: string, attempts: number }`              |
+| `rf:error`    | All candidates exhausted (giveup) | `{ url: string, reason?: unknown }`              |
 
 ## Exports
 
@@ -128,7 +128,7 @@ The runtime dispatches DOM `CustomEvent` at each decision point:
 // package.json exports
 {
   ".": "Node API (defineConfig / buildInjectedTags / types, etc.)",
-  "./runtime": "Browser IIFE runtime file (runtime.iife.js)"
+  "./runtime": "Browser IIFE runtime file (runtime.iife.js)",
 }
 ```
 

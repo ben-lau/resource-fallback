@@ -1,27 +1,28 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>Resource Fallback Demo (Vite + Vue)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <title>Resource Fallback Demo (Vite + Vue)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
   事件缓冲：runtime 的 CustomEvent 先于 app 模块执行。
   这段内联脚本缓存所有 rf:* 事件到 window.__RF_EVENTS__。
 -->
-<script>
-(function(){
-  var E = window.__RF_EVENTS__ = [];
-  var T = ['rf:retry','rf:fallback','rf:success','rf:error'];
-  for (var i = 0; i < T.length; i++) (function(t){
-    window.addEventListener(t, function(e){
-      E.push({ ts: Date.now(), type: t.slice(3), detail: e.detail });
-    });
-  })(T[i]);
-})();
-</script>
-</head>
-<body>
-<div id="app"></div>
-<script type="module" src="/src/main.ts"></script>
-</body>
+    <script>
+      (function () {
+        var E = (window.__RF_EVENTS__ = []);
+        var T = ['rf:retry', 'rf:fallback', 'rf:success', 'rf:error'];
+        for (var i = 0; i < T.length; i++)
+          (function (t) {
+            window.addEventListener(t, function (e) {
+              E.push({ ts: Date.now(), type: t.slice(3), detail: e.detail });
+            });
+          })(T[i]);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

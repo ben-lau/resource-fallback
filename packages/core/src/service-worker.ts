@@ -47,12 +47,16 @@ export function buildResourceFallbackManifest(input: ManifestInput): ResourceFal
     owner: defaultOwnerForType(asset.type),
   }));
   return {
-    version: 'rf-' + stableHash(stableStringify({
-      seed: input.versionSeed,
-      rules: input.rules,
-      assets,
-      versionSalt: input.versionSalt,
-    })),
+    version:
+      'rf-' +
+      stableHash(
+        stableStringify({
+          seed: input.versionSeed,
+          rules: input.rules,
+          assets,
+          versionSalt: input.versionSalt,
+        }),
+      ),
     rules: input.rules,
     assets,
   };
@@ -82,11 +86,14 @@ export function buildServiceWorkerAssets(
   return {
     path: serviceWorker.path,
     scope: serviceWorker.scope,
-    code: withPreloadedConfig(input.code || '/* resource-fallback service worker: RF_SW_CONFIG */', {
-      manifest,
-      runtimeConfig: stripSwRuntimeConfig(options),
-      serviceWorker,
-    }),
+    code: withPreloadedConfig(
+      input.code || '/* resource-fallback service worker: RF_SW_CONFIG */',
+      {
+        manifest,
+        runtimeConfig: stripSwRuntimeConfig(options),
+        serviceWorker,
+      },
+    ),
     manifest,
   };
 }
@@ -101,7 +108,9 @@ export function inferResourceFallbackAssetType(fileName: string): ResourceFallba
   return 'asset';
 }
 
-function withDefaults(input: ServiceWorkerOptions & { enabled: boolean }): NormalizedServiceWorkerOptions {
+function withDefaults(
+  input: ServiceWorkerOptions & { enabled: boolean },
+): NormalizedServiceWorkerOptions {
   const scope = normalizeScope(input.scope || '/');
   return {
     enabled: input.enabled,
@@ -177,7 +186,9 @@ function stringifyJs(value: unknown): string {
     }
     return '{' + parts.join(',') + '}';
   }
-  return JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 function stableStringify(value: unknown): string {

@@ -26,7 +26,7 @@ export default defineConfig({
           match: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
-            '/',  // 回源
+            '/', // 回源
           ],
         },
       ],
@@ -44,6 +44,7 @@ export default defineConfig({
 ### 1. HTML 注入
 
 通过 `transformIndexHtml` 钩子在 `<head>` 中注入：
+
 - `<link rel="preconnect">` 标签（为每个 fallback 域名预建连接）
 - `<script>` 内联运行时 IIFE + `install(config)` 调用
 
@@ -53,10 +54,10 @@ export default defineConfig({
 
 ```js
 // 原始输出
-import('/assets/chunk-abc.js')
+import('/assets/chunk-abc.js');
 
 // 改写后（构建产物中）
-window.__RF__.url('assets/chunk-abc.js')
+window.__RF__.url('assets/chunk-abc.js');
 // → 'https://cdn.example.com/assets/chunk-abc.js'（或熔断后跳过不可用 host）
 ```
 
@@ -66,13 +67,14 @@ window.__RF__.url('assets/chunk-abc.js')
 
 ```js
 // 原始代码
-const mod = await import('./Lazy.vue')
+const mod = await import('./Lazy.vue');
 
 // 构建后
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'))
+const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
 ```
 
 `__RF__.load` 内部执行完整的 retry → fallback 循环：
+
 1. 通过 `resolveBuiltUrl` 确定首次请求 URL
 2. 尝试 `import(url)`
 3. 失败后按配置重试（指数退避 + 抖动）
@@ -96,21 +98,17 @@ resourceFallback({
   rules: [
     {
       match: 'https://cdn.example.com/',
-      urls: [
-        'https://cdn-backup.example.com/',
-        'https://static.mysite.com/',
-        '/',
-      ],
+      urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
     },
   ],
-  debug: 'auto',            // localStorage.__RF_DEBUG__ 控制日志
-  sri: 'strip',             // fallback 时移除 integrity
-  nonce: 'my-csp-nonce',    // CSP nonce
-  injectPreconnect: true,   // 注入 <link rel="preconnect">
+  debug: 'auto', // localStorage.__RF_DEBUG__ 控制日志
+  sri: 'strip', // fallback 时移除 integrity
+  nonce: 'my-csp-nonce', // CSP nonce
+  injectPreconnect: true, // 注入 <link rel="preconnect">
   htmlInject: 'head-prepend', // 注入到 <head> 最前面
-})
+});
 ```
 
 ### 与 @vitejs/plugin-legacy 配合
@@ -127,7 +125,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/', ] }],
+      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

@@ -93,7 +93,9 @@ describe('webpack adapter', () => {
         },
         onFallback: (e) => {
           fallbacks++;
-          eventLog.push(`fallback ${(e as { from: string; to: string }).from} -> ${(e as { from: string; to: string }).to}`);
+          eventLog.push(
+            `fallback ${(e as { from: string; to: string }).from} -> ${(e as { from: string; to: string }).to}`,
+          );
         },
       },
       log,
