@@ -36,18 +36,18 @@
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@size-limit/file": "^12.1.0",
-    "@swc/core": "^1.10.0",
-    "@types/node": "^22.10.0",
-    "@vitest/coverage-v8": "^2.1.8",
-    "jsdom": "^25.0.1",
+    "@swc/core": "^1.15.40",
+    "@types/node": "^25.9.2",
+    "@vitest/coverage-v8": "^4.1.8",
+    "jsdom": "^29.1.1",
     "lefthook": "^2.1.9",
     "oxfmt": "^0.53.0",
     "oxlint": "^1.68.0",
     "publint": "^0.3.21",
     "size-limit": "^12.1.0",
     "tsup": "^8.3.5",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "size-limit": [
     {
