@@ -11,6 +11,7 @@ interface PreparedRule {
   raw: FallbackRule;
   retry: ReturnType<typeof mergeRetry>;
   circuit: ReturnType<typeof mergeCircuit>;
+  breaker: ReturnType<typeof createCircuitBreaker>;
 }
 
 export interface Resolver {
@@ -44,17 +45,15 @@ export interface Resolver {
 }
 
 export function createResolver(config: RuntimeConfig): Resolver {
-  const prepared: PreparedRule[] = (config.rules || []).map((r) => ({
-    raw: r,
-    retry: mergeRetry(config.defaults?.retry, r.retry),
-    circuit: mergeCircuit(config.defaults?.circuit, r.circuit),
-  }));
-
-  // 整个运行时共享同一个熔断器——host 本身就是全局的。
-  // 使用第一条匹配规则的 threshold/cooldown，保持简单。
-  const breaker = createCircuitBreaker(
-    prepared[0]?.circuit ?? mergeCircuit(config.defaults?.circuit, undefined),
-  );
+  const prepared: PreparedRule[] = (config.rules || []).map((r) => {
+    const circuit = mergeCircuit(config.defaults?.circuit, r.circuit);
+    return {
+      raw: r,
+      retry: mergeRetry(config.defaults?.retry, r.retry),
+      circuit,
+      breaker: createCircuitBreaker(circuit),
+    };
+  });
 
   function findPrepared(url: string, isFallback?: boolean): PreparedRule | undefined {
     // 从后向前遍历——当多条规则的 match 重复时，以最后一条为准。
@@ -91,7 +90,10 @@ export function createResolver(config: RuntimeConfig): Resolver {
     if (typeof match === 'string' && url.indexOf(match) === 0) {
       return { urlIndex: -1, prefix: match };
     }
-    return { urlIndex: 0, prefix: '' };
+    // URL 匹配了 rule 但不在 urls 列表中（match ≠ urls[0] 的场景）。
+    // urlIndex=-1 让 pickNextUrl 从 urls[0] 开始找可用 host。
+    // prefix 用 match（仅 string 类型）来截取资产路径；RegExp/function 无法提取前缀。
+    return { urlIndex: -1, prefix: typeof match === 'string' ? match : '' };
   }
 
   function swap(currentUrl: string, fromPrefix: string, toPrefix: string): string {
@@ -102,9 +104,13 @@ export function createResolver(config: RuntimeConfig): Resolver {
     return toPrefix;
   }
 
-  function pickNextUrl(rule: FallbackRule, fromIdx: number): number {
+  function pickNextUrl(
+    rule: FallbackRule,
+    fromIdx: number,
+    br: ReturnType<typeof createCircuitBreaker>,
+  ): number {
     for (let j = fromIdx + 1; j < rule.urls.length; j++) {
-      if (!breaker.isOpen(hostOf(rule.urls[j]))) return j;
+      if (!br.isOpen(hostOf(rule.urls[j]))) return j;
     }
     return -1;
   }
@@ -133,8 +139,8 @@ export function createResolver(config: RuntimeConfig): Resolver {
       // 通过 match 模式匹配到（匹配不受熔断器影响），所以初始链接始终会被尝试。
       // 记录失败让 resolveBuiltUrl（Vite modulepreload）和 pickNextUrl 能跳过
       // 已知不可用的 host，选择更优的候选。
-      breaker.recordFailure(hostOf(currentUrl));
-      const j = pickNextUrl(rule, ctx.urlIndex);
+      p.breaker.recordFailure(hostOf(currentUrl));
+      const j = pickNextUrl(rule, ctx.urlIndex, p.breaker);
       if (j === -1) return { kind: 'giveup', reason: 'rules-exhausted' };
       return {
         kind: 'fallback',
@@ -150,24 +156,26 @@ export function createResolver(config: RuntimeConfig): Resolver {
       // 与 resolve() 的语义一致：初始链接永远尝试。
       // __RF__.load 内部的 retry/fallback 循环负责在失败后切换到 urls 列表。
       for (let k = prepared.length - 1; k >= 0; k--) {
-        const rule = prepared[k].raw;
-        if (matchesFilename(rule.match, filename)) {
-          if (typeof rule.match === 'string') return joinAssetPrefix(rule.match, filename);
-          for (let i = 0; i < rule.urls.length; i++) {
-            if (!breaker.isOpen(hostOf(rule.urls[i]))) return joinAssetPrefix(rule.urls[i], filename);
+        const pr = prepared[k];
+        if (matchesFilename(pr.raw.match, filename)) {
+          if (typeof pr.raw.match === 'string') return joinAssetPrefix(pr.raw.match, filename);
+          for (let i = 0; i < pr.raw.urls.length; i++) {
+            if (!pr.breaker.isOpen(hostOf(pr.raw.urls[i]))) return joinAssetPrefix(pr.raw.urls[i], filename);
           }
-          return joinAssetPrefix(rule.urls[0], filename);
+          return joinAssetPrefix(pr.raw.urls[0], filename);
         }
       }
       return filename;
     },
 
     recordFailure(url) {
-      breaker.recordFailure(hostOf(url));
+      const p = findPrepared(url, true) || findPrepared(url);
+      if (p) p.breaker.recordFailure(hostOf(url));
     },
 
     recordSuccess(url) {
-      breaker.recordSuccess(hostOf(url));
+      const p = findPrepared(url, true) || findPrepared(url);
+      if (p) p.breaker.recordSuccess(hostOf(url));
     },
   };
 }

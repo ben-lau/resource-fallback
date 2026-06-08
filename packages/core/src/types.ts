@@ -196,4 +196,4 @@ export interface PluginOptions extends RuntimeConfig {
 export type ResolveResult =
   | { kind: 'retry'; url: string; delay: number; attempt: number }
   | { kind: 'fallback'; url: string; delay: number; from: string; attempt: number }
-  | { kind: 'giveup'; reason: 'rules-exhausted' | 'no-match' | 'circuit-open' };
+  | { kind: 'giveup'; reason: 'rules-exhausted' | 'no-match' };

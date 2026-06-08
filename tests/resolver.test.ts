@@ -221,6 +221,41 @@ describe('resolver', () => {
     }
   });
 
+  it('per-rule circuit breaker: different thresholds are independent', () => {
+    const r = createResolver({
+      rules: [
+        {
+          match: cdn1,
+          urls: [cdn1, cdn2],
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          circuit: { threshold: 2, cooldown: 60_000, shareAcrossTabs: false },
+        },
+        {
+          match: cdn2,
+          urls: [cdn2, origin],
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          circuit: { threshold: 5, cooldown: 60_000, shareAcrossTabs: false },
+        },
+      ],
+    });
+
+    // Rule A (cdn1): threshold=2, retry.max=0 → 每次 resolve 直接进 fallback，
+    // 同时 recordFailure(cdn1)。两次调用让 cdn1 在 Rule A 的 breaker 中达到阈值。
+    r.resolve(cdn1 + 'a.js', 1);
+    r.resolve(cdn1 + 'b.js', 1);
+
+    // 关键：per-rule breaker 意味着 Rule A 中 cdn1 的 2 次失败只记录在
+    // Rule A 的 breaker 中，不会影响 Rule B 的 breaker。
+    // cdn2 在 Rule B 的 breaker 中此时有 0 次失败。
+    const result = r.resolve(cdn2 + 'x.js', 1);
+    expect(result.kind).toBe('fallback');
+    // resolve 内部先 recordFailure(cdn2) 到 Rule B 的 breaker（1 次，未达阈值 5），
+    // 然后 pickNextUrl 找到 origin。
+    if (result.kind === 'fallback') {
+      expect(result.url).toBe(origin + 'x.js');
+    }
+  });
+
   it('duplicate rules: last matching rule wins', () => {
     const r = createResolver({
       rules: [
@@ -465,6 +500,28 @@ describe('resolver', () => {
     if (result.kind === 'fallback') {
       // Last rule has urls: [cdn1, origin], so fallback goes to origin
       expect(result.url).toBe(origin + 'chunk.js');
+    }
+  });
+
+  it('handles match ≠ urls when URL matches match but not any urls entry', () => {
+    const base = 'https://cdn.original.com/';
+    const altCdn = 'https://cdn.alt.com/';
+    const r = createResolver({
+      rules: [
+        {
+          match: base,
+          urls: [altCdn, '/'],
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+        },
+      ],
+    });
+    // URL matches `match` (base) but doesn't match any urls entry.
+    // Should fallback to urls[0] with correct asset path preserved.
+    const url = base + 'assets/chunk.js';
+    const result = r.resolve(url, 1);
+    expect(result.kind).toBe('fallback');
+    if (result.kind === 'fallback') {
+      expect(result.url).toBe(altCdn + 'assets/chunk.js');
     }
   });
 
