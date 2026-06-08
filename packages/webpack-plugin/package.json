@@ -30,7 +30,7 @@
     "webpack": ">=5"
   },
   "devDependencies": {
-    "webpack": "^5.97.1",
+    "webpack": "^5.107.2",
     "html-webpack-plugin": "^5.6.3"
   },
   "keywords": [
