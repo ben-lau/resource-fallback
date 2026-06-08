@@ -70,11 +70,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: .
+          path: packages
 
       - run: pnpm typecheck
 
   unit-test:
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -90,6 +91,11 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: packages
 
       - run: pnpm test:coverage
 
@@ -118,9 +124,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: .
+          path: packages
 
-      - run: npx playwright install --with-deps chromium
+      - run: pnpm --filter @resource-fallback-example/vite-vue exec playwright install --with-deps chromium
 
       - run: pnpm --filter @resource-fallback-example/vite-vue run build
 
@@ -151,9 +157,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: build-output
-          path: .
+          path: packages
 
-      - run: npx playwright install --with-deps chromium
+      - run: pnpm --filter @resource-fallback-example/webpack-react exec playwright install --with-deps chromium
 
       - run: pnpm --filter @resource-fallback-example/webpack-react run build
 
