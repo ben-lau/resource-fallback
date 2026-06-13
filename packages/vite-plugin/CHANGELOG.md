@@ -1,5 +1,23 @@
 # @resource-fallback/vite-plugin
 
+## [0.2.0](https://github.com/ben-lau/resource-fallback/compare/@resource-fallback/vite-plugin-v0.1.5...@resource-fallback/vite-plugin-v0.2.0) (2026-06-13)
+
+
+### Features
+
+* 0.0.2 ([db39ae0](https://github.com/ben-lau/resource-fallback/commit/db39ae09fe6d1ecf8c43fabee62906c3da7a449a))
+* **core:** 增加 Hybrid SW 资源回退能力 ([b08f835](https://github.com/ben-lau/resource-fallback/commit/b08f8353c743357f7f1ead24f0ea253f6a05b8f9))
+* version update ([6a09f67](https://github.com/ben-lau/resource-fallback/commit/6a09f673bfec1801297c8aca480cff442f99bc27))
+
+
+### Bug Fixes
+
+* **core:** JSON 序列化转义 &lt; 防止 script 注入，joinAssetPrefix 提升至 core 共享 ([724c4dd](https://github.com/ben-lau/resource-fallback/commit/724c4dd32a00d7ca43f6b190f29e8397b16d4acc))
+* **core:** 修复异步模块中包含 css 时丢失依赖关系的问题，补充部分测试场景 ([dfcbc26](https://github.com/ben-lau/resource-fallback/commit/dfcbc2659e395acc950c143054b8434c51c10d4b))
+* **resolver:** 修复资源路径拼接问题 ([7305e80](https://github.com/ben-lau/resource-fallback/commit/7305e804b58370853fee29e9544505512dcf1cef))
+* **sw:** 修复图片在 cors 场景下的一些问题 ([05f98a4](https://github.com/ben-lau/resource-fallback/commit/05f98a4de974dbdd3c97b844971ab257fb653f57))
+* **vite-plugin:** 修复vite 在加载异步模块时强制添加 match 内的 url 问题，补充测试用例 ([7927832](https://github.com/ben-lau/resource-fallback/commit/7927832b982f129837a140b4a365757c4ad02e6e))
+
 ## 0.1.5
 
 ### Patch Changes
