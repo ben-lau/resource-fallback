@@ -24,13 +24,10 @@ export default withMermaid(
 
     themeConfig: {
       logo: '/logo.svg',
-      socialLinks: [
-        { icon: 'github', link: 'https://github.com/ben-lau/resource-fallback' },
-      ],
+      socialLinks: [{ icon: 'github', link: 'https://github.com/ben-lau/resource-fallback' }],
       search: { provider: 'local' },
       editLink: {
-        pattern:
-          'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+        pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
       },
     },
 
@@ -43,7 +40,10 @@ export default withMermaid(
           sidebar: zhSidebar(),
           outline: { label: '本页目录' },
           lastUpdated: { text: '最后更新' },
-          editLink: { text: '在 GitHub 上编辑此页', pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path' },
+          editLink: {
+            text: '在 GitHub 上编辑此页',
+            pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+          },
           docFooter: { prev: '上一篇', next: '下一篇' },
           returnToTopLabel: '返回顶部',
           sidebarMenuLabel: '菜单',
@@ -54,12 +54,14 @@ export default withMermaid(
       en: {
         label: 'English',
         lang: 'en-US',
-        description:
-          'Zero-intrusion frontend resource fallback for Webpack & Vite',
+        description: 'Zero-intrusion frontend resource fallback for Webpack & Vite',
         themeConfig: {
           nav: enNav(),
           sidebar: enSidebar(),
-          editLink: { text: 'Edit this page on GitHub', pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path' },
+          editLink: {
+            text: 'Edit this page on GitHub',
+            pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+          },
         },
       },
     },
@@ -148,9 +150,7 @@ function zhSidebar() {
     '/design/': [
       {
         text: '设计文档',
-        items: [
-          { text: 'SW 资源回退对比', link: '/design/sw-comparison' },
-        ],
+        items: [{ text: 'SW 资源回退对比', link: '/design/sw-comparison' }],
       },
     ],
     '/api/': apiSidebar(),
@@ -201,9 +201,7 @@ function enSidebar() {
     '/en/design/': [
       {
         text: 'Design Docs',
-        items: [
-          { text: 'SW Fallback Comparison', link: '/en/design/sw-comparison' },
-        ],
+        items: [{ text: 'SW Fallback Comparison', link: '/en/design/sw-comparison' }],
       },
     ],
     '/api/': apiSidebar(),
