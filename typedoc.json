@@ -1,0 +1,19 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "packages/core/src/index.ts",
+    "packages/core/src/types.ts",
+    "packages/core/src/service-worker.ts"
+  ],
+  "tsconfig": "packages/core/tsconfig.json",
+  "out": "docs/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "githubPages": false,
+  "outputFileStrategy": "modules",
+  "hidePageHeader": true,
+  "hideGroupHeadings": false,
+  "useCodeBlocks": true
+}

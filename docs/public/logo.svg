@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6B7B8D"/>
+      <stop offset="100%" stop-color="#8B7355"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+
+  <!-- R -->
+  <path d="
+    M26 96 V32 h22
+    c12 0 20 7 20 17 c0 8-5 14-13 16
+    l16 31 h-13 l-14-29 h-6 v29 Z
+    M38 42 v18 h10 c7 0 11-4 11-9 s-4-9-11-9 Z
+  " fill="#fff"/>
+
+  <!-- F -->
+  <path d="M74 96 V32 h30 v10 H86 v14 h16 v10 H86 v30 Z" fill="#fff"/>
+
+  <!-- fallback arrow: curves from R's leg back under to suggest retry/fallback -->
+  <path d="M68 78 c6 4 10 6 14 6 h12 c6 0 10-3 10-8 v-6"
+        stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>
+  <path d="M100 74 l4-7 4 7" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+</svg>

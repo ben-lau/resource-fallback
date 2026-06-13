@@ -1,0 +1,467 @@
+---
+title: 问题案例
+---
+
+# 四、本仓库内解决过的问题（背景 → 思考过程 → 解决方案）
+
+### 4.1 Webpack：全局 Observer 与 chunk runtime 同时对同一失败做文章
+
+#### 背景
+
+Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流程往 DOM 里挂 `<script>`。为了覆盖 **入口脚本**、**异步 JS**、**CSS chunk**，工程里同时使用：
+
+- 浏览器侧：**`window.addEventListener('error', …, true)`** 捕获 `script`/`link` 的目标阶段错误；
+- Webpack 侧：在 **脚本加载路径**里注入重试/fallback。
+
+于是 **同一次脚本加载失败** 会冒泡：runtime 可能已经根据 `script.onerror` 决定重试一次，捕获阶段 Listener 又一遍 `resolver.resolve` → scheduleReplace，等价于 **两条独立的状态机**。Network 上出现：主 CDN、备 CDN 各自被请求的轮数大约是「单链路 × 2」，与你在配置里填的 `retry.max`、`urls.length` **心算对不上**，熔断与日志也会「看起来特别吵」。
+
+另外，Webpack 会给 **异步 chunk** 的 `<script>` 打上 **`data-webpack="..."`**。但 **extract 出来的样式** 常以 **`<link data-webpack="...">`** 形式出现；Webpack 自带的 chunk JS 加载器 **并不等同地处理 `<link>` 的失败链**——若\_observer 整块退出，CSS chunk 又没人管。
+
+#### 思考过程
+
+首先确认 **是不是双订阅**：临时关掉一端，请求轮数是否减半。  
+接着明确 **划界粒度不能是「有 data-webpack 就全不干」**：那样会放空 CSS。
+
+结论应是：**同一种「已由 Webpack loader 管线明确 owning」的失败只走一条路径**；**CSS** 由于没有对称的 runtime adapter，必须由 **仍能看见 `<link>` error 的那一途**接管。
+
+#### 解决方案（如何实现）
+
+在 `packages/core/src/runtime/observer.ts` 内：
+
+1. **`isWebpackChunkScript(el)`**：当 `tagName === 'SCRIPT'` 且存在 **`data-webpack`** 属性时，**直接 `return`**，不进入 resolver。这样 **异步 JS chunk** 只由 **`@resource-fallback/webpack-plugin` 注入的 runtime 模块**包装 `__webpack_require__.l`（或等价）处理。
+
+2. **不对 `<link>` 做同样豁免**：即使有 `data-webpack`，**LINK 元素仍落入 Observer**。注释中写清：**mini-css-extract-plugin 的产物**要靠 Observer 兜底。
+
+3. **入口 bundle**通常 **没有** `data-webpack`，仍可由 Observer 兜底（与异步 chunk 的 owning 区分开）。
+
+实施后预期：**单次失败只驱动一条 retry/fallback 序列**；Webpack 控制台与 rf 事件对齐后，可对「每个 chunk 的失败次数上限」心里有数。
+
+#### 延伸：异步 CSS chunk — Observer 不够，还须拦住 **`Promise.all` 里的 reject**
+
+**背景**：`mini-css-extract-plugin`、webpack **`experiments.css`** 等会在运行时往 **`__webpack_require__.f`** 上挂 **除 `j`（JS）以外的 loader**（典型键名如 **`miniCss`**）。异步分包若带独立 **`.css` chunk**，`__webpack_require__.e(chunkId)` 实质是 **`Promise.all`** 收集 **`l.f.j`** 与各 CSS loader 推入的 promise。**CSS `<link>` 加载失败**时，插件生成的 **`onerror` 会直接 `reject(ChunkLoadError)`**（常见 **`code: 'CSS_CHUNK_LOAD_FAILED'`**，且 **`request`** 指向含 `.css` 的 URL）。
+
+与此同时，Observer 仍可在 **`window` capture** 阶段 **替换 `<link>`** 并重试/fallback——**DOM 上样式最终可能修好**，但 **reject 已发生**，**整条 `import()` 仍失败**，React/Vue 懒路由表现为 **ErrorBoundary / 白屏**。这与 Vite 侧 **`vite:preloadError` 未 `preventDefault` 阻断后续执行**是同一类「**错误通道先于补救通道短路**」问题。
+
+**并非仅限 mini-css**：任意往 **`__webpack_require__.f`** 注册的 **非 `j`** loader，只要失败形态满足「**reject + URL 像样式 chunk**」，都应走同一策略；**纯 style-loader 注入**（无独立 CSS chunk URL）则不在此列。
+
+**解决**：在 **`@resource-fallback/webpack-plugin`** 注入的 **`RuntimeModule`**（与包装 **`__webpack_require__.l`** 同一段、**STAGE_TRIGGER** 保证晚于各 loader 注册）中：**遍历 `Object.keys(__webpack_require__.f)`，跳过 `"j"`**，对每个 **`typeof === 'function'`** 且未打 **`__rf_css`** 标记的 loader **包一层**：在 **`origFn(chunkId, promises)` 调用之后**，对 **`promises` 本次新增的条目**附加 **`.catch(err => { … })`**：
+
+- 若 **`err.code === 'CSS_CHUNK_LOAD_FAILED'`** 或 **`err.request` 匹配「路径以 `.css` 结尾（可跟 query/hash）」**：**`resolver.recordFailure(err.request)`**（尽力而为），然后 **吞掉 reject**（resolved continuation），使 **`Promise.all` 不因 CSS 首屏失败而失败**；
+- 其它错误 **原样 `throw`**，避免误伤 Module Federation **`remote`** 等非 CSS loader。
+
+**CSS 实体加载**：仍依赖 §4.1 中 **Observer 对 `<link>`** 的处理（与 **`<script data-webpack>` 豁免** 分工不变）。集成验证可参考 **`examples/webpack-react`** 中带 **`lazy-b.css`** 的 Lazy B：构建后出现独立 **`*.css` chunk**，在 **`publicPath` 指向不可达 CDN** 时，**若无上述 RuntimeModule 补丁**，E2E 会出现 **`lazy-b-loaded` 永不挂载**。
+
+---
+
+### 4.2 Vite：`import()` 失败无法单靠 DOM 替换兜底；改产物过早会破坏 preload/CSS 拓扑
+
+#### 背景
+
+Vue/React Router 懒加载在打包结果里多半是：
+
+```js
+import('./views/About-xxxx.js');
+```
+
+失败后，错误路径主要来自 **运行时 `import()` 的 Promise**，**不一定**与「某一个你能替换的静态 `<script src>`」一一对应。若只依赖 Observer 监听 **后来插入的标签**，会出现：
+
+- 白屏：**动态 import rejection** 没被转化成「换 URL 再请求」；
+- 或更隐蔽：**异步路由组件的 CSS** 依赖 Vite 生成的 **`__vitePreload` / import 图谱**——若在 Rollup/Vite **尚未生成完毕依赖关系**前就改写源码，很容易导致 **preload 映射与真实 import 不一致**，表现为 **进到页面了但没样式**，或 hydration 边界异常。
+
+早期若尝试仅用 `renderDynamicImport` 等钩子，常与 **preload 代码生成顺序**打架。
+
+#### 思考过程
+
+- **手工方案**（每个 `lazy` 外包 try/catch、业务里手写换 URL）：无法覆盖将来新增的懒加载入口，也不可维护。
+- **纯 HTML/onerror**：只覆盖静态入口 `<script>`，**盖不住 `import()` 图**。
+- **钩子时序**：改写动态 import 的 **最晚安全点**应当是「Vite 写完磁盘上的 chunk，`dynamicImports`、`__vitePreload`、CSS 侧的引用均已定型」——即 **bundle 已落地之后**再做 **文本级、可审计的替换**。
+
+#### 解决方案（如何实现）
+
+插件实现见 `packages/vite-plugin/src/index.ts`：
+
+1. **不在 **过早** transform 阶段**去动含 `__vitePreload` 的整个块；改为注册 **`async writeBundle(options, bundle)`**。
+
+2. 对每个 **Rollup chunk**：
+   - 若无 `dynamicImports`，跳过；
+   - 否则读 **`join(outDir, chunk.fileName)`** 的 **最终源码**；
+
+3. 使用 **`es-module-lexer`** 的 `parse(code)`：
+   - 仅处理 **`imp.d >= 0`** 的条目（动态 import，`imp.d === -1` 为静态 import）；
+   - **`imp.n`** 必须为 **字符串字面量**（非变量形式的 `import(x)` 本策略不改写）；
+   - 将 `./About-xxx.js` 相对于 **当前 chunk 目录**规范化，并校验该路径落在 **`chunk.dynamicImports`** 集合里——避免误伤非分包语句。
+
+4. 用 **`MagicString`**：`s.overwrite(imp.ss, imp.se, …)` **整句替换**整条动态 import 语句为：
+
+   `window.__RF__.load(JSON.stringify(normalizedRelativePath))`  
+   （实际代码为模板字符串，`JSON.stringify(resolved)` 保证转义正确。）
+
+5. 运行时 **`__RF__.load`** 实现在 `packages/core/src/runtime/adapter-vite.ts`：内部循环里调用 **`Function('u','return import(u)')`** 做 **原生 dynamic import**，与 **同一 `resolver`** 协同，从而在 **不改变「先由 Vite 生成 preload 拓扑」前提下**，把失败后的 **retry / fallback / cache bust**接进链路。
+
+附加闸门见 **4.4**——只有 `shouldRewriteUrls` 为真时才执行上述磁盘改写，以免 **base 不匹配**时还去动 chunk。
+
+#### 延伸：`vite:preloadError` 会「顺手」掐断后面的 JS 动态加载
+
+**背景**：Vite 生成的 **`__vitePreload`** 在 **CSS 预加载失败**时会派发 **`vite:preloadError`**（可 `cancelable`），并在 **`defaultPrevented` 为假时 `throw`**。若插件把动态 import 改成了 **`__vitePreload(..., () => __RF__.load(...))`** 这类形态，则 **CSS 预加载一失败就先抛错**，**后续的 `__RF__.load()` 根本不会执行**——表现为 **直达异步路由时 About 等 chunk 的 JS 永远不加载**，与 CSS 是否最终被 Observer 修好无关。
+
+**易踩坑**：事件载荷在 **`event.payload`**（不是常见的 `detail`）；监听里若不 **`event.preventDefault()`**，行为与「未监听」等价——仍会 throw。
+
+**解决**：在 `installViteAdapter` 中对 **`vite:preloadError`**：**先 `preventDefault()`**，再从 **`payload`** 解析 URL（若有），按需 **`recordFailure`** / 打观测事件；**CSS 实体加载**仍交给 **`window` capture + Observer** 对 `<link rel="stylesheet">` 的替换链路与 §4.3 一致。
+
+---
+
+### 4.3 浏览器：ES Module 失败 URL / module map 缓存；重插「同一 URL」无效
+
+#### 背景
+
+对 **`type="module"`** 的 `<script>` 或运行时 **`import(specifier)`**：一旦某 **绝对 URL**（含 origin + path）对应 **失败的 module graph**，浏览器会 **缓存失败状态**。此时你在 DOM 上做：
+
+- **同一个 `src` 的脚本节点 `replaceChild`**
+
+往往 **不会再发起新的 GET**，或 **直接进入同一失败 module record**。于是监控里「rf:retry」触发了，Network 却只看到第一次失败。
+
+另一类需求：**切换到 `urls` 里全新的 host** 时，若在 URL 上 **长期携带** 「仅用于重试去重缓存」的 query，会 **稀释 CDN 边缘缓存**，同一内容变成多个 cache key。
+
+#### 思考过程
+
+- Classic script：**每次插入新标签**更容易触发新请求，因此不必默认加 cache bust。
+- **`type=\"module"` 与动态 import**：必须 **换一个「对 module loader 来说是新 URL」的字符串**，常见手段是 **`?__rf=attempt-nonce`**；换到 **fallback host**后应 **删掉**该类参数，只对 **同源重试 URL**短暂存在。
+
+Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 append/strip），否则一端能恢复一端不能。
+
+#### 解决方案（如何实现）
+
+**Observer**（`observer.ts`）：
+
+1. **`needsCacheBust(el)`**：仅当 **`SCRIPT` + `type === 'module'`** 时返回 true。
+
+2. **retry**：若需 bust，则在 **同一逻辑 URL**上调用 `appendRetryParam(result.url, attempt)`（内部 `strip` 旧的 `__rf=` 再接新 nonce）。
+
+3. **fallback（换链）**：`fetchUrl = stripRetryParam(result.url)`，避免把上一轮重试的 query 带进新 CDN；同时 **`data-rf-attempt`** 重置，让 **新 host 独占一份 retry budget**（注释写明：不把「上轮在这 URL 上已经失败多次」误解成跳转瞬间耗尽预算）。
+
+**Vite adapter**（`adapter-vite.ts`）：
+
+- **`__RF__.load`** 内在 `catch` 后递增 `totalAttempts`，对 **再次 dynamic import** 使用带 **`appendRetryParam`** 的 URL，道理与 Observer 一致：打破 **失败 module record**。
+
+这样 **可视化现象**应当是：每次「真重试」在 Network 里能看到 **URL 发生变化或 host 发生变化**的请求行，而不是静默 no-op。
+
+---
+
+### 4.4 `vite.config` 里 `base: '/'`，规则却写 CDN `match` —— 异步 chunk 被整块拼到 CDN 外域（或逻辑错位）
+
+#### 背景
+
+很常见的一种配置心理状态：
+
+- **本地**：`base: '/'`，资源走同源；
+- **生产**：本应 `base: 'https://cdn.example/'`，规则和线上对齐；
+- 但仓库里 **提前写死了** CDN 前缀的 `match` / `urls`，或 CI 里 **`base` 未切到 CDN**就与 **CDN 形态的 rules**共存。
+
+另一类根因是纯 **静态分析 bug**：解析「chunk 文件名」是否属于某规则的逻辑里，对 **string** 类型的 `match` **一律视为匹配任意 filename**（`matchesFilename` 里 `typeof pattern === 'string' → true`）。则 **只要在规则列表里出现过 string CDN 前缀**，就可能把 **resolveBuiltUrl(任意文件名)** 都拼装成 CDN URL——即 **开发与预览构建也会在运行时或二次解析时误认为「chunks 都来自 CDN」**。
+
+表现出来的事故包括：
+
+- `base`仍是 `/`，但懒加载请求的却是 **`https://cdn.../assets/xxx.js`**，出现 **Mixed Content/CORS**，或无故 **变慢**；
+- 与产品设计「**不匹配就不改语义**」相反——**没在 CDN 发布的构建**却被 **构建插件硬改**.
+
+#### 思考过程
+
+需要两层闸门：
+
+1. **构建期是否真的要去改写动态 import**：只有 **当前配置的 `base` 与规则的 `match` 对世界「真的一致」**，才说明你 \*\*打算从该前缀发资源」，才应注入 `__RF__.load` 改写链路。
+
+2. **运行时仍可保留 Observer**：页面里 **`document.createElement('script')`** 手动插的 CDN 地址若 **字面符合 `match`**，仍可走兜底（与 「不动 Vite 默认 chunk 管线」可同时成立）。
+
+不应靠业务「记得删掉规则」人肉保证。
+
+#### 解决方案（如何实现）
+
+在 `vite-plugin` 的 **`config(userConfig)`**：
+
+- 读 `base`（默认 `"/"`）。
+- **`shouldRewriteUrls = options.rules.some(...)`**：
+  - string：`base === r.match`（严格相等）；
+  - RegExp：`r.match.test(base)`；
+  - function：`r.match(base)`。
+
+在 **`writeBundle`** 首部：`if (!shouldRewriteUrls) return;` —— **整块「动态 import → `**RF**.load」」不写盘**。
+
+效果归纳：
+
+| 场景                                 | 行为                                                                                                           |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `base` 与任一 `match` 对齐           | **改写**字面量动态 import，`__RF__.load`参与回退链。                                                           |
+| `base`为 `/`，规则只对 CDN（不相等） | **不改写**，Vite 默认行为加载 chunk；手写 `<script src="https://cdn...">` 仍可由 Observer 接管（若匹配规则）。 |
+
+这样既避免 **误判 filename 匹配的爆炸半径**，又用 **单一布尔**把「是否要动产物」说清楚。
+
+---
+
+### 4.5 `<script>` 用 `cloneNode`「保留属性后再改 src」— 新脚本不执行或行为诡异
+
+#### 背景
+
+替换失败节点的直觉实现是：**`el.cloneNode(true)`**，改掉 `src`，再 **`replaceChild`**。在某些浏览器路径下，克隆的脚本元素 **继承「已开始执行」等内部槽位**，规范层面 **禁止对已完成生命周期的克隆再 fetch**，现象是：**Network 静默**、控制台无报错、页面卡在半初始化。
+
+这和普通 `div` 的 clone **完全不是同一种心智模型**。
+
+#### 思考过程
+
+一旦确认 **「新建一个没有历史负担的脚本元素」是唯一稳妥路径**，就要系统化 **属性白名单**：不能无脑 copy 全部 attribute（部分安全或执行相关属性需要和 SRI/`nonce`/CSP 策略一致）。
+
+#### 解决方案（如何实现）
+
+在 `observer.ts` 的 `cloneTag`（函数名沿用历史语义，实际是 \*\*create 而非 clone）：
+
+1. **`document.createElement`** 建新 `script` 或 `link`。
+
+2. **`SCRIPT_FORWARDED_ATTRS` / `LINK_FORWARDED_ATTRS`** 白名单逐键拷贝：`type`、`crossorigin`、`nonce`、`referrerpolicy`、`fetchpriority`、`async`、`defer`、`noModule`、`rel`、`as`、`media`、`disabled` 等。
+
+3. **SRI 策略 `sri`**：`strip` 时故意不拷 `integrity`，避免 CDN 轮换后 hash 不符 **无限 error 循环**；`keep`/`strict`则保留，`integrity` 失败继续走下一轮 fallback。
+
+4. 打上 **`data-rf-attempt` / `data-rf-managed` / `fallback`（若适用）**；对 script 赋 **`fresh.src = newUrl`**（或 link 的 `href`）。
+
+5. 父节点上 **`replaceChild(replacement, el)`**，若延迟替换则 **`setTimeout(swap, delay)`**。
+
+该路径可与 **§4.3** 的 URL 重写联合使用：**先建新节点**，再附上 **strip 过的或带 `__rf` 的 fetch URL**。
+
+---
+
+### 4.6 规则写 `match: '/'`，运行时用 `script.src` 得到绝对 URL —— 前缀匹配失败
+
+#### 背景
+
+配置里习惯写 **「相对站点根」**的前缀，例如 `match: '/'` 或 `match: 'https://app.example.com/'` 与 **部署时 publicPath** 对齐。但 DOM 里 **`<script src="/assets/index.js">`** 读出 **`.src` 属性**时，浏览器 **规范化为完整的 `https://origin/assets/…`**。
+
+若 `resolver.matches` 对 string 使用的是 **`url.indexOf(pattern) === 0`**，则 **`/` 作为前缀**会与 **`https://…`**形态的字符串 **对不上**：表现为 **「首页明明挂了 CDN，Observer 永远不介入」**，或误以为库坏了。
+
+#### 思考过程
+
+必须统一 **「参与匹配的那一维 URL」**：要么 **规则全部写完整 origin**（对用户不友好），要么 **读 DOM 时使用与字面配置可比的形态**。业内常见做法是 **比对 `getAttribute('src')`/href**（保持 **HTML 字面量**，与 `href`/`src`写入时一致），而不是 **总是 canonicalize 之后的属性取值**。
+
+#### 解决方案（如何实现）
+
+`readUrl(el)`：**仅使用 `el.getAttribute('src')` 或 `el.getAttribute('href')`**（空串兜底），绝不为了「方便」改成 `HTMLScriptElement.prototype.src`。
+
+这样 **`match: '/'` + `<script src="/assets/…">`** 字面仍 **以 `/` 起头**，前缀匹配与设计文档 **`string 为前缀`** 的描述一致。
+
+注意：这与 **服务端渲染或某些框架用绝对 URL 写 attribute**的场景需自我一致——即 **match 要写与 attribute 字面一致的那一版**。
+
+---
+
+### 4.7 SystemJS（legacy）与 Observer 争抢同一加载 — 双倍回退或漏处理
+
+#### 背景
+
+`@vitejs/plugin-legacy` 等流水线会在不支持 `import` 的环境走 **SystemJS**。资源 URL、`fetch`/`instantiate` 路径与现代 **原生 `import`** 分叉。若在 **不知情**前提下仍只靠 **全局 `error` Observer**：
+
+- **可能**看见 SystemJS 插入的脚本失败，再走一遍 Observer；
+- **可能**SystemJS adapter 已经与 **resolver** 做了一轮；
+
+两条链 **互不感知**，易出现 **双倍请求**，或一端 **改写 DOM** 另一端 **仍以旧 URL 重试**，状态机错乱。
+
+#### 思考过程
+
+与 **§4.1**同理：**ownership**先于算法。区别在于 **Webpack 可以用 `data-webpack` 判别**；SystemJS路径需要 **运行时登记「此 URL 由 SystemJS 适配器认领」**，Observer **看到同一个 URL（或等价键）就不再 resolve**。
+
+曾评估过两种方案：
+
+**方案 A（完全接管 instantiate，已弃用）**：覆写 `System.constructor.prototype.instantiate`，不再委托给原始实现，而是自行创建 `<script>` 元素并通过 `data-systemjs` 属性标记，让 Observer 跳过这些脚本。
+
+- 优点：完全控制脚本创建、事件绑定和重试逻辑，不存在 Observer 与 adapter 的竞争
+- 缺点：
+  - 需要在 Observer 中增加 `isSystemJSScript` 检查
+  - 自建脚本可能遗漏 SystemJS 内部附加的属性（`crossOrigin`、`fetchPriority` 等）
+  - 如果 SystemJS 更新了 `instantiate` 的内部逻辑（如 integrity 校验、import map 支持），自建脚本不会自动获得这些改进
+
+**方案 B（委托式，采纳）**：覆写 `instantiate`，但内部仍**委托给原始 `origInstantiate`**，保留 SystemJS 全部的脚本创建逻辑，仅在 `.catch()` 中加入 retry/fallback 循环。通过 `systemjsManagedUrls` 共享 Set 通知 Observer 跳过正在被管理的 URL。
+
+方案 B 的核心优势：**不复制 SystemJS 内部实现**，当 SystemJS 升级或内部行为变化时自动兼容，维护成本显著低于方案 A。
+
+#### 解决方案（如何实现）
+
+采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入 **`resolver`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
+
+Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedUrls`**，直接 **return**，把 **全权**留给 SystemJS adapter。
+
+实施后：**legacy 与现代**共用 **熔断与 urls 语义**，且不 double-count 重试次数。
+
+---
+
+### 4.8 Resolver：初始链路先试、熔断与 `urls`、`findPrepared`/`isFallback`
+
+#### 背景
+
+产品上常同时要求：
+
+1. **每次会话仍先打主 CDN**（不被「上一轮熔断关了」永远不试）；
+2. **备选 CDN / 源站**上可以 **跳过明显挂掉的 host**；
+3. **奇怪 URL** 不应因为「正巧以某个 url 前缀开头」就误入整套 fallback（误判成本：多一次失败、多一跳监控）。
+
+若在实现上粗暴「所有失败都记入熔断并让 `match` 也吃熔断」，会违背 (1)。
+
+若 **初始就用 `urls`前缀来匹配未知资源**，会违背 (3)。
+
+多条规则 **`match`** 重复时若没有 **deterministic precedence**，配置文件一半生效一半不生效。
+
+#### 思考过程（与实现对齐）
+
+参阅 `packages/core/src/runtime/resolver.ts`：
+
+- **`findPrepared(url, isFallback)`**
+  - 从数组 **末尾向前**扫（**后来者覆盖前者**，解决重复 define）。
+  - **始终**先试 **`matches(r.raw.match, url)`**（string 前缀 / RegExp / 函数）。
+  - **仅当 `isFallback === true`**时才允许用 **`url.indexOf(r.raw.urls[j])===0`** 命中规则——这样 **凭空出现的 URL** 不会仅靠「长得像 urls 里某前缀」套上规则。
+
+- **`resolve`**：
+  - 无 Prepared → **`giveup: 'no-match'`**（Observer 会 `emitError`，但语义是 **不匹配而非失败链耗尽**，与 §4.9 观测有关）。
+  - `attemptOnUrl <= retry.max` → **retry**：**同一 logical URL**，Observer 再结合 **是否需要 module cache bust**。
+  - 超过 retry → **`breaker.recordFailure(hostOf(currentUrl))`** → **`pickNextUrl`**跳过 **打开的** host。
+
+- **`findMatchContext`**：处理 **`match` 前缀与 urls 列表前缀不一致**时仍能从当前 URL **剥出路径段** swapping 到 **下一候选前缀**。
+
+- **`resolveBuiltUrl`**：用于 **文件名 → 首轮 URL**。设计意图（见注释）：**不因熔断跳过「初始主推的 match URL」**，fallback 时再靠 **`resolve` + **RF**.load 循环**。`matchesFilename` 对 string仍 **恒 true**——因此 **必须与 Vite §4.4闸门**连用，以免 **离线 dev**误拼 CDN。
+
+配置上：**重复 match**在 prepare 结束时 **可对用户 warn**（若实现中带 logger），最终以 **遍历顺序**体现的 **最后一次为准**。
+
+#### 解决方案小结
+
+把这些 **写成代码与注释**，比单纯文档承诺「先试主链路」更可维护；熔断 **作用在备选链上的 host**，与 **首轮 match**解耦。**`swap`/`joinAssetPrefix`** 等小函数避免 **CDN 前缀少写末尾 `/`**时 **字符串直连文件名** 拼成 **`…prod` + `js/foo.js` → `…prodjs/foo.js`** 的病态 URL（线上表现为路径缺一层目录、404）；实现上需在 **`joinAssetPrefix`** 中 **按需补 `/`**，并在 **`swap` 剥前缀后走同一拼接**。
+
+---
+
+### 4.9 观测与示例：`giveup`/no-match 也会 `rf:error`，不能当作「已走完整回退链」
+
+#### 背景
+
+为调试方便，项目在 HTML 早期注入 listener，把所有 **`rf:*`** push 进 **`window.__RF_EVENTS__`**。
+
+**不匹配规则的脚本**失败后，Observer仍会进入 **`resolver.resolve` → `{ kind:'giveup', reason:'no-match' }`** → **`bus.emitError`**。若以 **「数组 length 变大」**作为「库里做了 fallback」的依据，就会把 **正确答案（未匹配应忽略 fallback）** 显示成 **「却被拦截」**的假阳性。
+
+产品上 **监控**若把 **`rf:error` 全盘当成事故**，也会产生 **告警风暴**——其中大量可能是 **预期的 no-match（第三方脚本、无关域）**.
+
+#### 思考过程
+
+必须把 **语义细分**落实到 **示例与消费者指南**：
+
+- **`rf:retry` / `rf:fallback`**：说明 **resolver 已经决定**，且 **下一轮会换 URL / 再加参数**。
+- **`rf:error`**：可能是 **`rules-exhausted`**（真·穷举失败），也可能是 **`no-match`**（**策略上未接管**）。
+
+#### 解决方案（如何实现）
+
+示例应用（Vue/React demo）改为：在点击「加载不匹配规则脚本」后，只扫描 **`__RF_EVENTS__` 新增的 slice**，若 **`type` 字段为 `'retry'` 或 `'fallback'`** 才认定为 **「本库已进入回退状态机」**；若仅有 **`error` 且无 retry/fallback**，则 UI 文案为 **符合预期的「未被拦截」**。
+
+线上监控同理：按需 filter **`detail.reason`** 或拆分 dashboard。
+
+---
+
+### 4.10 Hybrid Service Worker：补齐图片/字体/CSS 子资源，但不能把 SW 当成“全能 onerror”
+
+#### 背景
+
+本轮引入 **Hybrid SW** 的目标不是替换现有 Observer / Vite / Webpack / SystemJS adapter，而是补齐 DOM 层很难看见的资源：`img`、`@font-face`、CSS `url()`、媒体资源以及受控 CSS `@import`。
+
+实现后暴露了几个很典型的 Service Worker 误区：
+
+- **默认 `path: '/__rf/sw.js'` + `scope: '/'` 会制造部署心智负担**：浏览器默认只允许 SW 控制其脚本所在目录及子目录。若脚本在 `/__rf/sw.js`，想控制 `/`，服务器必须返回 `Service-Worker-Allowed: /`。这不适合作为库默认值。
+- **页面 `postMessage` 配置太晚**：图片、背景图和字体可能在页面 runtime 完成注册并 `postMessage` manifest 之前就发起请求；SW 若没有配置，只能 pass-through，视觉上就像“SW 没效果”。
+- **图片/CSS 背景图常是 `no-cors` 请求**：SW 看到的是 opaque response，无法读取真实 status。某些本地/代理环境中，假 CDN 的错误响应会变成 opaque，若默认当成功返回，浏览器拿到的仍是坏资源。
+- **本地 IP 不是 secure context**：`http://localhost` / `http://127.0.0.1` 可注册 SW，但 `http://192.168.x.x` 这类局域网 IP 默认不能注册。Webpack example 的 `http-server` 会展示 LAN IP，很容易误以为也能测试 SW。
+- **Service Worker 持久存在**：rebuild 后旧 SW 可能继续控制当前页面；磁盘 `dist/rf-sw.js` 已经是新的，不代表浏览器当前 controller 就是新的。
+- **测试“元素可见”不等于资源生效**：`<img>` 元素可见、背景块可见，只说明 DOM 渲染了；必须检查 `naturalWidth`、`document.fonts.check()`、SW 事件和 request/response，才能证明图片/字体真正 fallback 成功。
+
+#### 思考过程
+
+核心取舍是 **Hybrid ownership**：
+
+- **script / dynamic import / Webpack async script / SystemJS** 继续归页面侧 adapter。它们处理的不只是网络请求，还包括构建器 Promise、module map cache、CSS chunk reject、SRI/属性复制等语义。
+- **image / font / media / CSS 子资源** 归 SW。它们没有脚本执行顺序和构建器 Promise 的复杂语义，更适合在 fetch 层统一 retry/fallback。
+- **顶层 stylesheet** 暂不交给 SW。Observer 仍负责 `<link rel="stylesheet">`，避免 SW 与 Observer 对同一 `<link>` 重复 retry、重复计数、事件顺序混乱。
+- **CSS `@import`** 仅在 `request.destination === 'style'` 且 `request.referrer` 命中 manifest 中的 CSS 资源时接管，避免误伤页面主动加载的顶层 stylesheet。
+
+由此可以把 SW 当成 **一层补充的资源请求 owner**，而不是“fetch 层统一替换所有 adapter”。
+
+#### 解决方案（如何实现）
+
+1. **默认 path 跟随 scope 派生**
+
+   `normalizeServiceWorkerOptions()` 中不再默认 `/__rf/sw.js`，而是跟随 scope 派生带库名前缀的路径：
+   - `scope: '/'` → `path: '/rf-sw.js'`
+   - `scope: '/app/'` → `path: '/app/rf-sw.js'`
+
+   只有用户显式把 `path` 配到 scope 目录之外时，才需要自己配置 `Service-Worker-Allowed`。这样默认配置能在普通静态服务器上直接跑通。
+
+2. **manifest 预置进 SW 文件**
+
+   Vite/Webpack 插件构建时生成 `ResourceFallbackManifest`，再通过 `buildServiceWorkerAssets()` 把 `{ manifest, runtimeConfig, serviceWorker }` 写入 `self.__RF_SW_PRELOAD__`，拼在 SW bundle 前面。这里不能用普通 `JSON.stringify`：`RegExp` 会被序列化成 `{}`，导致 SW 中的 `match` 规则失效；当前使用 JS 表达式序列化，保留正则字面量。
+
+   `packages/core/src/sw/entry.ts` 在模块初始化时优先读取这个 preload：
+   - 有 preload：SW 第一个 fetch 事件前就有 ownership 信息；
+   - 页面 runtime 后续仍会 `postMessage` 最新配置，作为更新/补发通道。
+
+   这修掉了“SW 已控制页面，但早期图片/字体仍透传主 CDN”的竞态。
+
+3. **显式处理 opaque response 策略**
+
+   默认仍保守：opaque response 不当失败，避免跳过本来可用的跨源图片。
+
+   但示例为了演示“假 CDN 返回 opaque 错误也要继续回源”，新增 `serviceWorker.fallbackOnOpaque`，在 SW core 中对 **跨源 opaque response** 视作失败继续进入 resolver。这个选项是 opt-in，因为它可能牺牲正常 CDN opaque 图片的首选命中率。
+
+4. **Cache API 保守落地**
+
+   只缓存 **fallback 成功后的非 opaque 2xx response**；网络 retry/fallback 全部耗尽后，才读当前 manifest version 的 cache。manifest version 纳入资源、fallback rules 和关键 SW cache 策略，`activate` 时清理旧 `resource-fallback-*` cache，避免 rules/cache 策略变化后旧 manifest 的资源长期污染。
+
+5. **Webpack/Vite 插件都 emit SW asset + manifest**
+   - Vite：`generateBundle` 收集 bundle 输出，`transformIndexHtml` 使用 `post` 阶段，确保有最终 bundle 可生成非空 manifest。
+   - Webpack：从 `compilation.getAssets()` 与 HtmlWebpackPlugin tags 收集资源，输出 `rf-sw.js` 和 `manifest.json`，并把 manifest 注入页面安装配置。
+
+6. **事件与错误路径加固**
+
+   SW fetch 事件会优先使用 `FetchEvent.clientId` + `clients.get()` 定向给触发请求的页面；只有没有 `clientId` 时才回退到窗口广播，避免多 tab 共用一个 SW 时互相收到对方资源的 `rf:*` 事件。
+
+   `respondWith()` 外层增加最终兜底：如果 `fetchWithFallback()` 仍然 reject，SW 会补发一次 `rf:error`（若 core 尚未发出），并返回 `Response.error()`。这样浏览器看到的仍是接近真实网络失败的资源结果，而不是伪造的 503 文本响应，同时不会留下未处理 rejection。
+
+   另一个容易忽略的边界是熔断器：页面 runtime 默认可以通过 `localStorage` 跨 tab 共享 host 状态，但 SW resolver 必须强制使用独立内存 circuit。否则某个 tab 的页面侧状态会影响 SW 全局 fetch 决策，排障时会出现“清了页面状态但 SW 仍跳过 host”的错觉。
+
+#### 排障经验
+
+- **先看 secure context**：`localhost` 能跑、IP 不行，通常不是库逻辑错，而是 SW 注册被浏览器拒绝。必须用 `localhost`、`127.0.0.1` 或 HTTPS。
+- **先清旧 SW 再判断**：调试命令：
+
+  ```js
+  await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister()));
+  await caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  location.reload();
+  ```
+
+- **看当前 controller，不只看磁盘文件**：
+
+  ```js
+  navigator.serviceWorker.controller?.scriptURL;
+  ```
+
+  `dist/rf-sw.js` 已更新，不代表当前 tab 已由它控制。
+
+- **验证视觉资源不要只用 `toBeVisible()`**：
+  - 图片：检查 `img.naturalWidth > 0`
+  - 字体：检查 `await document.fonts.ready` + `document.fonts.check(...)`
+  - 背景图：检查 computed style 只是“URL 被写入”，还需结合 SW 事件/Network 证明请求成功
+  - SW 事件：检查资源 URL 是否出现 `retry/fallback/success`
+
+- **字体示例必须用真实字体**：文本占位的 `.woff2` 会被浏览器当坏字体丢弃，E2E 应使用真实 `.ttf/.woff2` 并断言 `document.fonts.check()`。
+
+#### 亮点总结
+
+这套 Hybrid SW 的亮点不是“多写一个 SW”，而是 **把每种资源的 owner、时机和可观测性拆清楚**：
+
+- manifest 让 SW 不靠后缀猜资源归属；
+- preload 消除页面 `postMessage` 竞态，并保留 `RegExp` 规则语义；
+- `fallbackOnOpaque` 把平台不可见性变成显式策略；
+- `clientId` 定向事件和 `Response.error()` 兜底让观测更准确；
+- manifest version + cache namespace 让 rules/cache 策略变化能自然失效；
+- 默认 path/scope 避免部署心智负担；
+- E2E 从“页面没挂”升级到“资源真实生效”。
+
+---
+
+上一篇：[开源方案对比](./comparison.md) · 下一篇：[可复用原则](./principles.md)

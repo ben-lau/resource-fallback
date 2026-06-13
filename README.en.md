@@ -6,7 +6,7 @@
 [![CI](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml/badge.svg)](https://github.com/ben-lau/resource-fallback/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/ben-lau/resource-fallback/graph/badge.svg)](https://codecov.io/gh/ben-lau/resource-fallback)
 
-> **[中文](README.md)** | English
+> **[中文](README.md)** | English | [📖 Docs](https://ben-lau.github.io/resource-fallback/en/)
 
 Zero-mental-overhead frontend resource fallback solution. Provides runtime **retry → multi-CDN fallback → origin** capabilities for Webpack and Vite build outputs (sync / async JS, CSS) — no changes to business code required.
 

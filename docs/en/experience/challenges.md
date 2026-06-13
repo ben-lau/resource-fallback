@@ -1,0 +1,18 @@
+---
+title: Technical Challenges
+---
+
+# II. Technical Challenges (Why This Is Not "Just Add onerror")
+
+| Dimension             | Challenge                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Semantics**         | Must satisfy: **try initial URL first**, circuit mainly constrains **fallback hosts**, **unmatched resources must not change semantics** (still `giveup`, but different from entering the fallback chain).                                                                                                                                                                                                       |
+| **Vite**              | Rewriting dynamic import **too early** breaks **`__vitePreload`/`__vite__mapDeps`** and async component **CSS**; literal dynamic import replacement must happen **after the bundle is finalized**.                                                                                                                                                                                                               |
+| **Webpack**           | Global `error` and **`__webpack_require__.l`** injection can both see **the same failure** — without DOM markers, **double retry**; **async CSS chunks** (mini-css-extract, `experiments.css`, non-`j` loaders in `__webpack_require__.f`) **reject promises** — Observer replacing `<link>` alone leaves **`Promise.all` short-circuited**: **JS fallback succeeds but lazy load still throws ChunkLoadError**. |
+| **ESM**               | Failed module record cache causes "looks like fallback but Network is flat"; **same URL + query strategy** must be consistent across all entry points.                                                                                                                                                                                                                                                           |
+| **Config vs reality** | When `base`/`publicPath` and rule `match` **diverge**, Node-side mis-matching arbitrary chunk filenames can **rewrite async chunks to wrong CDN** — product and engineering misjudgment; needs a **`shouldRewriteUrls` gate**.                                                                                                                                                                                   |
+| **Legacy**            | SystemJS and Observer without **mutually exclusive URL registration** → **double fallback** or missed handling.                                                                                                                                                                                                                                                                                                  |
+
+---
+
+Previous: [Engineering Highlights](./highlights.md) · Next: [OSS Comparison](./comparison.md)
