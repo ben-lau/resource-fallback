@@ -27,7 +27,7 @@ jobs:
 
       - run: pnpm build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: build-output
           path: |
@@ -160,7 +160,7 @@ jobs:
 
       - run: pnpm --filter @resource-fallback-example/vite-vue run test:e2e
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report-vite
@@ -193,7 +193,7 @@ jobs:
 
       - run: pnpm --filter @resource-fallback-example/webpack-react run test:e2e
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report-webpack
