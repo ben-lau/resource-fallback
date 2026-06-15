@@ -5,12 +5,19 @@ updates:
     schedule:
       interval: 'weekly'
     groups:
-      dev-dependencies:
-        dependency-type: 'development'
-      production-dependencies:
-        dependency-type: 'production'
+      minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
+    groups:
+      actions:
+        patterns:
+          - '*'
