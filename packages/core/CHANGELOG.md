@@ -1,5 +1,27 @@
 # @resource-fallback/core
 
+## [0.2.0](https://github.com/ben-lau/resource-fallback/compare/@resource-fallback/core-v0.1.5...@resource-fallback/core-v0.2.0) (2026-06-15)
+
+
+### Features
+
+* 0.0.2 ([db39ae0](https://github.com/ben-lau/resource-fallback/commit/db39ae09fe6d1ecf8c43fabee62906c3da7a449a))
+* **core:** 增加 Hybrid SW 资源回退能力 ([b08f835](https://github.com/ben-lau/resource-fallback/commit/b08f8353c743357f7f1ead24f0ea253f6a05b8f9))
+* **core:** 运行时支持 dispose() 卸载清理 ([7588010](https://github.com/ben-lau/resource-fallback/commit/7588010ef88c6e90c52f4efec57ffdb82f45b1ed))
+* version update ([6a09f67](https://github.com/ben-lau/resource-fallback/commit/6a09f673bfec1801297c8aca480cff442f99bc27))
+
+
+### Bug Fixes
+
+* **core:** JSON 序列化转义 &lt; 防止 script 注入，joinAssetPrefix 提升至 core 共享 ([724c4dd](https://github.com/ben-lau/resource-fallback/commit/724c4dd32a00d7ca43f6b190f29e8397b16d4acc))
+* **core:** kill-switch 严格匹配值类型，cookie 改为精确匹配 ([8e1c90c](https://github.com/ben-lau/resource-fallback/commit/8e1c90ca9c69c52217a500a63f90d74aeddb6d52))
+* **core:** 修复异步模块中包含 css 时丢失依赖关系的问题，补充部分测试场景 ([dfcbc26](https://github.com/ben-lau/resource-fallback/commit/dfcbc2659e395acc950c143054b8434c51c10d4b))
+* **resolver:** 修复资源路径拼接问题 ([7305e80](https://github.com/ben-lau/resource-fallback/commit/7305e804b58370853fee29e9544505512dcf1cef))
+* **sw:** 修复 cors 探测 credentials 问题并优化重复请求 ([140e473](https://github.com/ben-lau/resource-fallback/commit/140e47334194c5f6fca24a7d7155db1b0d6c2951))
+* **sw:** 修复图片在 cors 场景下的一些问题 ([05f98a4](https://github.com/ben-lau/resource-fallback/commit/05f98a4de974dbdd3c97b844971ab257fb653f57))
+* **vite-plugin:** 修复vite 在加载异步模块时强制添加 match 内的 url 问题，补充测试用例 ([7927832](https://github.com/ben-lau/resource-fallback/commit/7927832b982f129837a140b4a365757c4ad02e6e))
+* 修复 sw 意外覆盖opaque 场景 ([95b0883](https://github.com/ben-lau/resource-fallback/commit/95b08832a4ee329885f02edb016783b1873d9b07))
+
 ## 0.1.5
 
 ### Patch Changes
