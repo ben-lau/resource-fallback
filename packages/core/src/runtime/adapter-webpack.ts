@@ -47,8 +47,8 @@ interface AdapterDeps {
  * 如果 `chunkLoadingGlobals` 未知（例如运行时未通过 webpack 插件加载），
  * 则回退到扫描 window 上可枚举的 `webpackChunk*` 属性，并进行短时间轮询。
  */
-export function installWebpackAdapter(deps: AdapterDeps): void {
-  if (typeof window === 'undefined') return;
+export function installWebpackAdapter(deps: AdapterDeps): { dispose: () => void } {
+  if (typeof window === 'undefined') return { dispose() {} };
   const w = window as unknown as Record<string, unknown>;
 
   const knownGlobals = deps.chunkLoadingGlobals || [];
@@ -61,11 +61,17 @@ export function installWebpackAdapter(deps: AdapterDeps): void {
 
   scanAndHook(deps);
 
-  // 尽力轮询：等待后创建的数组（当我们的运行时无法预创建时）
+  const timers: ReturnType<typeof setTimeout>[] = [];
   const intervals = [50, 150, 400, 1000];
   for (let i = 0; i < intervals.length; i++) {
-    setTimeout(() => scanAndHook(deps), intervals[i]);
+    timers.push(setTimeout(() => scanAndHook(deps), intervals[i]));
   }
+
+  return {
+    dispose() {
+      for (let i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+    },
+  };
 }
 
 function scanAndHook(deps: AdapterDeps): void {

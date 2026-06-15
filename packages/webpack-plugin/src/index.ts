@@ -226,8 +226,9 @@ function toHtmlPluginTag(tag: HtmlTag): HtmlPluginTag {
 function locateHtmlPlugin(compiler: Compiler): unknown | undefined {
   for (const p of compiler.options.plugins || []) {
     if (!p) continue;
-    const name = (p as { constructor?: { name?: string } }).constructor?.name;
-    if (name === 'HtmlWebpackPlugin') return p;
+    const ctor = (p as { constructor?: { name?: string; getHooks?: unknown } }).constructor;
+    if (ctor?.name === 'HtmlWebpackPlugin') return p;
+    if (typeof ctor?.getHooks === 'function') return p;
   }
   return undefined;
 }

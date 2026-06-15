@@ -81,7 +81,7 @@ export function install(config: InstallOptions): void {
     log,
     sri: config.sri || 'strip',
   });
-  installWebpackAdapter({
+  const webpackCtl = installWebpackAdapter({
     resolver,
     bus,
     log,
@@ -96,7 +96,7 @@ export function install(config: InstallOptions): void {
   g.dispose = () => {
     observerCtl.dispose();
     viteCtl.dispose();
-    // webpack adapter 的 setTimeout 轮询为一次性且短暂（最多 1s），不需清理。
+    webpackCtl.dispose();
     // systemjs adapter 覆写了 System.constructor.prototype，无法安全还原。
     // sw adapter 的 message listener 绑定在 navigator.serviceWorker 上，
     // 页面卸载时自动回收。

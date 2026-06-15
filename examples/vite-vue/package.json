@@ -18,8 +18,8 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@resource-fallback/vite-plugin": "workspace:*",
-    "@vitejs/plugin-legacy": "^5.4.3",
-    "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-legacy": "^6.1.1",
+    "@vitejs/plugin-vue": "^6.0.7",
     "terser": "^5.46.2",
     "vite": "^6.4.2"
   }

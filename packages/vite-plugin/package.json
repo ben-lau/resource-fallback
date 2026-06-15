@@ -1,7 +1,7 @@
 {
   "name": "@resource-fallback/vite-plugin",
   "version": "0.1.5",
-  "description": "Vite 4+ plugin that wires @resource-fallback/core into your build (HTML injection + experimental.renderBuiltUrl)",
+  "description": "Vite 4+ plugin that wires @resource-fallback/core into your build (HTML injection + dynamic import rewriting)",
   "keywords": [
     "cdn",
     "fallback",

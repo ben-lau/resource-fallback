@@ -70,6 +70,9 @@ export default withMermaid(
       ssr: {
         noExternal: ['vitepress-plugin-mermaid', 'mermaid'],
       },
+      optimizeDeps: {
+        include: ['mermaid'],
+      },
     },
 
     mermaid: {},

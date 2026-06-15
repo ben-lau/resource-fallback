@@ -47,6 +47,8 @@ describe('entry (install)', () => {
 
   afterEach(() => {
     const w = window as unknown as Record<string, unknown>;
+    const g = w.__RF__ as { dispose?: () => void } | undefined;
+    if (g?.dispose) g.dispose();
     delete w.__RF_DISABLE__;
     delete w.__CUSTOM_DISABLE__;
     delete w.webpackChunk_test;

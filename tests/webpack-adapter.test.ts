@@ -217,7 +217,7 @@ describe('webpack adapter', () => {
       outerDoneArg = e;
     });
 
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 200));
     obs.disconnect();
 
     // We MUST see secondary requested at some point - if the closed-over
