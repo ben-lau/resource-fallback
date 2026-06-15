@@ -9,6 +9,8 @@ on:
       - 'typedoc.json'
       - 'README.md'
       - 'README.en.md'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
