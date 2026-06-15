@@ -9,6 +9,8 @@ import { createResolver } from '../packages/core/src/runtime/resolver';
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
 
+let disposeFns: Array<() => void> = [];
+
 function setup(globals: string[]) {
   const log = createLogger(false);
   const resolver = createResolver({
@@ -22,7 +24,8 @@ function setup(globals: string[]) {
     defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
   });
   const bus = createHookBus({}, log);
-  installWebpackAdapter({ resolver, bus, log, chunkLoadingGlobals: globals });
+  const ctl = installWebpackAdapter({ resolver, bus, log, chunkLoadingGlobals: globals });
+  disposeFns.push(() => ctl.dispose());
 }
 
 describe('webpack adapter', () => {
@@ -33,6 +36,8 @@ describe('webpack adapter', () => {
   });
 
   afterEach(() => {
+    for (const fn of disposeFns) fn();
+    disposeFns = [];
     delete (window as unknown as Record<string, unknown>).webpackChunk_demo;
   });
 
@@ -101,7 +106,13 @@ describe('webpack adapter', () => {
       log,
     );
     installObserver({ resolver, bus, log, sri: 'strip' });
-    installWebpackAdapter({ resolver, bus, log, chunkLoadingGlobals: ['webpackChunk_demo'] });
+    const ctl = installWebpackAdapter({
+      resolver,
+      bus,
+      log,
+      chunkLoadingGlobals: ['webpackChunk_demo'],
+    });
+    disposeFns.push(() => ctl.dispose());
     const arr = (window as unknown as Record<string, unknown[][]>).webpackChunk_demo;
 
     // fakeRuntime stands in for webpack's LoadScriptRuntimeModule. It creates

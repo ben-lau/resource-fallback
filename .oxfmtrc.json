@@ -1,5 +1,5 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
-  "ignorePatterns": ["dist", "coverage", "playwright-report", "test-results"]
+  "ignorePatterns": ["dist", "coverage", "playwright-report", "test-results", "CHANGELOG.md"]
 }
