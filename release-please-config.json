@@ -6,7 +6,9 @@
   "group-pull-request-title-pattern": "chore: release v${version}",
   "packages": {
     ".": {
+      "package-name": "",
       "component": "",
+      "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
