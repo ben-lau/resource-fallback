@@ -50,11 +50,11 @@
   },
   "dependencies": {
     "@resource-fallback/core": "workspace:*",
-    "es-module-lexer": "^2.1.0",
+    "es-module-lexer": "^2.2.0",
     "magic-string": "^0.30.21"
   },
   "devDependencies": {
-    "vite": "^6.4.2"
+    "vite": "^6.4.3"
   },
   "peerDependencies": {
     "vite": ">=4"
