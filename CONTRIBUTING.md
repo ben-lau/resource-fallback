@@ -68,7 +68,7 @@ feat!: rename config option `retryCount` to `maxRetries`
 
 项目使用 lefthook 管理 git hooks，`pnpm install` 后自动安装：
 
-- **pre-commit**: oxlint 检查 + oxfmt 自动格式化暂存文件
+- **pre-commit**: 对暂存文件跑 oxlint（`--fix --deny-warnings`）与 oxfmt（`--write`），并自动 `git add` 修复结果；覆盖范围与 CI `pnpm lint` / `pnpm fmt:check` 同一套规则（含 `.md` 等），CI 再全量复检
 - **commit-msg**: commitlint 校验提交信息格式
 
 ## 发布流程

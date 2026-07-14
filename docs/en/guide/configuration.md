@@ -30,12 +30,12 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 
 ## FallbackRule
 
-| Field     | Type             | Default      | Description                                                                                                                                                                      |
-| --------- | ---------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field     | Type             | Default      | Description                                                                                                                                                                                                                              |
+| --------- | ---------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `base`    | `string`         | **Required** | Asset URL prefix (case-sensitive). Used for: prefix-matching failed URLs, stripping the path for candidate swap, and Vite bare filename → CDN URL. May differ from `urls`: `base` is the first-load prefix; `urls` is the fallback chain |
-| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                             |
-| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                              |
-| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                    |
+| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                                                                                     |
+| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                                                                                      |
+| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                                                                            |
 
 ::: tip rule `base` vs Vite `base`
 

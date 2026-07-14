@@ -203,12 +203,12 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### FallbackRule
 
-| Field     | Type             | Default      | Description                                                                                                                                                                      |
-| --------- | ---------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field     | Type             | Default      | Description                                                                                                                                                                                                                              |
+| --------- | ---------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `base`    | `string`         | **Required** | Asset URL prefix (case-sensitive). Used for: prefix-matching failed URLs, stripping the path for candidate swap, and Vite bare filename → CDN URL. May differ from `urls`: `base` is the first-load prefix; `urls` is the fallback chain |
-| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                             |
-| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                              |
-| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                    |
+| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                                                                                     |
+| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                                                                                      |
+| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                                                                            |
 
 > Vite's config `base` and `FallbackRule.base` share a name: call them Vite `base` vs rule `base` in prose. Vite `base` / Webpack `publicPath` should equal `rules[].base`.
 

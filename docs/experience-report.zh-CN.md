@@ -28,7 +28,7 @@
 | **Vite**       | 动态 import 若在 **过早** 钩子改坏产物，会破坏 **`__vitePreload`/`__vite__mapDeps`** 与异步组件 **CSS**；必须在 **bundle 已定稿**后再做字面量动态 import 的定点替换。                                                                                                                                                                                                                       |
 | **Webpack**    | 全局 `error` 与 **`__webpack_require__.l`** 注入脚本 **同一次失败可被两条链路看见**，不靠 DOM 标记切分则会 **双倍重试**；另：**异步 CSS chunk**（`mini-css-extract-plugin`、`experiments.css` 等写入 `__webpack_require__.f` 的非 `j` loader）失败时会 **reject promise**，若仅依赖 Observer 换 `<link>`，**`Promise.all` 仍会短路**，表现为 **JS 已回退成功但懒加载仍抛 ChunkLoadError**。 |
 | **ESM**        | 失败 module record 缓存导致「看似在回退、网络不涨」的假实现；必须与 **同一 URL + query** 的策略一致才能在各入口复现可控。                                                                                                                                                                                                                                                                   |
-| **配置与现实** | Vite `base`/`publicPath` 与 rule `base` **不一致时**，若在 Node 侧误开改写闸门，会把 **本应同源的异步 chunk** 整块改到外域——属于 **产品与工程双误判**，需 **`shouldRewriteUrls`（两侧 `ensureTrailingSlash` 后再比）一类闸门**。                                                                                                                                                                                |
+| **配置与现实** | Vite `base`/`publicPath` 与 rule `base` **不一致时**，若在 Node 侧误开改写闸门，会把 **本应同源的异步 chunk** 整块改到外域——属于 **产品与工程双误判**，需 **`shouldRewriteUrls`（两侧 `ensureTrailingSlash` 后再比）一类闸门**。                                                                                                                                                            |
 | **Legacy**     | SystemJS 与 Observer 若不 **互斥登记 URL**，易产生 **双重回退** 或遗漏。                                                                                                                                                                                                                                                                                                                    |
 
 ---
@@ -259,10 +259,10 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 效果归纳：
 
-| 场景                                          | 行为                                                                                                           |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Vite `base` 与任一 rule `base` 规范化后相等   | **改写**字面量动态 import，`__RF__.load`参与回退链。                                                           |
-| Vite `base`为 `/`，规则只对 CDN（不相等）     | **不改写**，Vite 默认行为加载 chunk；手写 `<script src="https://cdn...">` 仍可由 Observer 接管（若命中 rule `base`）。 |
+| 场景                                        | 行为                                                                                                                   |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Vite `base` 与任一 rule `base` 规范化后相等 | **改写**字面量动态 import，`__RF__.load`参与回退链。                                                                   |
+| Vite `base`为 `/`，规则只对 CDN（不相等）   | **不改写**，Vite 默认行为加载 chunk；手写 `<script src="https://cdn...">` 仍可由 Observer 接管（若命中 rule `base`）。 |
 
 这样用 **单一布尔**把「是否要动产物」说清楚，避免 Vite `base` 未切 CDN 时误拼外域 URL。
 

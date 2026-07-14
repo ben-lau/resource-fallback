@@ -24,13 +24,13 @@ import {
 } from '@resource-fallback/core';
 ```
 
-| Function                  | Description                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                          |
-| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                      |
-| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                     |
-| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config    |
-| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string suitable for embedding in the page           |
+| Function                  | Description                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                       |
+| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                   |
+| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                  |
+| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config |
+| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string suitable for embedding in the page        |
 
 ### defineConfig
 

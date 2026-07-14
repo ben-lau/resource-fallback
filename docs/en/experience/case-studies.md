@@ -160,10 +160,10 @@ Two gates:
 - **`shouldRewriteUrls = options.rules.some((r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base))`** — trailing-slash normalization; no RegExp / function
 - **`writeBundle`**: `if (!shouldRewriteUrls) return;`
 
-| Scenario                                               | Behavior                                                                      |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| Vite `base` strictly equals a rule `base`              | Rewrite literal dynamic import → **`__RF__.load`**                            |
-| Vite `base` is `/`, rules target CDN only (not equal)  | **No rewrite**; hand-written CDN scripts still Observer if they hit rule `base` |
+| Scenario                                              | Behavior                                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Vite `base` strictly equals a rule `base`             | Rewrite literal dynamic import → **`__RF__.load`**                              |
+| Vite `base` is `/`, rules target CDN only (not equal) | **No rewrite**; hand-written CDN scripts still Observer if they hit rule `base` |
 
 ---
 
