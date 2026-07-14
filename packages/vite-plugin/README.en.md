@@ -23,7 +23,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // origin fallback
@@ -35,7 +35,7 @@ export default defineConfig({
 });
 ```
 
-> **Important**: The value of `base` should match `match` to ensure build output URLs match the rule.
+> **Important**: Vite `base` should equal `rules[].base` (rule `base`) so build output URLs hit the rule. URL rewriting runs only when both sides match after trailing-slash normalization (`ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base)`).
 
 ## How It Works
 
@@ -97,7 +97,7 @@ The runtime also listens for Vite's `vite:preloadError` event. When modulepreloa
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
@@ -125,7 +125,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+      rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

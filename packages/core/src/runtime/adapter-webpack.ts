@@ -111,7 +111,7 @@ function wrapRequire(req: WebpackRequireLike, deps: AdapterDeps): void {
   req.__rfWrapped = true;
 
   if (typeof req.l !== 'function') {
-    deps.log.warn('检测到 webpack runtime 但没有 .l 方法——跳过 chunk hook');
+    deps.log.warn('webpack runtime detected but .l is missing — skip chunk hook');
     return;
   }
 
@@ -119,7 +119,7 @@ function wrapRequire(req: WebpackRequireLike, deps: AdapterDeps): void {
   // 并用 `__rf_wrapped` 标记。如果已有该包装则无需再次包装——否则会导致每次
   // retry/success 事件被重复触发，并且争抢重试预算。保留现有包装即可。
   if ((req.l as { __rf_wrapped?: boolean }).__rf_wrapped) {
-    deps.log.debug('webpack 插件已包装 .l；chunk-array adapter 让步');
+    deps.log.debug('webpack plugin already wrapped .l; chunk-array adapter yields');
     return;
   }
 

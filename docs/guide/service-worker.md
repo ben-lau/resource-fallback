@@ -47,6 +47,8 @@ resourceFallback({
 2. 输出 `rf-sw.js` SW 资产文件
 3. 将 manifest 预置到 SW 文件中（`__RF_SW_PRELOAD__`），避免首次 fetch 时 manifest 尚未就绪的竞态
 
+规则侧仅为 string 形式的 rule `base`（构建期会规范化尾斜杠），preload 使用普通 `JSON.stringify`，不再需要 RegExp 字面量特判。
+
 manifest 精简策略：仅保留 `owner === 'sw'` 和 `type === 'style'` 的 asset，减小预加载体积。
 
 默认 SW path 跟随 scope 派生：`scope: '/'` 时输出 `/rf-sw.js`，`scope: '/app/'` 时输出 `/app/rf-sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed` 响应头。

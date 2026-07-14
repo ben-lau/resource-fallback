@@ -12,7 +12,7 @@ title: Reusable Principles
 
 4. **Vite: `vite:preloadError` must `preventDefault()`, read payload from `payload`** — otherwise CSS preload failure throws and blocks **`__RF__.load()`**.
 
-5. **When `base` and `match` diverge, don't open the build gate**: use **`shouldRewriteUrls`** to prevent accidental CDN URL assembly.
+5. **When Vite `base` and rule `base` diverge, don't open the build gate**: use **`shouldRewriteUrls` (compare after `ensureTrailingSlash` on both sides)** to prevent accidental CDN URL assembly.
 
 6. **Don't use `cloneNode` to swap script src**; create new elements + **attribute whitelist + SRI policy**.
 
@@ -24,7 +24,7 @@ title: Reusable Principles
 
 10. **SystemJS and Observer must register URLs for mutual exclusion**.
 
-11. **Resolver: `urls`-prefix match only when `isFallback === true`**; separate **circuit vs first-match semantics**; **duplicate match — last wins**.
+11. **Resolver: `urls`-prefix match only when `isFallback === true`**; separate **circuit vs first-load rule `base` semantics**; **duplicate rule `base` / `resolveBuiltUrl` — last wins**.
 
 12. **`rf:error` ≠ always ran fallback**: split **no-match** in UI and alerts.
 
@@ -38,7 +38,7 @@ title: Reusable Principles
 
 17. **Verify visual resources by real load**: img → **`naturalWidth`**; font → **`document.fonts.check()`**; background → Network/SW events; **`toBeVisible()`** only proves DOM exists.
 
-18. **SW preload with `RegExp` cannot use bare `JSON.stringify`** — rules become `{}`, fetch never matches.
+18. **Rules use string rule `base` only** — no RegExp / function matchers; SW preload embeds JSON-serializable config.
 
 19. **SW events should target `clientId`** — broadcast pollutes multi-tab observability.
 

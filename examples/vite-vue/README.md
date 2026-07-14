@@ -32,7 +32,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
   plugins: [
     resourceFallback({
       rules: [{
-        match: 'http://cdn-primary.example.invalid/',  // 匹配 base
+        base: 'http://cdn-primary.example.invalid/',  // rule.base = Vite base
         urls: [
           'http://cdn-secondary.example.invalid/',     // 备用 CDN 1
           'http://cdn-backup.example.invalid/',         // 备用 CDN 2

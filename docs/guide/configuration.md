@@ -12,7 +12,7 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 
 | 字段                  | 类型                              | 默认值               | 说明                                                                |
 | --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组，按顺序匹配，重复 match 以最后一条为准                 |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；多条规则时 `resolveBuiltUrl` 以最后一条命中为准        |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
 | `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
@@ -30,19 +30,17 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 
 ## FallbackRule
 
-| 字段      | 类型                                   | 默认值   | 说明                                          |
-| --------- | -------------------------------------- | -------- | --------------------------------------------- |
-| `match`   | `string \| RegExp \| (url) => boolean` | **必填** | URL 匹配模式。string 为前缀匹配               |
-| `urls`    | `string[]`                             | **必填** | 有序候选 URL 前缀列表。最后一个通常为回源地址 |
-| `retry`   | `RetryOptions`                         | 见下表   | 覆盖该规则的重试配置                          |
-| `circuit` | `CircuitOptions`                       | 见下表   | 覆盖该规则的熔断配置                          |
+| 字段      | 类型             | 默认值   | 说明                                                                                                                                                          |
+| --------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`    | `string`         | **必填** | 资源 URL 前缀（区分大小写）。用于：前缀匹配失败 URL、剥路径后拼接到候选、Vite 裸文件名拼出首轮 CDN URL。可与 `urls` 分离：`base` 是首轮前缀，`urls` 是回退链 |
+| `urls`    | `string[]`       | **必填** | 有序候选 URL 前缀列表（回退链）。最后一个通常为回源地址                                                                                                       |
+| `retry`   | `RetryOptions`   | 见下表   | 覆盖该规则的重试配置                                                                                                                                          |
+| `circuit` | `CircuitOptions` | 见下表   | 覆盖该规则的熔断配置                                                                                                                                          |
 
-::: tip match 模式说明
+::: tip rule `base` 与 Vite `base`
 
-- **string** — 前缀匹配（区分大小写）
-- **RegExp** — 对 URL 做正则测试
-- **函数** — 针对每个 URL 自行决定（构建期序列化时仅支持 string 或 RegExp）
-  :::
+Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vite `base` 与 rule `base`。Vite `base` / Webpack `publicPath` 应等于 `rules[].base`。`base` 与 `urls` 可以不同——`base` 管首轮加载前缀，`urls` 管失败后的回退链。不再支持 RegExp / 函数匹配。
+:::
 
 ## RetryOptions
 
@@ -64,7 +62,7 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 
 ## ServiceWorkerOptions
 
-Hybrid SW 默认关闭。启用后，Vite/Webpack 插件会生成资源 manifest，并输出 SW asset；SW bundle 会预置 manifest/config（保留 `RegExp` 规则语义），页面 runtime 负责注册 SW、补发配置，并把 SW `postMessage` 事件桥接为现有 `rf:*` 事件。
+Hybrid SW 默认关闭。启用后，Vite/Webpack 插件会生成资源 manifest，并输出 SW asset；SW bundle 会预置 manifest/config，页面 runtime 负责注册 SW、补发配置，并把 SW `postMessage` 事件桥接为现有 `rf:*` 事件。
 
 ```ts
 resourceFallback({
@@ -102,7 +100,7 @@ SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },

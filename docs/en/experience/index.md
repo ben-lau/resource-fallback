@@ -26,7 +26,7 @@ Compared with webpack-retry-chunk-load-plugin, vite-plugin-cdn-import, webpack-f
 
 ### [Case Studies](./case-studies.md)
 
-Ten solved problems (4.1–4.10): Webpack double-handling, Vite dynamic import, ESM cache, base/match gate, cloneNode, URL matching, SystemJS, Resolver semantics, observability events, Hybrid SW.
+Ten solved problems (4.1–4.10): Webpack double-handling, Vite dynamic import, ESM cache, Vite base / rule base gate, cloneNode, URL matching, SystemJS, Resolver semantics, observability events, Hybrid SW.
 
 ### [Reusable Principles](./principles.md)
 

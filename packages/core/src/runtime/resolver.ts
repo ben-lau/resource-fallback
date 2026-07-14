@@ -1,6 +1,7 @@
-import type { FallbackRule, MatchPattern, ResolveResult, RuntimeConfig } from '../types';
+import type { FallbackRule, ResolveResult, RuntimeConfig } from '../types';
 import { backoff, mergeRetry } from './retry';
 import { createCircuitBreaker, hostOf, mergeCircuit } from './circuit';
+import { normalizeFallbackRule } from './utils';
 
 interface PreparedRule {
   raw: FallbackRule;
@@ -18,7 +19,7 @@ export interface Resolver {
    *                     （调用方在 fallback 后会重置为 1）
    * @param isFallback   当前 URL 是否已处于 fallback 阶段（来自 urls 列表）。
    *                     为 false 时表示仍在初始链接上重试——初始链接只通过
-   *                     match 匹配，且失败不计入熔断器。
+   *                     base 前缀匹配，且失败不计入熔断器。
    */
   resolve(currentUrl: string, attemptOnUrl: number, isFallback?: boolean): ResolveResult;
 
@@ -41,21 +42,22 @@ export interface Resolver {
 
 export function createResolver(config: RuntimeConfig): Resolver {
   const prepared: PreparedRule[] = (config.rules || []).map((r) => {
-    const circuit = mergeCircuit(config.defaults?.circuit, r.circuit);
+    const rule = normalizeFallbackRule(r);
+    const circuit = mergeCircuit(config.defaults?.circuit, rule.circuit);
     return {
-      raw: r,
-      retry: mergeRetry(config.defaults?.retry, r.retry),
+      raw: rule,
+      retry: mergeRetry(config.defaults?.retry, rule.retry),
       circuit,
       breaker: createCircuitBreaker(circuit),
     };
   });
 
   function findPrepared(url: string, isFallback?: boolean): PreparedRule | undefined {
-    // 从后向前遍历——当多条规则的 match 重复时，以最后一条为准。
+    // 从后向前遍历——当多条规则的 base 重复时，以最后一条为准。
     for (let i = prepared.length - 1; i >= 0; i--) {
       const r = prepared[i];
-      if (matches(r.raw.match, url)) return r;
-      // 仅在 fallback 阶段才通过 urls 前缀匹配。初始资源只通过 match 识别，
+      if (url.indexOf(r.raw.base) === 0) return r;
+      // 仅在 fallback 阶段才通过 urls 前缀匹配。初始资源只通过 base 识别，
       // 避免全新资源的 URL 恰好以某条规则的 urls 开头而误入 fallback 逻辑。
       if (isFallback) {
         for (let j = 0; j < r.raw.urls.length; j++) {
@@ -69,26 +71,20 @@ export function createResolver(config: RuntimeConfig): Resolver {
   /**
    * 找到 url 在 urls 数组中的位置以及用于截取资产路径的前缀。
    *
-   * 当 match 和 urls[0] 指向不同域名时（如 base 用 cdn-primary.example.invalid
-   * 但 urls 列表写的是 cdn-primary.example1.invalid），url 不会匹配任何 urls
-   * 前缀。此时使用 match（仅限 string 类型）作为前缀来提取资产路径，
-   * 并返回 urlIndex=-1 表示"在 urls 列表之前"，让 pickNextUrl 从 urls[0] 开始。
+   * 当 base 和 urls[0] 指向不同前缀时，url 不会匹配任何 urls 前缀。
+   * 此时使用 base 作为前缀来提取资产路径，并返回 urlIndex=-1 表示
+   * 「在 urls 列表之前」，让 pickNextUrl 从 urls[0] 开始。
    */
-  function findMatchContext(
-    rule: FallbackRule,
-    match: MatchPattern,
-    url: string,
-  ): { urlIndex: number; prefix: string } {
+  function findMatchContext(rule: FallbackRule, url: string): { urlIndex: number; prefix: string } {
     for (let i = 0; i < rule.urls.length; i++) {
       if (url.indexOf(rule.urls[i]) === 0) return { urlIndex: i, prefix: rule.urls[i] };
     }
-    if (typeof match === 'string' && url.indexOf(match) === 0) {
-      return { urlIndex: -1, prefix: match };
+    if (url.indexOf(rule.base) === 0) {
+      return { urlIndex: -1, prefix: rule.base };
     }
-    // URL 匹配了 rule 但不在 urls 列表中（match ≠ urls[0] 的场景）。
-    // urlIndex=-1 让 pickNextUrl 从 urls[0] 开始找可用 host。
-    // prefix 用 match（仅 string 类型）来截取资产路径；RegExp/function 无法提取前缀。
-    return { urlIndex: -1, prefix: typeof match === 'string' ? match : '' };
+    // 已通过 findPrepared 命中规则（含 isFallback 的 urls 路径），但当前 URL
+    // 既不以 base 也不以任一 urls 开头——理论上不应到达；保底用 base。
+    return { urlIndex: -1, prefix: rule.base };
   }
 
   function swap(currentUrl: string, fromPrefix: string, toPrefix: string): string {
@@ -119,7 +115,7 @@ export function createResolver(config: RuntimeConfig): Resolver {
       const p = findPrepared(currentUrl, isFallback);
       if (!p) return { kind: 'giveup', reason: 'no-match' };
       const rule = p.raw;
-      const ctx = findMatchContext(rule, p.raw.match, currentUrl);
+      const ctx = findMatchContext(rule, currentUrl);
 
       if (attemptOnUrl <= p.retry.max) {
         return {
@@ -131,7 +127,7 @@ export function createResolver(config: RuntimeConfig): Resolver {
       }
 
       // 始终记录失败到熔断器。初始链接（isFallback=false）仍然会被 findPrepared
-      // 通过 match 模式匹配到（匹配不受熔断器影响），所以初始链接始终会被尝试。
+      // 通过 base 前缀匹配到（匹配不受熔断器影响），所以初始链接始终会被尝试。
       // 记录失败让 resolveBuiltUrl（Vite modulepreload）和 pickNextUrl 能跳过
       // 已知不可用的 host，选择更优的候选。
       p.breaker.recordFailure(hostOf(currentUrl));
@@ -147,21 +143,12 @@ export function createResolver(config: RuntimeConfig): Resolver {
     },
 
     resolveBuiltUrl(filename) {
-      // 初始链接（match URL）始终优先返回，不受熔断器影响——
+      // 初始链接（base URL）始终优先返回，不受熔断器影响——
       // 与 resolve() 的语义一致：初始链接永远尝试。
       // __RF__.load 内部的 retry/fallback 循环负责在失败后切换到 urls 列表。
-      for (let k = prepared.length - 1; k >= 0; k--) {
-        const pr = prepared[k];
-        if (matchesFilename(pr.raw.match, filename)) {
-          if (typeof pr.raw.match === 'string') return joinAssetPrefix(pr.raw.match, filename);
-          for (let i = 0; i < pr.raw.urls.length; i++) {
-            if (!pr.breaker.isOpen(hostOf(pr.raw.urls[i])))
-              return joinAssetPrefix(pr.raw.urls[i], filename);
-          }
-          return joinAssetPrefix(pr.raw.urls[0], filename);
-        }
-      }
-      return filename;
+      // 多规则时后来者胜。
+      if (prepared.length === 0) return filename;
+      return joinAssetPrefix(prepared[prepared.length - 1].raw.base, filename);
     },
 
     recordFailure(url) {
@@ -176,27 +163,9 @@ export function createResolver(config: RuntimeConfig): Resolver {
   };
 }
 
-function matches(pattern: MatchPattern, url: string): boolean {
-  if (typeof pattern === 'string') return url.indexOf(pattern) === 0;
-  if (pattern instanceof RegExp) return pattern.test(url);
-  if (typeof pattern === 'function') return !!pattern(url);
-  return false;
-}
-
-/**
- * 与 `matches` 类似，但也允许用纯文件名测试 string 类型的模式。
- * 供 `resolveBuiltUrl` 使用——Vite 只会传入资源文件名。
- */
-function matchesFilename(pattern: MatchPattern, filename: string): boolean {
-  if (typeof pattern === 'string') return true; // base URL 前缀始终适用
-  if (pattern instanceof RegExp) return pattern.test(filename);
-  if (typeof pattern === 'function') return !!pattern(filename);
-  return false;
-}
-
 /**
  * Vite/Rollup 传给 `renderBuiltUrl` 的文件名通常不带前导 `/`（如 `js/chunk.js`）。
- * 若 `match` / `urls[i]` 写成无前导目录分隔的形式（漏掉末尾 `/`），
+ * 若 `base` / `urls[i]` 写成无前导目录分隔的形式（漏掉末尾 `/`），
  * 字符串相加会得到 `.../edu-study-platform-prod` + `js/x.js` → `...prodjs/x.js`。
  */
 function joinAssetPrefix(prefix: string, filename: string): string {

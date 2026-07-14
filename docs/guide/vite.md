@@ -25,7 +25,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // 回源
@@ -38,7 +38,7 @@ export default defineConfig({
 ```
 
 ::: tip 重要
-`base` 的值应当与 `match` 保持一致，确保构建产物的 URL 能被规则匹配。
+Vite `base` 应当与 `rules[].base`（rule `base`）保持一致，确保构建产物的 URL 能被规则匹配。
 :::
 
 完整配置选项见 [配置参考](./configuration.md)。
@@ -87,7 +87,7 @@ const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'))
 
 #### writeBundle + es-module-lexer
 
-`writeBundle` 钩子使用 `es-module-lexer` 解析 chunk 内的动态 import，将 match 规则命中的 URL 替换为 `__RF__.load()` 调用。这解决了异步模块中包含 CSS 时依赖关系丢失的问题。
+`writeBundle` 钩子使用 `es-module-lexer` 解析 chunk 内的动态 import，将需改写的 URL 替换为 `__RF__.load()` 调用。这解决了异步模块中包含 CSS 时依赖关系丢失的问题。
 
 ```js
 // writeBundle 改写示例
@@ -96,13 +96,19 @@ window.__RF__.load('assets/About-xxx.js');
 
 ### shouldRewriteUrls 闸门
 
-在 `configResolved` 阶段，插件会比较 Vite 最终解析后的 `base` 与 `rules` 中的 `match` 规则：
+在 `configResolved` 阶段，插件会比较 Vite 最终解析后的 `base` 与 `rules[].base`（两侧都会做尾斜杠规范化，与 runtime 一致）：
 
-- 若 `base` 与至少一条规则的 `match` 匹配，则启用 URL 改写（`renderBuiltUrl`、`writeBundle`）
-- 若不匹配，则跳过 URL 改写，避免非 match 范围的资源被错误重写
+```ts
+shouldRewriteUrls = options.rules.some(
+  (r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base),
+);
+```
+
+- 若规范化后 Vite `base` 与至少一条 rule `base` 相等，则启用 URL 改写（`renderBuiltUrl`、`writeBundle`）
+- 否则跳过 URL 改写，避免 Vite `base` 未切到 CDN 时误把异步 chunk 拼到外域
 
 ::: info 为何在 configResolved 判断
-`base` 从 `configResolved` 获取，确保读取的是 Vite 最终解析后的 base 值（考虑 plugin 间覆盖）。
+Vite `base` 从 `configResolved` 获取，确保读取的是 Vite 最终解析后的值（考虑 plugin 间覆盖）。
 :::
 
 ### **RF**.load 回退循环
@@ -131,7 +137,7 @@ window.__RF__.load('assets/About-xxx.js');
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
@@ -158,7 +164,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+      rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

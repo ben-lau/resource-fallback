@@ -22,7 +22,8 @@ At build time, Vite/Webpack plugins generate a `ResourceFallbackManifest` and em
 
 - SW has ownership info **before the first fetch event**
 - Page runtime still `postMessage`s updated config as a follow-up channel
-- `RegExp` rules use JS expression serialization (plain `JSON.stringify` would turn them into `{}`)
+- Rules use string `base` prefixes (no RegExp / function matchers)
+- Preload is plain `JSON.stringify` (rules are normalized with trailing slashes at build time)
 
 Manifest version includes resources, fallback rules, and cache policy. On `activate`, old `resource-fallback-*` caches are cleaned.
 
@@ -56,7 +57,7 @@ Enable with `serviceWorker: true` or an object:
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', '/'],
     },
   ],

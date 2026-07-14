@@ -1,10 +1,53 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ensureTrailingSlash,
   inferResourceFallbackAssetType,
   joinAssetPrefix,
+  normalizeFallbackRules,
   serialiseConfig,
 } from '../packages/core/src/index';
+
+describe('ensureTrailingSlash', () => {
+  it('appends slash when missing', () => {
+    expect(ensureTrailingSlash('https://cdn.example.com')).toBe('https://cdn.example.com/');
+  });
+
+  it('keeps existing trailing slash', () => {
+    expect(ensureTrailingSlash('https://cdn.example.com/')).toBe('https://cdn.example.com/');
+  });
+
+  it('leaves empty string and root slash alone', () => {
+    expect(ensureTrailingSlash('')).toBe('');
+    expect(ensureTrailingSlash('/')).toBe('/');
+  });
+
+  it('makes Vite gate comparison insensitive to trailing slash', () => {
+    const viteBase = 'https://cdn.example.com/';
+    const ruleBase = 'https://cdn.example.com';
+    // Vite resolved base usually has a trailing slash; rule.base often omits it.
+    expect(viteBase).not.toBe(ruleBase);
+    expect(ensureTrailingSlash(viteBase)).toBe(ensureTrailingSlash(ruleBase));
+  });
+});
+
+describe('normalizeFallbackRules', () => {
+  it('normalizes base and urls trailing slashes', () => {
+    expect(
+      normalizeFallbackRules([
+        {
+          base: 'https://cdn.example.com',
+          urls: ['https://backup.example.com', '/'],
+        },
+      ]),
+    ).toEqual([
+      {
+        base: 'https://cdn.example.com/',
+        urls: ['https://backup.example.com/', '/'],
+      },
+    ]);
+  });
+});
 
 describe('joinAssetPrefix', () => {
   it('returns filename as-is for absolute URL', () => {
@@ -52,13 +95,13 @@ describe('serialiseConfig', () => {
     expect(result).toContain('[]');
   });
 
-  it('renders RegExp as native literal', () => {
+  it('serialises string base fields with trailing slash normalized', () => {
     const result = serialiseConfig({
-      rules: [{ match: /^https:\/\/cdn\.com\//, urls: ['https://cdn.com/'] }],
+      rules: [{ base: 'https://cdn.com', urls: ['https://cdn.com'] }],
       defaults: {},
     });
-    expect(result).toContain('/^https:\\/\\/cdn\\.com\\//');
-    expect(result).not.toContain('__regexp__');
+    expect(result).toContain('"base":"https://cdn.com/"');
+    expect(result).toContain('"urls":["https://cdn.com/"]');
   });
 
   it('handles webpackChunkLoadingGlobals', () => {

@@ -1,11 +1,3 @@
-/**
- * 用于判断失败 URL 是否受某条规则管辖的匹配模式。
- *  - `string` 前缀匹配（区分大小写）
- *  - `RegExp` 对 URL 做正则测试
- *  - 函数针对每个 URL 自行决定
- */
-export type MatchPattern = string | RegExp | ((url: string) => boolean);
-
 export interface RetryOptions {
   /** 同一 URL 的重试预算。超过此次数后切换到下一个 URL。默认 2。 */
   max?: number;
@@ -37,8 +29,15 @@ export interface CircuitOptions {
 }
 
 export interface FallbackRule {
-  /** 决定该规则是否应用于某个失败 URL。 */
-  match: MatchPattern;
+  /**
+   * 资源 URL 前缀（区分大小写）。用于：
+   * - 判断失败 URL 是否受本规则管辖（前缀匹配）
+   * - 剥路径后拼接到下一个候选
+   * - Vite 裸文件名拼出首轮 CDN URL
+   *
+   * 例如 `https://cdn.example.com/`。可与 `urls` 分离：`base` 是首轮前缀，`urls` 是回退链。
+   */
+  base: string;
   /**
    * 有序的候选 base URL 列表。当某 URL 的重试预算耗尽后，运行时会用下一个候选
    * 替换匹配的前缀。最后一个通常指向自建源站。
@@ -74,8 +73,7 @@ export type DebugFlag = boolean | 'auto';
  * 浏览器运行时使用的配置对象。
  *
  * 注意：该对象会被 JSON 序列化并嵌入页面，所有值必须是原始类型（不能有函数）。
- * {@link FallbackRule.match} 此处仅支持 string 或 RegExp。
- * （在运行时通过 JS 调用 `install()` 时才支持函数形式的 `match`。）
+ * {@link FallbackRule.base} 必须为 string URL 前缀。
  */
 export interface RuntimeConfig {
   rules: FallbackRule[];

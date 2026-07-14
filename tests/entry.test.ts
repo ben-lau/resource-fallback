@@ -58,7 +58,7 @@ describe('entry (install)', () => {
 
   it('install sets installed=true and exposes resolver', () => {
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
@@ -68,12 +68,12 @@ describe('entry (install)', () => {
 
   it('install is idempotent — second call is a no-op', () => {
     install({
-      rules: [{ match: cdn1, urls: [cdn1, 'https://cdn2.example.com/'] }],
+      rules: [{ base: cdn1, urls: [cdn1, 'https://cdn2.example.com/'] }],
     });
     const resolver1 = getGlobal().resolver;
 
     install({
-      rules: [{ match: 'https://other.example.com/', urls: ['https://other.example.com/'] }],
+      rules: [{ base: 'https://other.example.com/', urls: ['https://other.example.com/'] }],
     });
     const resolver2 = getGlobal().resolver;
 
@@ -82,7 +82,7 @@ describe('entry (install)', () => {
 
   it('__RF__.url returns correct URL after install', () => {
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
@@ -93,7 +93,7 @@ describe('entry (install)', () => {
     (window as unknown as Record<string, unknown>).__RF_DISABLE__ = true;
 
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
@@ -106,7 +106,7 @@ describe('entry (install)', () => {
     history.replaceState(null, '', '/?__rf=off');
 
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
@@ -119,7 +119,7 @@ describe('entry (install)', () => {
     document.cookie = '__rf_disable=1; path=/';
 
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
@@ -132,35 +132,35 @@ describe('entry (install)', () => {
 
     install({
       rules: [
-        { match: cdn1, urls: [cdn1] },
-        { match: cdn1, urls: [cdn1, 'https://backup.example.com/'] },
+        { base: cdn1, urls: [cdn1] },
+        { base: cdn1, urls: [cdn1, 'https://backup.example.com/'] },
       ],
       debug: true,
     });
 
     const warnCalls = warnSpy.mock.calls;
     const duplicateWarning = warnCalls.find(
-      (args) => typeof args[1] === 'string' && args[1].includes('重复'),
+      (args) => typeof args[1] === 'string' && args[1].includes('duplicate'),
     );
     expect(duplicateWarning).toBeTruthy();
 
     warnSpy.mockRestore();
   });
 
-  it('does not warn when all rules have unique match patterns', () => {
+  it('does not warn when all rules have unique base prefixes', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     install({
       rules: [
-        { match: cdn1, urls: [cdn1] },
-        { match: 'https://other.example.com/', urls: ['https://other.example.com/'] },
+        { base: cdn1, urls: [cdn1] },
+        { base: 'https://other.example.com/', urls: ['https://other.example.com/'] },
       ],
       debug: true,
     });
 
     const warnCalls = warnSpy.mock.calls;
     const duplicateWarning = warnCalls.find(
-      (args) => typeof args[1] === 'string' && args[1].includes('重复'),
+      (args) => typeof args[1] === 'string' && args[1].includes('duplicate'),
     );
     expect(duplicateWarning).toBeUndefined();
 
@@ -176,7 +176,7 @@ describe('entry (install)', () => {
 
   it('install with webpackChunkLoadingGlobals creates chunk arrays', () => {
     install({
-      rules: [{ match: cdn1, urls: [cdn1] }],
+      rules: [{ base: cdn1, urls: [cdn1] }],
       webpackChunkLoadingGlobals: ['webpackChunk_test'],
     });
 

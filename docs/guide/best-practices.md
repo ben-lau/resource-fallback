@@ -9,7 +9,7 @@ title: 最佳实践
 ## 规则配置建议
 
 1. **`urls` 顺序就是回退顺序** — 建议依次写入：备用 CDN → 自建 CDN → 回源（`'/'`）
-2. **`match` 应等于 `base` / `publicPath`** — 确保首次加载的资源 URL 能被规则匹配
+2. **rule `base` 应等于 Vite `base` / Webpack `publicPath`** — 确保首次加载的资源 URL 能被规则匹配
 3. **回源 URL 使用相对路径** — 避免再次遇到 CDN 故障（如 `'/'`）
 4. **`retry.max` 不宜过大** — 过多重试会延长用户等待时间，建议 1~3 次
 5. **为入口失败兜底** — 在 `index.html` 中添加 `rf:error` 监听，显示降级 UI
@@ -18,7 +18,7 @@ title: 最佳实践
 
 ```ts
 {
-  match: 'https://cdn.example.com/',  // 与 base / publicPath 一致
+  base: 'https://cdn.example.com/',  // 与 Vite base / Webpack publicPath 一致
   urls: [
     'https://cdn-backup.example.com/', // 备用 CDN
     'https://static.mysite.com/',      // 自建静态源
@@ -31,13 +31,14 @@ title: 最佳实践
 
 ## CDN 前缀注意事项
 
-::: warning match 对齐
-Vite 项目的 `match` 必须对齐 `base`；Webpack 项目的 `match` 必须对齐 `output.publicPath`。如果首次资源 URL 匹配不上 `match`，运行时不会进入 retry/fallback。
+::: warning rule `base` 对齐
+Vite 项目的 rule `base` 必须对齐 Vite `base`；Webpack 项目的 rule `base` 必须对齐 `output.publicPath`。如果首次资源 URL 匹配不上 rule `base`，运行时不会进入 retry/fallback。
 :::
 
-- `match` 和 `urls` 中的每一项都应为 **base URL 前缀**（含末尾 `/`），例如 `https://cdn.example.com/`
+- rule `base` 和 `urls` 中的每一项都应为 **URL 前缀**（含末尾 `/`），例如 `https://cdn.example.com/`
+- rule `base` 与 `urls` 可以不同：`base` 是首轮前缀，`urls` 是回退链
 - 最后一个 `urls` 条目通常指向同源回源，避免主 CDN 故障时再次命中 CDN
-- 重复 `match` 以最后一条规则为准
+- 多条规则时 `resolveBuiltUrl` 以最后一条命中为准
 
 ## 调试技巧
 

@@ -7,7 +7,7 @@ import type { ResourceFallbackManifest } from '../packages/core/src/types';
 
 const manifest: ResourceFallbackManifest = {
   version: 'rf-test',
-  rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+  rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
   assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image', owner: 'sw' }],
 };
 

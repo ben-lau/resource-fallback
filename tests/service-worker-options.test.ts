@@ -34,7 +34,7 @@ describe('service worker options', () => {
   it('builds a manifest with page-owned scripts and sw-owned subresources', () => {
     const manifest = buildResourceFallbackManifest({
       versionSeed: 'build-1',
-      rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+      rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
       assets: [
         { url: 'https://cdn.example.com/assets/app.js', type: 'script' },
         { url: 'https://cdn.example.com/assets/app.css', type: 'style' },
@@ -59,7 +59,7 @@ describe('service worker options', () => {
     expect(
       buildServiceWorkerAssets(
         {
-          rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+          rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
           serviceWorker: false,
         },
         {
@@ -71,7 +71,7 @@ describe('service worker options', () => {
 
     const assets = buildServiceWorkerAssets(
       {
-        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
         serviceWorker: true,
       },
       {
@@ -92,12 +92,10 @@ describe('service worker options', () => {
     });
   });
 
-  it('preserves RegExp rules in the preloaded service worker config', () => {
+  it('preserves string base rules in the preloaded service worker config', () => {
     const assets = buildServiceWorkerAssets(
       {
-        rules: [
-          { match: /^https:\/\/cdn\d+\.example\.com\//, urls: ['https://cdn1.example.com/', '/'] },
-        ],
+        rules: [{ base: 'https://cdn1.example.com/', urls: ['https://cdn1.example.com/', '/'] }],
         serviceWorker: true,
       },
       {
@@ -106,8 +104,32 @@ describe('service worker options', () => {
       },
     );
 
-    expect(assets?.code).toContain('"match":/^https:\\/\\/cdn\\d+\\.example\\.com\\//');
-    expect(assets?.code).not.toContain('"match":{}');
+    expect(assets?.code).toContain('"base":"https://cdn1.example.com/"');
+    expect(assets?.code.startsWith('self.__RF_SW_PRELOAD__=')).toBe(true);
+  });
+
+  it('normalizes trailing slash so manifest version stays stable', () => {
+    const input = {
+      versionSeed: 'same-build',
+      assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image' as const }],
+    };
+    const withSlash = buildServiceWorkerAssets(
+      {
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+        serviceWorker: true,
+      },
+      input,
+    );
+    const withoutSlash = buildServiceWorkerAssets(
+      {
+        rules: [{ base: 'https://cdn.example.com', urls: ['https://cdn.example.com', '/'] }],
+        serviceWorker: true,
+      },
+      input,
+    );
+
+    expect(withSlash?.manifest.version).toBe(withoutSlash?.manifest.version);
+    expect(withoutSlash?.manifest.rules[0].base).toBe('https://cdn.example.com/');
   });
 
   it('changes manifest version when rules or sw cache policy changes', () => {
@@ -117,21 +139,21 @@ describe('service worker options', () => {
     };
     const first = buildServiceWorkerAssets(
       {
-        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
         serviceWorker: { cache: { enabled: true } },
       },
       input,
     );
     const changedRule = buildServiceWorkerAssets(
       {
-        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/b/'] }],
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/b/'] }],
         serviceWorker: { cache: { enabled: true } },
       },
       input,
     );
     const changedCache = buildServiceWorkerAssets(
       {
-        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/a/'] }],
         serviceWorker: { cache: { enabled: false } },
       },
       input,

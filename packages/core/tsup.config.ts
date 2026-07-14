@@ -18,11 +18,11 @@ export default defineConfig([
     splitting: false,
     shims: true,
   },
-  // 2) Browser runtime: a single self-contained ES5 IIFE shipped to the page.
+  // 2) Browser runtime: a single self-contained ES2020 IIFE shipped to the page.
   {
     entry: { runtime: 'src/runtime/entry.ts' },
     format: ['iife'],
-    target: 'es5',
+    target: 'es2020',
     outDir: 'dist',
     outExtension: () => ({ js: '.iife.js' }),
     globalName: '__RF__',

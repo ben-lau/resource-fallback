@@ -8,14 +8,14 @@ Production recommendations for configuring, debugging, and operating resource-fa
 
 ## Rule configuration
 
-### Align match with base / publicPath
+### Align rule `base` with Vite `base` / `publicPath`
 
-| Build tool | Align `match` with  |
-| ---------- | ------------------- |
-| Vite       | `base`              |
-| Webpack    | `output.publicPath` |
+| Build tool | Align rule `base` with |
+| ---------- | ---------------------- |
+| Vite       | Vite `base`            |
+| Webpack    | `output.publicPath`    |
 
-If the first resource URL does not match `match`, the runtime never enters retry/fallback.
+If the first resource URL does not match the rule `base`, the runtime never enters retry/fallback. Vite's config `base` and `FallbackRule.base` share a name — keep them equal in practice.
 
 ### urls order is fallback order
 
@@ -29,7 +29,7 @@ The last entry is usually `'/'` (relative origin) to avoid hitting a broken CDN 
 
 ```ts
 {
-  match: 'https://cdn.example.com/',
+  base: 'https://cdn.example.com/',
   urls: [
     'https://cdn-backup.example.com/',
     'https://static.mysite.com/',
@@ -49,7 +49,7 @@ Override per rule when different asset classes need different policies:
 ```ts
 rules: [
   {
-    match: 'https://cdn.example.com/',
+    base: 'https://cdn.example.com/',
     urls: ['https://cdn-backup.example.com/', '/'],
     retry: { max: 2, baseDelay: 300 },
     circuit: { threshold: 3, cooldown: 30000 },

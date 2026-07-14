@@ -35,7 +35,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
@@ -50,8 +50,8 @@ export default defineConfig({
 });
 ```
 
-::: tip Align match with base
-The value of `match` should match Vite's `base` so build output URLs hit the rule.
+::: tip Align rule `base` with Vite `base`
+`rules[].base` (rule `base`) should equal Vite `base` so build output URLs hit the rule.
 :::
 
 ## Minimal Webpack config
@@ -70,7 +70,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
@@ -79,8 +79,8 @@ module.exports = {
 };
 ```
 
-::: tip Align match with publicPath
-The value of `match` should match `output.publicPath`.
+::: tip Align rule `base` with publicPath
+`rules[].base` (rule `base`) should equal `output.publicPath`.
 :::
 
 ## Verification
@@ -114,7 +114,7 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 
 ## Getting started notes
 
-1. **Align `match` with the emitted asset prefix** — Vite: `base`; Webpack: `output.publicPath`. If the initial resource URL does not match `match`, the runtime will not enter retry/fallback.
+1. **Align `rules[].base` with the emitted asset prefix** — Vite: Vite `base`; Webpack: `output.publicPath`. If the initial resource URL does not match the rule `base`, the runtime will not enter retry/fallback.
 2. **`urls` order is fallback order** — recommended: backup CDN → self-hosted static origin → same-origin `'/'`. The last entry is usually same-origin to avoid hitting a broken CDN again.
 3. **Vite dev is not the main verification target** — the dev server uses native ESM; dynamic `import()` failures cannot be fully intercepted. Use `vite build && vite preview` or the example E2E tests.
 4. **Add your own UI fallback for entry resource failures** — if the entry bundle exhausts all candidate URLs, React/Vue has not started yet. Add a lightweight `rf:error` listener in `index.html`.

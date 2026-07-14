@@ -10,6 +10,10 @@ resource-fallback 在设计时考虑了 Content Security Policy（CSP）和 Subr
 
 运行时默认以**内联 `<script>`** 注入 `<head>`，需要配合 CSP 使用。
 
+::: tip 不需要 `unsafe-eval`
+运行时 IIFE 目标为 es2020，动态加载使用浏览器原生 `import()`，**不**通过 `Function('u','return import(u)')` 等方式求值。因此 CSP **不必**放行 `script-src 'unsafe-eval'`。内联脚本仍需 `nonce` 或改用 `externalRuntime`。
+:::
+
 ### 方式一：nonce 支持
 
 通过 `nonce` 选项为注入的 `<script>` 标签附加 CSP nonce：
@@ -116,7 +120,7 @@ resourceFallback({
   sri: 'strip',
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', '/'],
     },
   ],

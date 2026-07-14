@@ -20,7 +20,7 @@ function setup(onError?: (e: RfErrorEvent) => void, onFallback?: (e: FallbackEve
   const resolver = createResolver({
     rules: [
       {
-        match: cdn1,
+        base: cdn1,
         urls: [cdn1, cdn2, origin],
         retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
       },
@@ -304,7 +304,7 @@ describe('observer', () => {
     const resolver = createResolver({
       rules: [
         {
-          match: cssCdn,
+          base: cssCdn,
           urls: [cssCdn, cssBackup],
           retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
@@ -342,7 +342,7 @@ describe('observer', () => {
     const resolver = createResolver({
       rules: [
         {
-          match: cdn1,
+          base: cdn1,
           urls: [cdn1, cdn2],
           retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
@@ -372,7 +372,7 @@ describe('observer', () => {
     const resolver = createResolver({
       rules: [
         {
-          match: cdn1,
+          base: cdn1,
           urls: [cdn1, cdn2],
           retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },
@@ -472,7 +472,7 @@ describe('observer', () => {
     const resolver = createResolver({
       rules: [
         {
-          match: 'https://keep-test.example.com/',
+          base: 'https://keep-test.example.com/',
           urls: ['https://keep-test.example.com/', cdn2],
           retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },

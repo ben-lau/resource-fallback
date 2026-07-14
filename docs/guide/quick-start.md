@@ -35,7 +35,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
@@ -50,8 +50,8 @@ export default defineConfig({
 });
 ```
 
-::: tip match 与 base 对齐
-`match` 的值应当与 Vite 的 `base` 保持一致，确保构建产物的 URL 能被规则匹配。
+::: tip rule `base` 与 Vite `base` 对齐
+`rules[].base`（rule `base`）应当与 Vite `base` 保持一致，确保构建产物的 URL 能被规则匹配。
 :::
 
 ## Webpack 最小配置
@@ -70,7 +70,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
@@ -79,8 +79,8 @@ module.exports = {
 };
 ```
 
-::: tip match 与 publicPath 对齐
-`match` 的值应当与 `output.publicPath` 保持一致。
+::: tip rule `base` 与 publicPath 对齐
+`rules[].base`（rule `base`）应当与 `output.publicPath` 保持一致。
 :::
 
 ## 验证
@@ -114,7 +114,7 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 
 ## 上手注意点
 
-1. **`match` 要对齐构建产物前缀** — Vite 对齐 `base`，Webpack 对齐 `output.publicPath`。如果首次资源 URL 匹配不上 `match`，运行时不会进入 retry/fallback。
+1. **`rules[].base` 要对齐构建产物前缀** — Vite 对齐 Vite `base`，Webpack 对齐 `output.publicPath`。如果首次资源 URL 匹配不上 rule `base`，运行时不会进入 retry/fallback。
 2. **`urls` 顺序就是回退顺序** — 建议写成备用 CDN → 自建静态源 → 回源 `'/'`。最后一个通常放同源回源，避免主 CDN 故障时再次命中 CDN。
 3. **Vite dev 不是主要验证环境** — dev server 使用原生 ESM，动态 `import()` 失败无法完整拦截；请用 `vite build && vite preview` 或示例里的 E2E 验证。
 4. **入口资源失败要自己兜底 UI** — 入口 bundle 如果所有候选 URL 都失败，React/Vue 还没启动；建议在 `index.html` 加一个轻量 `rf:error` 监听显示降级文案。

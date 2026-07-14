@@ -7,10 +7,12 @@ import MagicString from 'magic-string';
 import {
   buildInjectedTags,
   buildServiceWorkerAssets,
+  ensureTrailingSlash,
   getServiceWorkerCode,
   inferResourceFallbackAssetType,
   joinAssetPrefix,
   normalizeServiceWorkerOptions,
+  rfError,
   type HtmlTag,
   type PluginOptions,
   type ResourceFallbackManifest,
@@ -24,7 +26,7 @@ type OutputBundleLike = Record<string, { fileName: string; type: 'chunk' | 'asse
 
 export default function resourceFallback(options: ViteResourceFallbackOptions): Plugin {
   if (!options || !Array.isArray(options.rules) || options.rules.length === 0) {
-    throw new Error(`[${PLUGIN_NAME}] \`rules\` must be a non-empty array`);
+    throw rfError('`rules` must be a non-empty array');
   }
 
   let shouldRewriteUrls = true;
@@ -48,12 +50,9 @@ export default function resourceFallback(options: ViteResourceFallbackOptions): 
 
     configResolved(resolvedConfig) {
       base = resolvedConfig.base;
-      shouldRewriteUrls = options.rules.some((r) => {
-        if (typeof r.match === 'string') return base === r.match;
-        if (r.match instanceof RegExp) return r.match.test(base);
-        if (typeof r.match === 'function') return r.match(base);
-        return false;
-      });
+      shouldRewriteUrls = options.rules.some(
+        (r) => ensureTrailingSlash(base) === ensureTrailingSlash(r.base),
+      );
     },
 
     generateBundle(_outputOptions, bundle) {

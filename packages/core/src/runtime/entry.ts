@@ -109,11 +109,8 @@ export function install(config: InstallOptions): void {
   });
 }
 
-function matchKey(rule: FallbackRule): string | null {
-  const m = rule.match;
-  if (typeof m === 'string') return m;
-  if (m instanceof RegExp) return m.toString();
-  return null;
+function matchKey(rule: FallbackRule): string {
+  return rule.base;
 }
 
 function warnDuplicateRules(rules: FallbackRule[] | undefined, log: Logger): void {
@@ -121,10 +118,9 @@ function warnDuplicateRules(rules: FallbackRule[] | undefined, log: Logger): voi
   const seen = new Map<string, number>();
   for (let i = 0; i < rules.length; i++) {
     const key = matchKey(rules[i]);
-    if (key === null) continue;
     const prev = seen.get(key);
     if (prev !== undefined) {
-      log.warn('重复的 match 规则，以最后一个为准', { match: key, indices: [prev, i] });
+      log.warn('duplicate base rule; last one wins', { base: key, indices: [prev, i] });
     }
     seen.set(key, i);
   }

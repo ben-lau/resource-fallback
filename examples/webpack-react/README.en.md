@@ -34,7 +34,7 @@ Uses `.invalid` domains (RFC 2606 reserved) — DNS always fails, no mock server
   plugins: [
     new ResourceFallbackWebpackPlugin({
       rules: [{
-        match: 'http://cdn-primary.example.invalid/',  // matches publicPath
+        base: 'http://cdn-primary.example.invalid/',  // rule.base = publicPath
         urls: [
           'http://cdn-secondary.example.invalid/',     // backup CDN 1
           'http://cdn-backup.example.invalid/',         // backup CDN 2

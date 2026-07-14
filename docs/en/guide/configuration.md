@@ -12,7 +12,7 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 
 | Field                 | Type                              | Default              | Description                                                               |
 | --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array, matched in order; last match wins for duplicates     |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array; for `resolveBuiltUrl`, the last matching rule wins   |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`   |
 | `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` during fallback                         |
@@ -30,19 +30,17 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 
 ## FallbackRule
 
-| Field     | Type                                   | Default      | Description                                                         |
-| --------- | -------------------------------------- | ------------ | ------------------------------------------------------------------- |
-| `match`   | `string \| RegExp \| (url) => boolean` | **Required** | URL matching pattern. String uses prefix matching                   |
-| `urls`    | `string[]`                             | **Required** | Ordered candidate URL prefix list. Last one is typically the origin |
-| `retry`   | `RetryOptions`                         | See below    | Override retry config for this rule                                 |
-| `circuit` | `CircuitOptions`                       | See below    | Override circuit breaker config for this rule                       |
+| Field     | Type             | Default      | Description                                                                                                                                                                      |
+| --------- | ---------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`    | `string`         | **Required** | Asset URL prefix (case-sensitive). Used for: prefix-matching failed URLs, stripping the path for candidate swap, and Vite bare filename → CDN URL. May differ from `urls`: `base` is the first-load prefix; `urls` is the fallback chain |
+| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                             |
+| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                              |
+| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                    |
 
-::: tip match pattern
+::: tip rule `base` vs Vite `base`
 
-- **string** — prefix match (case-sensitive)
-- **RegExp** — regex test against URL
-- **function** — per-URL decision (build-time serialization supports string or RegExp only)
-  :::
+Vite's config `base` and `FallbackRule.base` share a name: call them Vite `base` vs rule `base` in prose. Vite `base` / Webpack `publicPath` should equal `rules[].base`. `base` and `urls` may differ — `base` is the first-load prefix; `urls` is the fallback chain. RegExp / function matchers are no longer supported.
+:::
 
 ## RetryOptions
 
@@ -64,7 +62,7 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 
 ## ServiceWorkerOptions
 
-Hybrid SW is disabled by default. When enabled, Vite/Webpack plugins generate a resource manifest and emit a SW asset. The SW bundle preloads manifest/config (preserving `RegExp` rule semantics), while the page runtime registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into existing `rf:*` events.
+Hybrid SW is disabled by default. When enabled, Vite/Webpack plugins generate a resource manifest and emit a SW asset. The SW bundle preloads manifest/config, while the page runtime registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into existing `rf:*` events.
 
 ```ts
 resourceFallback({
@@ -102,7 +100,7 @@ The SW resolver always uses an isolated in-memory circuit breaker. Even if page-
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },

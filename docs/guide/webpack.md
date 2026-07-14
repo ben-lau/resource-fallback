@@ -30,7 +30,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // 回源
@@ -43,7 +43,7 @@ module.exports = {
 ```
 
 ::: tip 重要
-`output.publicPath` 应当与 `match` 保持一致。
+`output.publicPath` 应当与 `rules[].base`（rule `base`）保持一致。
 :::
 
 完整配置选项见 [配置参考](./configuration.md)。
@@ -122,7 +122,7 @@ Observer 作为安全网，处理 `__webpack_require__.l` 未覆盖的场景：
 new ResourceFallbackWebpackPlugin({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },

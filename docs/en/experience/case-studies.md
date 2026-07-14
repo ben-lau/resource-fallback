@@ -91,9 +91,9 @@ Early attempts with `renderDynamicImport` alone fought **preload generation orde
 
    `window.__RF__.load(JSON.stringify(normalizedRelativePath))`
 
-5. **`__RF__.load`** in `packages/core/src/runtime/adapter-vite.ts`: **`Function('u','return import(u)')`** loop with same **`resolver`**, preserving **preload topology** while adding retry/fallback/cache bust.
+5. **`__RF__.load`** in `packages/core/src/runtime/adapter-vite.ts`: native browser **`import(url)`** in the loop (IIFE targets es2020 — no `Function(...)` / `unsafe-eval`), with the same **`resolver`**, preserving **preload topology** while adding retry/fallback/cache bust.
 
-Gate: **§4.4 `shouldRewriteUrls`** — only rewrite when `base` aligns with `match`.
+Gate: **§4.4 `shouldRewriteUrls`** — only rewrite when Vite `base` equals a rule `base` after `ensureTrailingSlash`.
 
 ### Extension: `vite:preloadError` can block subsequent JS dynamic load
 
@@ -133,37 +133,37 @@ Expected: each real retry shows **changed URL or host** in Network.
 
 ---
 
-## 4.4 `vite.config` `base: '/'` but rules use CDN `match` — async chunks wrongly point at CDN
+## 4.4 Vite `base: '/'` but rules use CDN rule `base` — async chunks wrongly point at CDN
 
 ### Background
 
 Common misconfiguration:
 
-- Local **`base: '/'`**, production should be CDN `base`
-- Repo has **CDN `match`/`urls` hardcoded** while CI **`base` not switched**
+- Local Vite **`base: '/'`**, production should be CDN Vite `base`
+- Repo has **CDN rule `base`/`urls` hardcoded** while CI **Vite `base` not switched**
 
-Or static analysis bug: **`matchesFilename` treats string `match` as matching any filename** → **`resolveBuiltUrl(any file)`** becomes CDN URL even in dev/preview.
+Historical root cause (old API): **`matchesFilename` treated string `match` as matching any filename** → **`resolveBuiltUrl(any file)`** became CDN URL even in dev/preview. Current API requires string rule **`base`** and a rewrite gate that compares Vite `base` to rule `base` after trailing-slash normalization.
 
-Symptoms: **`base` is `/` but lazy load hits `https://cdn.../assets/xxx.js`** — Mixed Content/CORS; violates "don't change semantics when unmatched".
+Symptoms: **Vite `base` is `/` but lazy load hits `https://cdn.../assets/xxx.js`** — Mixed Content/CORS; violates "don't change semantics when misaligned".
 
 ### Thinking
 
 Two gates:
 
-1. **Build-time rewrite**: only when **`base` truly aligns with rule `match`**
-2. **Runtime Observer**: manual CDN `<script src>` matching `match` can still fallback without rewriting Vite chunks
+1. **Build-time rewrite**: only when **Vite `base` is strictly equal to at least one rule `base`**
+2. **Runtime Observer**: manual CDN `<script src>` whose prefix matches rule `base` can still fallback without rewriting Vite chunks
 
 ### Solution
 
 `vite-plugin` **`configResolved`**:
 
-- **`shouldRewriteUrls = options.rules.some(...)`** — string: `base === r.match`; RegExp: `r.match.test(base)`; function: `r.match(base)`
+- **`shouldRewriteUrls = options.rules.some((r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base))`** — trailing-slash normalization; no RegExp / function
 - **`writeBundle`**: `if (!shouldRewriteUrls) return;`
 
-| Scenario                             | Behavior                                                           |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| `base` aligns with a `match`         | Rewrite literal dynamic import → **`__RF__.load`**                 |
-| `base` is `/`, rules target CDN only | **No rewrite**; hand-written CDN scripts still Observer if matched |
+| Scenario                                               | Behavior                                                                      |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Vite `base` strictly equals a rule `base`              | Rewrite literal dynamic import → **`__RF__.load`**                            |
+| Vite `base` is `/`, rules target CDN only (not equal)  | **No rewrite**; hand-written CDN scripts still Observer if they hit rule `base` |
 
 ---
 
@@ -191,11 +191,11 @@ Works with §4.3 URL rewrite: **new node** + stripped or `__rf` URL.
 
 ---
 
-## 4.6 Rule `match: '/'` but runtime reads `script.src` as absolute URL — prefix match fails
+## 4.6 Rule `base: '/'` but runtime reads `script.src` as absolute URL — prefix match fails
 
 ### Background
 
-Config uses site-root prefix **`match: '/'`**. **`<script src="/assets/index.js">`** → **`.src`** normalizes to **`https://origin/assets/…`**. String prefix **`url.indexOf('/') === 0`** fails on **`https://…`** — Observer never intervenes.
+Config uses site-root prefix **`base: '/'`**. **`<script src="/assets/index.js">`** → **`.src`** normalizes to **`https://origin/assets/…`**. String prefix **`url.indexOf('/') === 0`** fails on **`https://…`** — Observer never intervenes.
 
 ### Thinking
 
@@ -205,7 +205,7 @@ Compare **same URL dimension** as config — use **`getAttribute('src')`/`href`*
 
 `readUrl(el)`: **`el.getAttribute('src')` or `getAttribute('href')`** only.
 
-**`match: '/'` + `<script src="/assets/…">`** still prefix-matches. Ensure **match matches attribute literal** if frameworks write absolute URLs.
+**`base: '/'` + `<script src="/assets/…">`** still prefix-matches. Ensure **rule `base` matches the attribute literal** if frameworks write absolute URLs.
 
 ---
 
@@ -243,10 +243,10 @@ Product requirements:
 
 `packages/core/src/runtime/resolver.ts`:
 
-- **`findPrepared(url, isFallback)`**: scan **end to start** (last rule wins); always **`matches(r.raw.match, url)`**; **only if `isFallback === true`** allow **`url.indexOf(r.raw.urls[j])===0`**
+- **`findPrepared(url, isFallback)`**: scan **end to start** (last rule wins); always **prefix-match rule `base`**; **only if `isFallback === true`** allow **`url.indexOf(r.raw.urls[j])===0`**
 - **`resolve`**: no match → **`giveup: 'no-match'`**; retry budget → retry; else **`recordFailure(host)`** → **`pickNextUrl`**
-- **`findMatchContext`**: swap when **`match` prefix ≠ urls list prefix**
-- **`resolveBuiltUrl`**: initial URL — **circuit does not skip first match URL**; string `matchesFilename` always true → **must pair with §4.4 gate**
+- **Path strip / swap**: rule `base` may differ from `urls` list prefixes
+- **`resolveBuiltUrl`**: filename → first URL via rule `base`; **circuit does not skip first-load URL**; **last matching rule wins**; still **must pair with §4.4 gate**
 
 Use **`joinAssetPrefix`** in **`swap`** to avoid **`prod` + `js/foo.js` → `prodjs/foo.js`**.
 
@@ -293,7 +293,7 @@ Typical SW pitfalls exposed:
 ### Solution
 
 1. **Default path follows scope**: `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js`
-2. **Manifest preloaded in SW file** via **`self.__RF_SW_PRELOAD__`** — JS expression serialization for **`RegExp`**
+2. **Manifest preloaded in SW file** via **`self.__RF_SW_PRELOAD__`** — rules use string rule `base` only (JSON-serializable; no RegExp / function match)
 3. **`fallbackOnOpaque` opt-in** for cross-origin opaque as failure
 4. **Conservative Cache API** — fallback 2xx only; versioned namespace; cleanup on activate
 5. **Vite/Webpack emit SW + manifest**; webpack from `getAssets()` + HtmlWebpackPlugin tags

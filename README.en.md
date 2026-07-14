@@ -129,7 +129,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
@@ -160,7 +160,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
@@ -171,7 +171,7 @@ module.exports = {
 
 ### Getting Started Notes
 
-1. **Align `match` with the emitted asset prefix**: for Vite, align it with `base`; for Webpack, align it with `output.publicPath`. If the initial resource URL does not match `match`, the runtime will not enter retry/fallback.
+1. **Align `rules[].base` with the emitted asset prefix**: for Vite, align it with Vite `base`; for Webpack, align it with `output.publicPath`. If the initial resource URL does not match the rule `base`, the runtime will not enter retry/fallback.
 2. **`urls` order is fallback order**: a common order is backup CDN → self-hosted static origin → same-origin fallback `'/'`. The last entry is usually same-origin to avoid hitting a broken CDN again.
 3. **Vite dev is not the main verification target**: the dev server uses native ESM, so dynamic `import()` failures cannot be fully intercepted. Use `vite build && vite preview` or the example E2E tests to verify fallback behavior.
 4. **Add your own UI fallback for entry resource failures**: for both Vite and Webpack, if the entry bundle exhausts all candidate URLs, React/Vue has not started yet. Add a lightweight `rf:error` listener in `index.html` to show a degraded message.
@@ -185,7 +185,7 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 | Field                 | Type                              | Default              | Description                                                               |
 | --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array, matched in order; last match wins for duplicates     |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array; for `resolveBuiltUrl`, the last matching rule wins   |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`   |
 | `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback               |
@@ -203,12 +203,14 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### FallbackRule
 
-| Field     | Type                                   | Default      | Description                                                         |
-| --------- | -------------------------------------- | ------------ | ------------------------------------------------------------------- |
-| `match`   | `string \| RegExp \| (url) => boolean` | **Required** | URL matching pattern. String uses prefix matching                   |
-| `urls`    | `string[]`                             | **Required** | Ordered candidate URL prefix list. Last one is typically the origin |
-| `retry`   | `RetryOptions`                         | See below    | Override retry config for this rule                                 |
-| `circuit` | `CircuitOptions`                       | See below    | Override circuit breaker config for this rule                       |
+| Field     | Type             | Default      | Description                                                                                                                                                                      |
+| --------- | ---------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`    | `string`         | **Required** | Asset URL prefix (case-sensitive). Used for: prefix-matching failed URLs, stripping the path for candidate swap, and Vite bare filename → CDN URL. May differ from `urls`: `base` is the first-load prefix; `urls` is the fallback chain |
+| `urls`    | `string[]`       | **Required** | Ordered candidate URL prefix list (fallback chain). Last one is typically the origin                                                                                             |
+| `retry`   | `RetryOptions`   | See below    | Override retry config for this rule                                                                                                                                              |
+| `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                    |
+
+> Vite's config `base` and `FallbackRule.base` share a name: call them Vite `base` vs rule `base` in prose. Vite `base` / Webpack `publicPath` should equal `rules[].base`.
 
 ### RetryOptions
 
@@ -230,7 +232,7 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### ServiceWorkerOptions
 
-Hybrid SW is disabled by default. When enabled, the Vite/Webpack plugins generate a resource manifest and emit a SW asset. The SW bundle preloads the manifest/config (preserving `RegExp` rule semantics), while the page runtime registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into the existing `rf:*` events. SW events are delivered to the triggering page first via `FetchEvent.clientId`, avoiding cross-tab event leakage.
+Hybrid SW is disabled by default. When enabled, the Vite/Webpack plugins generate a resource manifest and emit a SW asset. The SW bundle preloads the manifest/config, while the page runtime registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into the existing `rf:*` events. SW events are delivered to the triggering page first via `FetchEvent.clientId`, avoiding cross-tab event leakage.
 
 ```ts
 resourceFallback({
@@ -385,7 +387,7 @@ Open DevTools → Network to observe the complete retry → fallback → origin 
 ## Best Practices
 
 1. **`urls` order is fallback order** — recommended: backup CDN → self-hosted CDN → origin (`/`)
-2. **`match` should equal `base` / `publicPath`** — ensures first-load resource URLs match the rule
+2. **rule `base` should equal Vite `base` / Webpack `publicPath`** — ensures first-load resource URLs match the rule
 3. **Use relative paths for origin fallback** — avoids hitting the CDN again (e.g. `'/'`)
 4. **Keep `debug: 'auto'` in production** — set `localStorage.__RF_DEBUG__ = '1'` for on-the-fly debugging
 5. **Don't set `retry.max` too high** — excessive retries increase user wait time; 1–3 is recommended
@@ -446,7 +448,7 @@ Upcoming improvements, optimizations, and known limitations, sorted by priority:
 
 - [ ] **Chrome DevTools extension** — visualize fallback chains, circuit breaker state, event timeline
 - [ ] **Performance metrics** — built-in `performance.mark` / `performance.measure` to quantify fallback impact on load time
-- [ ] **Config validation** — build-time check whether `match` aligns with `base`/`publicPath`
+- [ ] **Config validation** — build-time check whether `rules[].base` aligns with Vite `base` / Webpack `publicPath`
 - [ ] **Better logging** — distinguish debug / info / warn / error levels, support custom logger
 
 ### Documentation

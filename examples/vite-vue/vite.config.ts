@@ -16,7 +16,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'http://cdn-primary.example.invalid/',
+          base: 'http://cdn-primary.example.invalid/',
           urls: [
             'http://cdn-secondary.example.invalid/',
             'http://cdn-backup.example.invalid/',

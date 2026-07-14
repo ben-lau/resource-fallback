@@ -93,7 +93,7 @@ export function installObserver(deps: ObserverDeps): { dispose(): void } {
   ) {
     const parent = el.parentNode;
     if (!parent) {
-      log.warn('父节点不存在 - 无法替换', { url: newUrl });
+      log.warn('parent node missing — cannot replace', { url: newUrl });
       return;
     }
     const replacement = cloneTag(el, newUrl, nextAttempt, sri, isFallback);
@@ -104,7 +104,7 @@ export function installObserver(deps: ObserverDeps): { dispose(): void } {
         if (el.parentNode) el.parentNode.replaceChild(replacement, el);
         else parent.appendChild(replacement);
       } catch (err) {
-        log.warn('替换失败', err);
+        log.warn('replace failed', err);
       }
     };
 

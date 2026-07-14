@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { HtmlTag, PluginOptions, RuntimeConfig } from './types';
+import { normalizeFallbackRules } from './runtime/utils';
 
 export type {
   CircuitOptions,
@@ -11,7 +12,6 @@ export type {
   FallbackRule,
   HtmlTag,
   HtmlTagAttributes,
-  MatchPattern,
   NormalizedServiceWorkerOptions,
   PluginOptions,
   ResolveResult,
@@ -33,6 +33,12 @@ export {
   inferResourceFallbackAssetType,
   normalizeServiceWorkerOptions,
 } from './service-worker';
+export { RF_PREFIX, rfError } from './error';
+export {
+  ensureTrailingSlash,
+  normalizeFallbackRule,
+  normalizeFallbackRules,
+} from './runtime/utils';
 
 /**
  * 恒等辅助函数——让用户在编写配置时获得类型检查和 IDE 悬浮提示。
@@ -125,8 +131,7 @@ interface ExtendedPluginOptions extends PluginOptions {
  * 构建所有需要注入到 HTML 中的 `<script>` / `<link>` 标签描述。
  * webpack 和 vite 插件都调用此函数以确保输出一致的标记。
  *
- * 运行时配置被 JSON 序列化并内联；仅原始类型的匹配器（string / RegExp）会被保留。
- * 函数形式的 `match` 需要通过 `defaults` 传入或手动初始化运行时。
+ * 运行时配置会被序列化并内联；`rules` 在序列化前会规范化 `base`/`urls` 尾斜杠。
  */
 export function buildInjectedTags(opts: ExtendedPluginOptions): HtmlTag[] {
   const tags: HtmlTag[] = [];
@@ -178,13 +183,16 @@ export function buildInjectedTags(opts: ExtendedPluginOptions): HtmlTag[] {
 }
 
 /**
- * 将运行时配置序列化为 JSON，其中 `RegExp` 实例会被渲染为原生正则字面量，
- * 以便运行时直接使用。
+ * 将运行时配置序列化为可嵌入页面的 JS 对象字面量。
+ * 序列化前会规范化 `rules[].base` / `urls` 的尾斜杠。
  */
 export function serialiseConfig(
   cfg: RuntimeConfig & { webpackChunkLoadingGlobals?: string[] },
 ): string {
-  return stringify(cfg);
+  return stringify({
+    ...cfg,
+    rules: normalizeFallbackRules(cfg.rules),
+  });
 }
 
 /**
@@ -233,9 +241,6 @@ function safeOrigin(url: string): string | null {
 }
 
 function stringify(value: unknown): string {
-  if (value instanceof RegExp) {
-    return value.toString();
-  }
   if (Array.isArray(value)) {
     return '[' + value.map(stringify).join(',') + ']';
   }

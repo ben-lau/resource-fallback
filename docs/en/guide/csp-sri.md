@@ -6,6 +6,10 @@ title: CSP & SRI
 
 resource-fallback injects a runtime `<script>` into `<head>` by default. This page covers CSP compliance, SRI strategies, and kill switches.
 
+## CSP: no `unsafe-eval` required
+
+The runtime IIFE targets es2020 and uses native `import()` for dynamic loads — **not** `Function('u','return import(u)')`. CSP does **not** need `script-src 'unsafe-eval'`. Inline injection still needs a `nonce`, or use `externalRuntime`.
+
 ## CSP: nonce support
 
 Pass a nonce to the injected script tag:

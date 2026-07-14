@@ -131,7 +131,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: [
             'https://cdn2.example.com/',
             'https://backup.example.com/',
@@ -162,7 +162,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn1.example.com/',
+          base: 'https://cdn1.example.com/',
           urls: ['https://cdn2.example.com/', 'https://backup.example.com/', '/'],
         },
       ],
@@ -173,7 +173,7 @@ module.exports = {
 
 ### 上手注意点
 
-1. **`match` 要对齐构建产物前缀**：Vite 对齐 `base`，Webpack 对齐 `output.publicPath`。如果首次资源 URL 匹配不上 `match`，运行时不会进入 retry/fallback。
+1. **`rules[].base` 要对齐构建产物前缀**：Vite 对齐 Vite `base`，Webpack 对齐 `output.publicPath`。如果首次资源 URL 匹配不上 rule `base`，运行时不会进入 retry/fallback。
 2. **`urls` 顺序就是回退顺序**：建议写成备用 CDN → 自建静态源 → 回源 `'/'`。最后一个通常放同源回源，避免主 CDN 故障时再次命中 CDN。
 3. **Vite dev 不是主要验证环境**：dev server 使用原生 ESM，动态 `import()` 失败无法完整拦截；请用 `vite build && vite preview` 或示例里的 E2E 验证。
 4. **入口资源失败要自己兜底 UI**：无论 Vite 还是 Webpack，入口 bundle 如果所有候选 URL 都失败，React/Vue 还没启动；建议在 `index.html` 加一个轻量 `rf:error` 监听显示降级文案。
@@ -187,7 +187,7 @@ module.exports = {
 
 | 字段                  | 类型                              | 默认值               | 说明                                                                |
 | --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组，按顺序匹配，重复 match 以最后一条为准                 |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；多条规则时 `resolveBuiltUrl` 以最后一条命中为准        |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
 | `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
@@ -205,12 +205,14 @@ module.exports = {
 
 ### FallbackRule
 
-| 字段      | 类型                                   | 默认值   | 说明                                          |
-| --------- | -------------------------------------- | -------- | --------------------------------------------- |
-| `match`   | `string \| RegExp \| (url) => boolean` | **必填** | URL 匹配模式。string 为前缀匹配               |
-| `urls`    | `string[]`                             | **必填** | 有序候选 URL 前缀列表。最后一个通常为回源地址 |
-| `retry`   | `RetryOptions`                         | 见下表   | 覆盖该规则的重试配置                          |
-| `circuit` | `CircuitOptions`                       | 见下表   | 覆盖该规则的熔断配置                          |
+| 字段      | 类型              | 默认值   | 说明                                                                                                                                          |
+| --------- | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`    | `string`          | **必填** | 资源 URL 前缀（区分大小写）。用于：前缀匹配失败 URL、剥路径后拼接到候选、Vite 裸文件名拼出首轮 CDN URL。可与 `urls` 分离：`base` 是首轮前缀，`urls` 是回退链 |
+| `urls`    | `string[]`        | **必填** | 有序候选 URL 前缀列表（回退链）。最后一个通常为回源地址                                                                                       |
+| `retry`   | `RetryOptions`    | 见下表   | 覆盖该规则的重试配置                                                                                                                          |
+| `circuit` | `CircuitOptions`  | 见下表   | 覆盖该规则的熔断配置                                                                                                                          |
+
+> Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vite `base` 与 rule `base`。Vite `base` / Webpack `publicPath` 应等于 `rules[].base`。
 
 ### RetryOptions
 
@@ -232,7 +234,7 @@ module.exports = {
 
 ### ServiceWorkerOptions
 
-Hybrid SW 默认关闭。启用后，Vite/Webpack 插件会生成资源 manifest，并输出 SW asset；SW bundle 会预置 manifest/config（保留 `RegExp` 规则语义），页面 runtime 负责注册 SW、补发配置，并把 SW `postMessage` 事件桥接为现有 `rf:*` 事件。SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串台。
+Hybrid SW 默认关闭。启用后，Vite/Webpack 插件会生成资源 manifest，并输出 SW asset；SW bundle 会预置 manifest/config，页面 runtime 负责注册 SW、补发配置，并把 SW `postMessage` 事件桥接为现有 `rf:*` 事件。SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串台。
 
 ```ts
 resourceFallback({
@@ -387,7 +389,7 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 ## 最佳实践
 
 1. **`urls` 顺序就是回退顺序** — 建议依次写入：备用 CDN → 自建 CDN → 回源（`/`）
-2. **`match` 应等于 `base` / `publicPath`** — 确保首次加载的资源 URL 能被规则匹配
+2. **rule `base` 应等于 Vite `base` / Webpack `publicPath`** — 确保首次加载的资源 URL 能被规则匹配
 3. **回源 URL 使用相对路径** — 避免再次遇到 CDN 故障（如 `'/'`）
 4. **生产环境保持 `debug: 'auto'`** — 线上排查时设置 `localStorage.__RF_DEBUG__ = '1'` 即可看日志
 5. **`retry.max` 不宜过大** — 过多重试会延长用户等待时间，建议 1~3 次
@@ -448,7 +450,7 @@ pnpm release                # build + publish 所有包到 npm
 
 - [ ] **Chrome DevTools 扩展** — 可视化展示回退链路、熔断器状态、事件时间线
 - [ ] **性能指标上报** — 内置 `performance.mark` / `performance.measure`，量化回退对加载时间的影响
-- [ ] **配置校验** — 构建时校验 `match` 与 `base`/`publicPath` 是否匹配，提前发现配置错误
+- [ ] **配置校验** — 构建时校验 `rules[].base` 与 Vite `base` / Webpack `publicPath` 是否对齐，提前发现配置错误
 - [ ] **更完善的日志** — 区分 debug / info / warn / error 级别，支持自定义 logger
 
 ### 文档

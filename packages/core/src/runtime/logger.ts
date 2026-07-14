@@ -1,6 +1,5 @@
 import type { DebugFlag } from '../types';
-
-const PREFIX = '[resource-fallback]';
+import { RF_PREFIX } from '../error';
 
 export interface Logger {
   enabled: boolean;
@@ -19,10 +18,10 @@ export function createLogger(flag: DebugFlag | undefined): Logger {
   }
   return {
     enabled: true,
-    info: (m, d) => console.info(PREFIX, m, d ?? ''),
-    warn: (m, d) => console.warn(PREFIX, m, d ?? ''),
-    error: (m, d) => console.error(PREFIX, m, d ?? ''),
-    debug: (m, d) => console.debug(PREFIX, m, d ?? ''),
+    info: (m, d) => console.info(RF_PREFIX, m, d ?? ''),
+    warn: (m, d) => console.warn(RF_PREFIX, m, d ?? ''),
+    error: (m, d) => console.error(RF_PREFIX, m, d ?? ''),
+    debug: (m, d) => console.debug(RF_PREFIX, m, d ?? ''),
   };
 }
 

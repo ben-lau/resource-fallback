@@ -16,7 +16,7 @@ function setup(globals: string[]) {
   const resolver = createResolver({
     rules: [
       {
-        match: cdn1,
+        base: cdn1,
         urls: [cdn1, cdn2],
         retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
       },
@@ -80,7 +80,7 @@ describe('webpack adapter', () => {
     const resolver = createResolver({
       rules: [
         {
-          match: cdn1,
+          base: cdn1,
           urls: [cdn1, cdn2],
           retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
         },

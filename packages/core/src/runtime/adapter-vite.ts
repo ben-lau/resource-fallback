@@ -13,6 +13,15 @@ interface VitePreloadErrorEvent extends Event {
   payload?: unknown;
 }
 
+type ImportModule = (url: string) => Promise<unknown>;
+
+let importModule: ImportModule = (url) => import(/* @vite-ignore */ /* webpackIgnore: true */ url);
+
+/** @internal 仅供测试替换动态 import。传入 null 恢复默认。 */
+export function setViteImportModule(fn: ImportModule | null): void {
+  importModule = fn || ((url) => import(/* @vite-ignore */ /* webpackIgnore: true */ url));
+}
+
 /**
  * Vite 特有的运行时钩子。
  *
@@ -31,9 +40,6 @@ export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
   if (!w.__RF__) w.__RF__ = {};
   w.__RF__.url = (filename: string) => deps.resolver.resolveBuiltUrl(filename);
 
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const dynamicImport = Function('u', 'return import(u)') as (url: string) => Promise<unknown>;
-
   w.__RF__.load = async (filename: string) => {
     let currentUrl = deps.resolver.resolveBuiltUrl(filename);
     let isFallback = false;
@@ -48,7 +54,7 @@ export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
         // 强制浏览器将其视为新的 module record。
         const importUrl =
           totalAttempts > 0 ? appendRetryParam(currentUrl, totalAttempts) : currentUrl;
-        const mod = await dynamicImport(importUrl);
+        const mod = await importModule(importUrl);
         deps.resolver.recordSuccess(currentUrl);
         deps.bus.emitSuccess({ url: currentUrl, attempts: attempt });
         return mod;
@@ -96,7 +102,7 @@ export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
     const reason = (event as VitePreloadErrorEvent).payload;
     const url = extractUrlFromError(reason);
     if (!url) {
-      deps.log.warn('vite:preloadError 无法解析出 URL', reason);
+      deps.log.warn('vite:preloadError could not extract URL', reason);
       return;
     }
     deps.bus.emitFallback({ from: url, to: '<deferred>', reason: 'vite-preload-failure' });

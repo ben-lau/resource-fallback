@@ -30,7 +30,7 @@ import {
 | `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                      |
 | `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                     |
 | `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config    |
-| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string; `RegExp` preserved as native regex literals |
+| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string suitable for embedding in the page           |
 
 ### defineConfig
 
@@ -40,7 +40,7 @@ import { defineConfig } from '@resource-fallback/core';
 export default defineConfig({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://backup.example.com/', '/'],
       retry: { max: 2, baseDelay: 300 },
       circuit: { threshold: 3 },
@@ -58,7 +58,7 @@ Manually inject the runtime for custom plugins / build pipelines:
 import { buildInjectedTags } from '@resource-fallback/core';
 
 const tags = buildInjectedTags({
-  rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+  rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
   nonce: 'abc123',
   injectPreconnect: true,
 });
@@ -142,7 +142,6 @@ export type {
   FallbackRule,
   HtmlTag,
   HtmlTagAttributes,
-  MatchPattern,
   PluginOptions,
   ResolveResult,
   RetryEvent,

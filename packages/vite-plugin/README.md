@@ -23,7 +23,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // 回源
@@ -35,7 +35,7 @@ export default defineConfig({
 });
 ```
 
-> **重要**：`base` 的值应当与 `match` 保持一致，确保构建产物的 URL 能被规则匹配。
+> **重要**：Vite `base` 应当与 `rules[].base`（rule `base`）保持一致，确保构建产物的 URL 能被规则匹配。仅当两边在规范化尾斜杠后相等（`ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base)`）时才会改写 URL。
 
 ## 工作原理
 
@@ -97,7 +97,7 @@ const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'))
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
@@ -125,7 +125,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+      rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

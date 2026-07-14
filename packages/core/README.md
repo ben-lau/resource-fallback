@@ -30,7 +30,7 @@ import {
 | `getRuntimePath()`        | 返回 IIFE 运行时文件的绝对路径                                  |
 | `getRuntimeCode()`        | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）              |
 | `buildInjectedTags(opts)` | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组 |
-| `serialiseConfig(cfg)`    | 将运行时配置序列化为 JSON 字符串，`RegExp` 保持为原生正则字面量 |
+| `serialiseConfig(cfg)`    | 将运行时配置序列化为可嵌入页面的 JSON 字符串                    |
 
 ### defineConfig
 
@@ -40,7 +40,7 @@ import { defineConfig } from '@resource-fallback/core';
 export default defineConfig({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://backup.example.com/', '/'],
       retry: { max: 2, baseDelay: 300 },
       circuit: { threshold: 3 },
@@ -58,7 +58,7 @@ export default defineConfig({
 import { buildInjectedTags } from '@resource-fallback/core';
 
 const tags = buildInjectedTags({
-  rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+  rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
   nonce: 'abc123',
   injectPreconnect: true,
 });
@@ -142,7 +142,6 @@ export type {
   FallbackRule,
   HtmlTag,
   HtmlTagAttributes,
-  MatchPattern,
   PluginOptions,
   ResolveResult,
   RetryEvent,

@@ -30,7 +30,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // origin fallback
@@ -43,7 +43,7 @@ module.exports = {
 ```
 
 ::: tip Important
-`output.publicPath` should match `match`.
+`output.publicPath` should equal `rules[].base` (rule `base`).
 :::
 
 Full options: [Configuration Reference](./configuration.md).
@@ -152,7 +152,7 @@ The runtime also hooks `window[chunkLoadingGlobal]` (default `webpackChunk_`) `p
 new ResourceFallbackWebpackPlugin({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },

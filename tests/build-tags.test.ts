@@ -8,7 +8,7 @@ describe('buildInjectedTags', () => {
       defineConfig({
         rules: [
           {
-            match: 'https://cdn1.example.com/',
+            base: 'https://cdn1.example.com/',
             urls: ['https://cdn1.example.com/', 'https://cdn2.example.com/'],
           },
         ],
@@ -25,7 +25,7 @@ describe('buildInjectedTags', () => {
       defineConfig({
         rules: [
           {
-            match: 'https://cdn1.example.com/',
+            base: 'https://cdn1.example.com/',
             urls: ['https://cdn1.example.com/', '/', './local/'],
           },
         ],
@@ -47,7 +47,7 @@ describe('buildInjectedTags', () => {
   it('skips preconnect when injectPreconnect=false', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: 'https://x/', urls: ['https://x/'] }],
+        rules: [{ base: 'https://x/', urls: ['https://x/'] }],
         injectPreconnect: false,
       }),
     );
@@ -57,7 +57,7 @@ describe('buildInjectedTags', () => {
   it('emits CSP nonce on injected script', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: 'https://x/', urls: ['https://x/'] }],
+        rules: [{ base: 'https://x/', urls: ['https://x/'] }],
         injectPreconnect: false,
         nonce: 'abc123',
       }),
@@ -69,7 +69,7 @@ describe('buildInjectedTags', () => {
   it('externalRuntime emits two scripts: src + install', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: 'https://x/', urls: ['https://x/'] }],
+        rules: [{ base: 'https://x/', urls: ['https://x/'] }],
         injectPreconnect: false,
         externalRuntime: true,
       }),
@@ -80,21 +80,22 @@ describe('buildInjectedTags', () => {
     expect(scripts[1].innerHTML).toContain('install(');
   });
 
-  it('serialises RegExp match patterns', () => {
+  it('serialises string base in install config', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: /^https:\/\/cdn\d+\//, urls: ['https://cdn1/'] }],
+        rules: [{ base: 'https://cdn1.example.com/', urls: ['https://cdn1/'] }],
         injectPreconnect: false,
       }),
     );
     const script = tags.find((t) => t.tagName === 'script' && t.innerHTML?.includes('install('));
-    expect(script?.innerHTML).toContain('/^https:\\/\\/cdn\\d+\\//');
+    expect(script?.innerHTML).toContain('https://cdn1.example.com/');
+    expect(script?.innerHTML).toContain('"base"');
   });
 
   it('escapes </script> in config strings to prevent HTML injection', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: '</script><script>alert(1)</script>', urls: ['https://x/'] }],
+        rules: [{ base: '</script><script>alert(1)</script>', urls: ['https://x/'] }],
         injectPreconnect: false,
       }),
     );
@@ -106,12 +107,12 @@ describe('buildInjectedTags', () => {
   it('serialises service worker manifest into the install config when provided', () => {
     const tags = buildInjectedTags(
       defineConfig({
-        rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+        rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
         injectPreconnect: false,
         serviceWorker: true,
         serviceWorkerManifest: {
           version: 'rf-test',
-          rules: [{ match: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
+          rules: [{ base: 'https://cdn.example.com/', urls: ['https://cdn.example.com/', '/'] }],
           assets: [{ url: 'https://cdn.example.com/logo.png', type: 'image', owner: 'sw' }],
         },
       }),

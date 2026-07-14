@@ -17,7 +17,7 @@ const manifest: ResourceFallbackManifest = {
   version: 'rf-test',
   rules: [
     {
-      match: cdn,
+      base: cdn,
       urls: [cdn, origin],
       retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
     },

@@ -14,7 +14,7 @@ export function createHookBus(hooks: RuntimeHooks | undefined, log: Logger): Hoo
     try {
       fn(e);
     } catch (err) {
-      log.warn('钩子 ' + name + ' 抛出异常', err);
+      log.warn('hook ' + name + ' threw', err);
     }
   };
 

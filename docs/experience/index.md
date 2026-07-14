@@ -26,7 +26,7 @@ title: 开发与落地经验
 
 ### [问题案例](./case-studies.md)
 
-本仓库内解决过的问题（背景 → 思考过程 → 解决方案），共 10 个案例：Webpack 双处理、Vite 动态 import、ESM 缓存、base/match 闸门、cloneNode、URL 匹配、SystemJS、Resolver 语义、观测事件、Hybrid SW。
+本仓库内解决过的问题（背景 → 思考过程 → 解决方案），共 10 个案例：Webpack 双处理、Vite 动态 import、ESM 缓存、Vite base / rule base 闸门、cloneNode、URL 匹配、SystemJS、Resolver 语义、观测事件、Hybrid SW。
 
 ### [可复用原则](./principles.md)
 

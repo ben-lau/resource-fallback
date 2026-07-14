@@ -36,18 +36,18 @@ export function installSwAdapter(deps: SwAdapterDeps): void {
     return;
   }
   if (!deps.config.serviceWorkerManifest) {
-    deps.log.warn('Service Worker 已启用但缺少 manifest，跳过注册');
+    deps.log.warn('Service Worker enabled but manifest is missing; skip registration');
     return;
   }
 
   const container = (navigator as unknown as { serviceWorker?: ServiceWorkerContainerLike })
     .serviceWorker;
   if (!container || typeof container.register !== 'function') {
-    deps.log.warn('当前环境不支持 Service Worker');
+    deps.log.warn('Service Worker is not supported in this environment');
     return;
   }
   if (!isSecureServiceWorkerContext()) {
-    deps.log.warn('Service Worker 需要 HTTPS 或 localhost 环境');
+    deps.log.warn('Service Worker requires HTTPS or localhost');
     return;
   }
 
@@ -76,12 +76,12 @@ export function installSwAdapter(deps: SwAdapterDeps): void {
         container.ready
           .then((readyRegistration) => postConfig(readyRegistration, message))
           .catch((err) => {
-            deps.log.warn('等待 Service Worker ready 失败', err);
+            deps.log.warn('waiting for Service Worker ready failed', err);
           });
       }
     })
     .catch((err) => {
-      deps.log.warn('Service Worker 注册失败', err);
+      deps.log.warn('Service Worker registration failed', err);
     });
 }
 
@@ -116,7 +116,8 @@ function unregisterStaleWorkers(log: Logger, swPath: string): void {
             reg
               .unregister()
               .then((ok) => {
-                if (ok) log.info('已卸载旧的 resource-fallback Service Worker', { scriptURL });
+                if (ok)
+                  log.info('unregistered previous resource-fallback Service Worker', { scriptURL });
               })
               .catch(() => {});
           }

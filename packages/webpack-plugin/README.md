@@ -28,7 +28,7 @@ module.exports = {
     new ResourceFallbackWebpackPlugin({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // 回源
@@ -40,7 +40,7 @@ module.exports = {
 };
 ```
 
-> **重要**：`output.publicPath` 应当与 `match` 保持一致。
+> **重要**：`output.publicPath` 应当与 `rules[].base`（rule `base`）保持一致。
 
 ## 工作原理
 
@@ -106,7 +106,7 @@ Observer 自动跳过带 `data-webpack` 属性的 `<script>` 标签，避免与 
 new ResourceFallbackWebpackPlugin({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },

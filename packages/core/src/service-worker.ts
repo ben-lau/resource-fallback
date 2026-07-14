@@ -7,6 +7,7 @@ import type {
   RuntimeConfig,
   ServiceWorkerOptions,
 } from './types';
+import { normalizeFallbackRules } from './runtime/utils';
 
 export interface ManifestInputAsset {
   url: string;
@@ -42,6 +43,7 @@ export function normalizeServiceWorkerOptions(
 }
 
 export function buildResourceFallbackManifest(input: ManifestInput): ResourceFallbackManifest {
+  const rules = normalizeFallbackRules(input.rules);
   const assets = input.assets.map((asset) => ({
     ...asset,
     owner: defaultOwnerForType(asset.type),
@@ -52,12 +54,12 @@ export function buildResourceFallbackManifest(input: ManifestInput): ResourceFal
       stableHash(
         stableStringify({
           seed: input.versionSeed,
-          rules: input.rules,
+          rules,
           assets,
           versionSalt: input.versionSalt,
         }),
       ),
-    rules: input.rules,
+    rules,
     assets,
   };
 }
@@ -143,12 +145,13 @@ function withPreloadedConfig(
     serviceWorker: NormalizedServiceWorkerOptions;
   },
 ): string {
-  return `self.__RF_SW_PRELOAD__=${stringifyJs(preload)};\n${code}`;
+  // rules 仅为 string 前缀，整份 preload 可用 JSON；无需 RegExp 字面量特判。
+  return `self.__RF_SW_PRELOAD__=${JSON.stringify(preload)};\n${code}`;
 }
 
 function stripSwRuntimeConfig(config: RuntimeConfig): RuntimeConfig {
   return {
-    rules: config.rules,
+    rules: normalizeFallbackRules(config.rules),
     defaults: config.defaults,
     debug: config.debug,
     sri: config.sri,
@@ -173,28 +176,7 @@ function stableHash(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
-function stringifyJs(value: unknown): string {
-  if (value instanceof RegExp) return value.toString();
-  if (Array.isArray(value)) return '[' + value.map(stringifyJs).join(',') + ']';
-  if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    const parts: string[] = [];
-    for (const key of Object.keys(obj)) {
-      const item = obj[key];
-      if (item === undefined || typeof item === 'function') continue;
-      parts.push(JSON.stringify(key) + ':' + stringifyJs(item));
-    }
-    return '{' + parts.join(',') + '}';
-  }
-  return JSON.stringify(value)
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-}
-
 function stableStringify(value: unknown): string {
-  if (value instanceof RegExp) {
-    return JSON.stringify({ __type: 'RegExp', source: value.source, flags: value.flags });
-  }
   if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
   if (value && typeof value === 'object') {
     const obj = value as Record<string, unknown>;

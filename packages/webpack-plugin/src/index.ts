@@ -7,6 +7,7 @@ import {
   inferResourceFallbackAssetType,
   joinAssetPrefix,
   normalizeServiceWorkerOptions,
+  rfError,
   type HtmlTag,
   type PluginOptions,
 } from '@resource-fallback/core';
@@ -20,7 +21,7 @@ export class ResourceFallbackWebpackPlugin {
 
   constructor(options: WebpackPluginOptions) {
     if (!options || !Array.isArray(options.rules) || options.rules.length === 0) {
-      throw new Error(`${PLUGIN}: \`rules\` must be a non-empty array`);
+      throw rfError('`rules` must be a non-empty array');
     }
     this.options = options;
   }
@@ -44,8 +45,8 @@ export class ResourceFallbackWebpackPlugin {
         if (!warnedNoHtml.has(compiler)) {
           warnedNoHtml.add(compiler);
           compilation.warnings.push(
-            new Error(
-              `${PLUGIN}: 未检测到 html-webpack-plugin；运行时不会被自动注入。请添加 html-webpack-plugin 或通过 @resource-fallback/core 的 getRuntimeCode() 手动注入运行时。`,
+            rfError(
+              'html-webpack-plugin not found; runtime will not be injected automatically. Add html-webpack-plugin or inject via @resource-fallback/core getRuntimeCode().',
             ) as unknown as Error,
           );
         }
@@ -57,7 +58,7 @@ export class ResourceFallbackWebpackPlugin {
           ?.getHooks ?? ctor.getHooks;
       if (typeof getHooks !== 'function') {
         compilation.warnings.push(
-          new Error(`${PLUGIN}: html-webpack-plugin 版本过低（需要 v4+）。`) as unknown as Error,
+          rfError('html-webpack-plugin is too old (v4+ required).') as unknown as Error,
         );
         return;
       }

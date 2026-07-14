@@ -25,7 +25,7 @@ export default defineConfig({
     resourceFallback({
       rules: [
         {
-          match: 'https://cdn.example.com/',
+          base: 'https://cdn.example.com/',
           urls: [
             'https://cdn-backup.example.com/',
             '/', // origin fallback
@@ -38,7 +38,7 @@ export default defineConfig({
 ```
 
 ::: tip Important
-The value of `base` should match `match` so build output URLs hit the rule.
+Vite `base` should equal `rules[].base` (rule `base`) so build output URLs hit the rule.
 :::
 
 Full options: [Configuration Reference](./configuration.md).
@@ -87,7 +87,7 @@ const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'))
 
 #### writeBundle + es-module-lexer
 
-The `writeBundle` hook uses `es-module-lexer` to parse dynamic imports inside chunks and replace match-rule URLs with `__RF__.load()` calls. This preserves dependency relationships when async modules include CSS.
+The `writeBundle` hook uses `es-module-lexer` to parse dynamic imports inside chunks and replace URLs that need rewriting with `__RF__.load()` calls. This preserves dependency relationships when async modules include CSS.
 
 ```js
 // writeBundle rewrite example
@@ -96,13 +96,19 @@ window.__RF__.load('assets/About-xxx.js');
 
 ### shouldRewriteUrls gate
 
-In `configResolved`, the plugin compares Vite's final resolved `base` with `rules[].match`:
+In `configResolved`, the plugin compares Vite's final resolved `base` with `rules[].base` (both sides use the same trailing-slash normalization as the runtime):
 
-- If `base` matches at least one rule's `match`, URL rewriting is enabled (`renderBuiltUrl`, `writeBundle`)
-- Otherwise rewriting is skipped to avoid incorrectly rewriting non-matching resources
+```ts
+shouldRewriteUrls = options.rules.some(
+  (r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base),
+);
+```
+
+- If the normalized Vite `base` equals at least one rule `base`, URL rewriting is enabled (`renderBuiltUrl`, `writeBundle`)
+- Otherwise rewriting is skipped so async chunks are not rewritten to a CDN when Vite `base` is still `/`
 
 ::: info Why configResolved
-`base` is read from `configResolved` to get Vite's final resolved value (after other plugins may override it).
+Vite `base` is read from `configResolved` to get Vite's final resolved value (after other plugins may override it).
 :::
 
 ### **RF**.load fallback loop
@@ -142,7 +148,7 @@ window.addEventListener('vite:preloadError', (event) => {
 resourceFallback({
   rules: [
     {
-      match: 'https://cdn.example.com/',
+      base: 'https://cdn.example.com/',
       urls: ['https://cdn-backup.example.com/', 'https://static.mysite.com/', '/'],
       retry: { max: 2, baseDelay: 300, maxDelay: 3000, jitter: true },
       circuit: { threshold: 3, cooldown: 30000 },
@@ -169,7 +175,7 @@ export default defineConfig({
   plugins: [
     legacy({ targets: ['defaults', 'not IE 11'] }),
     resourceFallback({
-      rules: [{ match: 'https://cdn.example.com/', urls: ['/'] }],
+      rules: [{ base: 'https://cdn.example.com/', urls: ['/'] }],
     }),
   ],
 });

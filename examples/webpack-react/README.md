@@ -34,7 +34,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
   plugins: [
     new ResourceFallbackWebpackPlugin({
       rules: [{
-        match: 'http://cdn-primary.example.invalid/',  // 匹配 publicPath
+        base: 'http://cdn-primary.example.invalid/',  // rule.base = publicPath
         urls: [
           'http://cdn-secondary.example.invalid/',     // 备用 CDN 1
           'http://cdn-backup.example.invalid/',         // 备用 CDN 2

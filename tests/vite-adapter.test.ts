@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
-import { installViteAdapter } from '../packages/core/src/runtime/adapter-vite';
+import { installViteAdapter, setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
 import { createResolver } from '../packages/core/src/runtime/resolver';
 
 const cdn1 = 'https://cdn1.example.com/';
@@ -32,7 +32,7 @@ function setup(opts?: {
   const resolver = createResolver({
     rules: [
       {
-        match: cdn1,
+        base: cdn1,
         urls: [cdn1, cdn2, origin],
         retry: {
           max: opts?.retryMax ?? 1,
@@ -69,9 +69,11 @@ describe('vite-adapter', () => {
   beforeEach(() => {
     localStorage.clear();
     (window as unknown as Record<string, unknown>).__RF__ = {};
+    setViteImportModule(null);
   });
 
   afterEach(() => {
+    setViteImportModule(null);
     delete (window as unknown as Record<string, unknown>).__RF__;
   });
 
@@ -82,21 +84,9 @@ describe('vite-adapter', () => {
       expect(g.url!('assets/chunk.js')).toBe(cdn1 + 'assets/chunk.js');
     });
 
-    it('returns filename as-is when no rule matches', () => {
-      setup();
-      const _g = getGlobal();
-      // The match pattern is a string prefix (cdn1), and matchesFilename
-      // returns true for all string patterns, so any filename matches.
-      // Use a resolver with RegExp match that won't match arbitrary filenames.
+    it('returns filename as-is when no rules', () => {
       const log = createLogger(false);
-      const resolver = createResolver({
-        rules: [
-          {
-            match: /^https:\/\/specific\.cdn\.com\//,
-            urls: ['https://specific.cdn.com/'],
-          },
-        ],
-      });
+      const resolver = createResolver({ rules: [] });
       const bus = createHookBus({}, log);
       installViteAdapter({ resolver, bus, log });
       expect(getGlobal().url!('random-file.js')).toBe('random-file.js');
@@ -106,49 +96,26 @@ describe('vite-adapter', () => {
   describe('__RF__.load', () => {
     it('succeeds on first attempt without cache-busting', async () => {
       const successes: string[] = [];
-      setup({ onSuccess: (e) => successes.push((e as { url: string }).url) });
-
-      // Mock dynamic import via the global Function constructor
-      const originalFunction = globalThis.Function;
       const importMock = vi.fn().mockResolvedValue({ default: 'module-content' });
-      vi.stubGlobal('Function', function (this: unknown, ...args: string[]) {
-        if (args[0] === 'u' && args[1] === 'return import(u)') {
-          return importMock;
-        }
-        return new originalFunction(...args);
-      });
-
-      // Reinstall adapter with the mocked Function
-      (window as unknown as Record<string, unknown>).__RF__ = {};
+      setViteImportModule(importMock);
       setup({ onSuccess: (e) => successes.push((e as { url: string }).url) });
 
       const g = getGlobal();
       const result = await g.load!('assets/chunk.js');
       expect(result).toEqual({ default: 'module-content' });
       expect(importMock).toHaveBeenCalledTimes(1);
-      // First attempt should not have cache-bust param
       const calledUrl = importMock.mock.calls[0][0] as string;
       expect(calledUrl).not.toContain('__rf=');
-
-      vi.unstubAllGlobals();
     });
 
     it('adds cache-bust param on retry attempts', async () => {
       let callCount = 0;
-      const originalFunction = globalThis.Function;
       const importMock = vi.fn().mockImplementation((_url: string) => {
         callCount++;
         if (callCount <= 1) return Promise.reject(new Error('fail'));
         return Promise.resolve({ default: 'ok' });
       });
-      vi.stubGlobal('Function', function (this: unknown, ...args: string[]) {
-        if (args[0] === 'u' && args[1] === 'return import(u)') {
-          return importMock;
-        }
-        return new originalFunction(...args);
-      });
-
-      (window as unknown as Record<string, unknown>).__RF__ = {};
+      setViteImportModule(importMock);
       setup({ retryMax: 2 });
 
       const g = getGlobal();
@@ -157,27 +124,17 @@ describe('vite-adapter', () => {
       expect(importMock).toHaveBeenCalledTimes(2);
       const secondUrl = importMock.mock.calls[1][0] as string;
       expect(secondUrl).toContain('__rf=');
-
-      vi.unstubAllGlobals();
     });
 
     it('emits retry and fallback events through the chain', async () => {
       let callCount = 0;
       const events: string[] = [];
-      const originalFunction = globalThis.Function;
       const importMock = vi.fn().mockImplementation(() => {
         callCount++;
         if (callCount <= 3) return Promise.reject(new Error('fail'));
         return Promise.resolve({ default: 'ok' });
       });
-      vi.stubGlobal('Function', function (this: unknown, ...args: string[]) {
-        if (args[0] === 'u' && args[1] === 'return import(u)') {
-          return importMock;
-        }
-        return new originalFunction(...args);
-      });
-
-      (window as unknown as Record<string, unknown>).__RF__ = {};
+      setViteImportModule(importMock);
       setup({
         retryMax: 1,
         onRetry: (e) => events.push('retry:' + (e as { url: string }).url),
@@ -188,25 +145,14 @@ describe('vite-adapter', () => {
       const g = getGlobal();
       await g.load!('assets/chunk.js');
 
-      // Expected: attempt cdn1(fail) -> retry cdn1(fail) -> fallback cdn2(fail) -> retry cdn2(success)
       expect(events).toContain('retry:' + cdn1 + 'assets/chunk.js');
       expect(events).toContain('fallback:' + cdn2 + 'assets/chunk.js');
-
-      vi.unstubAllGlobals();
     });
 
     it('throws after all urls exhausted', async () => {
       const events: string[] = [];
-      const originalFunction = globalThis.Function;
       const importMock = vi.fn().mockRejectedValue(new Error('always fail'));
-      vi.stubGlobal('Function', function (this: unknown, ...args: string[]) {
-        if (args[0] === 'u' && args[1] === 'return import(u)') {
-          return importMock;
-        }
-        return new originalFunction(...args);
-      });
-
-      (window as unknown as Record<string, unknown>).__RF__ = {};
+      setViteImportModule(importMock);
       setup({
         retryMax: 0,
         onError: (e) => events.push('error:' + (e as { url: string }).url),
@@ -215,8 +161,6 @@ describe('vite-adapter', () => {
       const g = getGlobal();
       await expect(g.load!('assets/chunk.js')).rejects.toThrow('always fail');
       expect(events.some((e) => e.startsWith('error:'))).toBe(true);
-
-      vi.unstubAllGlobals();
     });
   });
 

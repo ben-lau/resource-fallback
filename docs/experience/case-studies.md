@@ -96,9 +96,9 @@ import('./views/About-xxxx.js');
    `window.__RF__.load(JSON.stringify(normalizedRelativePath))`  
    （实际代码为模板字符串，`JSON.stringify(resolved)` 保证转义正确。）
 
-5. 运行时 **`__RF__.load`** 实现在 `packages/core/src/runtime/adapter-vite.ts`：内部循环里调用 **`Function('u','return import(u)')`** 做 **原生 dynamic import**，与 **同一 `resolver`** 协同，从而在 **不改变「先由 Vite 生成 preload 拓扑」前提下**，把失败后的 **retry / fallback / cache bust**接进链路。
+5. 运行时 **`__RF__.load`** 实现在 `packages/core/src/runtime/adapter-vite.ts`：内部循环里直接调用浏览器 **原生 `import(url)`**（IIFE 目标 es2020，无需 `Function(...)` / `unsafe-eval`），与 **同一 `resolver`** 协同，从而在 **不改变「先由 Vite 生成 preload 拓扑」前提下**，把失败后的 **retry / fallback / cache bust**接进链路。
 
-附加闸门见 **4.4**——只有 `shouldRewriteUrls` 为真时才执行上述磁盘改写，以免 **base 不匹配**时还去动 chunk。
+附加闸门见 **4.4**——只有 `shouldRewriteUrls` 为真时才执行上述磁盘改写，以免 Vite `base` 与 rule `base` **不一致**时还去动 chunk。
 
 #### 延伸：`vite:preloadError` 会「顺手」掐断后面的 JS 动态加载
 
@@ -147,53 +147,50 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.4 `vite.config` 里 `base: '/'`，规则却写 CDN `match` —— 异步 chunk 被整块拼到 CDN 外域（或逻辑错位）
+### 4.4 `vite.config` 里 Vite `base: '/'`，规则却写 CDN `base` —— 异步 chunk 被整块拼到 CDN 外域（或逻辑错位）
 
 #### 背景
 
 很常见的一种配置心理状态：
 
-- **本地**：`base: '/'`，资源走同源；
-- **生产**：本应 `base: 'https://cdn.example/'`，规则和线上对齐；
-- 但仓库里 **提前写死了** CDN 前缀的 `match` / `urls`，或 CI 里 **`base` 未切到 CDN**就与 **CDN 形态的 rules**共存。
+- **本地**：Vite `base: '/'`，资源走同源；
+- **生产**：本应 Vite `base: 'https://cdn.example/'`，规则和线上对齐；
+- 但仓库里 **提前写死了** CDN 前缀的 rule `base` / `urls`，或 CI 里 **Vite `base` 未切到 CDN**就与 **CDN 形态的 rules**共存。
 
-另一类根因是纯 **静态分析 bug**：解析「chunk 文件名」是否属于某规则的逻辑里，对 **string** 类型的 `match` **一律视为匹配任意 filename**（`matchesFilename` 里 `typeof pattern === 'string' → true`）。则 **只要在规则列表里出现过 string CDN 前缀**，就可能把 **resolveBuiltUrl(任意文件名)** 都拼装成 CDN URL——即 **开发与预览构建也会在运行时或二次解析时误认为「chunks 都来自 CDN」**。
+历史根因（旧 API）：解析「chunk 文件名」是否属于某规则时，对 **string** 类型的 `match` **一律视为匹配任意 filename**（旧 `matchesFilename`）。当前 API 已改为必填 **rule `base` 字符串前缀**，并用闸门约束构建期改写。
 
 表现出来的事故包括：
 
-- `base`仍是 `/`，但懒加载请求的却是 **`https://cdn.../assets/xxx.js`**，出现 **Mixed Content/CORS**，或无故 **变慢**；
-- 与产品设计「**不匹配就不改语义**」相反——**没在 CDN 发布的构建**却被 **构建插件硬改**.
+- Vite `base`仍是 `/`，但懒加载请求的却是 **`https://cdn.../assets/xxx.js`**，出现 **Mixed Content/CORS**，或无故 **变慢**；
+- 与产品设计「**不对齐就不改语义**」相反——**没在 CDN 发布的构建**却被 **构建插件硬改**.
 
 #### 思考过程
 
 需要两层闸门：
 
-1. **构建期是否真的要去改写动态 import**：只有 **当前配置的 `base` 与规则的 `match` 对世界「真的一致」**，才说明你 \*\*打算从该前缀发资源」，才应注入 `__RF__.load` 改写链路。
+1. **构建期是否真的要去改写动态 import**：只有 **当前 Vite `base` 与至少一条 rule `base` 在尾斜杠规范化后相等**，才说明你打算从该前缀发资源，才应注入 `__RF__.load` 改写链路。
 
-2. **运行时仍可保留 Observer**：页面里 **`document.createElement('script')`** 手动插的 CDN 地址若 **字面符合 `match`**，仍可走兜底（与 「不动 Vite 默认 chunk 管线」可同时成立）。
+2. **运行时仍可保留 Observer**：页面里 **`document.createElement('script')`** 手动插的 CDN 地址若 **字面前缀符合 rule `base`**，仍可走兜底（与 「不动 Vite 默认 chunk 管线」可同时成立）。
 
 不应靠业务「记得删掉规则」人肉保证。
 
 #### 解决方案（如何实现）
 
-在 `vite-plugin` 的 **`config(userConfig)`**：
+在 `vite-plugin` 的 **`configResolved`**：
 
-- 读 `base`（默认 `"/"`）。
-- **`shouldRewriteUrls = options.rules.some(...)`**：
-  - string：`base === r.match`（严格相等）；
-  - RegExp：`r.match.test(base)`；
-  - function：`r.match(base)`。
+- 读最终解析后的 Vite `base`（默认 `"/"`）。
+- **`shouldRewriteUrls = options.rules.some((r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base))`**（尾斜杠规范化后比较；不再支持 RegExp / 函数）。
 
-在 **`writeBundle`** 首部：`if (!shouldRewriteUrls) return;` —— **整块「动态 import → `**RF**.load」」不写盘**。
+在 **`writeBundle`** 首部：`if (!shouldRewriteUrls) return;` —— **整块「动态 import → `__RF__.load`」不写盘**。
 
 效果归纳：
 
-| 场景                                 | 行为                                                                                                           |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `base` 与任一 `match` 对齐           | **改写**字面量动态 import，`__RF__.load`参与回退链。                                                           |
-| `base`为 `/`，规则只对 CDN（不相等） | **不改写**，Vite 默认行为加载 chunk；手写 `<script src="https://cdn...">` 仍可由 Observer 接管（若匹配规则）。 |
+| 场景                                          | 行为                                                                                                           |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Vite `base` 与任一 rule `base` 规范化后相等   | **改写**字面量动态 import，`__RF__.load`参与回退链。                                                           |
+| Vite `base`为 `/`，规则只对 CDN（不相等）     | **不改写**，Vite 默认行为加载 chunk；手写 `<script src="https://cdn...">` 仍可由 Observer 接管（若命中 rule `base`）。 |
 
-这样既避免 **误判 filename 匹配的爆炸半径**，又用 **单一布尔**把「是否要动产物」说清楚。
+这样用 **单一布尔**把「是否要动产物」说清楚，避免 Vite `base` 未切 CDN 时误拼外域 URL。
 
 ---
 
@@ -227,11 +224,11 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.6 规则写 `match: '/'`，运行时用 `script.src` 得到绝对 URL —— 前缀匹配失败
+### 4.6 规则写 `base: '/'`，运行时用 `script.src` 得到绝对 URL —— 前缀匹配失败
 
 #### 背景
 
-配置里习惯写 **「相对站点根」**的前缀，例如 `match: '/'` 或 `match: 'https://app.example.com/'` 与 **部署时 publicPath** 对齐。但 DOM 里 **`<script src="/assets/index.js">`** 读出 **`.src` 属性**时，浏览器 **规范化为完整的 `https://origin/assets/…`**。
+配置里习惯写 **「相对站点根」**的前缀，例如 `base: '/'` 或 `base: 'https://app.example.com/'` 与 **部署时 publicPath** 对齐。但 DOM 里 **`<script src="/assets/index.js">`** 读出 **`.src` 属性**时，浏览器 **规范化为完整的 `https://origin/assets/…`**。
 
 若 `resolver.matches` 对 string 使用的是 **`url.indexOf(pattern) === 0`**，则 **`/` 作为前缀**会与 **`https://…`**形态的字符串 **对不上**：表现为 **「首页明明挂了 CDN，Observer 永远不介入」**，或误以为库坏了。
 
@@ -243,9 +240,9 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 `readUrl(el)`：**仅使用 `el.getAttribute('src')` 或 `el.getAttribute('href')`**（空串兜底），绝不为了「方便」改成 `HTMLScriptElement.prototype.src`。
 
-这样 **`match: '/'` + `<script src="/assets/…">`** 字面仍 **以 `/` 起头**，前缀匹配与设计文档 **`string 为前缀`** 的描述一致。
+这样 **`base: '/'` + `<script src="/assets/…">`** 字面仍 **以 `/` 起头**，前缀匹配与设计文档 **`string 为前缀`** 的描述一致。
 
-注意：这与 **服务端渲染或某些框架用绝对 URL 写 attribute**的场景需自我一致——即 **match 要写与 attribute 字面一致的那一版**。
+注意：这与 **服务端渲染或某些框架用绝对 URL 写 attribute**的场景需自我一致——即 **rule `base` 要写与 attribute 字面一致的那一版**。
 
 ---
 
@@ -298,11 +295,11 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 2. **备选 CDN / 源站**上可以 **跳过明显挂掉的 host**；
 3. **奇怪 URL** 不应因为「正巧以某个 url 前缀开头」就误入整套 fallback（误判成本：多一次失败、多一跳监控）。
 
-若在实现上粗暴「所有失败都记入熔断并让 `match` 也吃熔断」，会违背 (1)。
+若在实现上粗暴「所有失败都记入熔断并让首轮 rule `base` 也吃熔断」，会违背 (1)。
 
 若 **初始就用 `urls`前缀来匹配未知资源**，会违背 (3)。
 
-多条规则 **`match`** 重复时若没有 **deterministic precedence**，配置文件一半生效一半不生效。
+多条规则 **rule `base`** 重复时若没有 **deterministic precedence**，配置文件一半生效一半不生效。
 
 #### 思考过程（与实现对齐）
 
@@ -310,7 +307,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 - **`findPrepared(url, isFallback)`**
   - 从数组 **末尾向前**扫（**后来者覆盖前者**，解决重复 define）。
-  - **始终**先试 **`matches(r.raw.match, url)`**（string 前缀 / RegExp / 函数）。
+  - **始终**先试 **rule `base` 前缀匹配**（`url` 以 `r.base` 开头；不再支持 RegExp / 函数）。
   - **仅当 `isFallback === true`**时才允许用 **`url.indexOf(r.raw.urls[j])===0`** 命中规则——这样 **凭空出现的 URL** 不会仅靠「长得像 urls 里某前缀」套上规则。
 
 - **`resolve`**：
@@ -318,15 +315,15 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
   - `attemptOnUrl <= retry.max` → **retry**：**同一 logical URL**，Observer 再结合 **是否需要 module cache bust**。
   - 超过 retry → **`breaker.recordFailure(hostOf(currentUrl))`** → **`pickNextUrl`**跳过 **打开的** host。
 
-- **`findMatchContext`**：处理 **`match` 前缀与 urls 列表前缀不一致**时仍能从当前 URL **剥出路径段** swapping 到 **下一候选前缀**。
+- **剥路径 / swap**：rule `base` 与 `urls` 列表前缀可不一致——仍能从当前 URL **剥出路径段**拼到 **下一候选前缀**。
 
-- **`resolveBuiltUrl`**：用于 **文件名 → 首轮 URL**。设计意图（见注释）：**不因熔断跳过「初始主推的 match URL」**，fallback 时再靠 **`resolve` + **RF**.load 循环**。`matchesFilename` 对 string仍 **恒 true**——因此 **必须与 Vite §4.4闸门**连用，以免 **离线 dev**误拼 CDN。
+- **`resolveBuiltUrl`**：用于 **文件名 → 首轮 URL**（用 rule `base` 拼装）。设计意图：**不因熔断跳过「初始主推的 rule `base` URL」**，fallback 时再靠 **`resolve` + `__RF__.load` 循环**。多条规则时 **最后一条命中为准**；构建期仍须与 Vite §4.4 闸门连用，以免 Vite `base` 未对齐时误拼 CDN。
 
-配置上：**重复 match**在 prepare 结束时 **可对用户 warn**（若实现中带 logger），最终以 **遍历顺序**体现的 **最后一次为准**。
+配置上：重复 rule `base` 最终以 **遍历顺序的最后一次为准**。
 
 #### 解决方案小结
 
-把这些 **写成代码与注释**，比单纯文档承诺「先试主链路」更可维护；熔断 **作用在备选链上的 host**，与 **首轮 match**解耦。**`swap`/`joinAssetPrefix`** 等小函数避免 **CDN 前缀少写末尾 `/`**时 **字符串直连文件名** 拼成 **`…prod` + `js/foo.js` → `…prodjs/foo.js`** 的病态 URL（线上表现为路径缺一层目录、404）；实现上需在 **`joinAssetPrefix`** 中 **按需补 `/`**，并在 **`swap` 剥前缀后走同一拼接**。
+把这些 **写成代码与注释**，比单纯文档承诺「先试主链路」更可维护；熔断 **作用在备选链上的 host**，与 **首轮 rule `base`**解耦。**`swap`/`joinAssetPrefix`** 等小函数避免 **CDN 前缀少写末尾 `/`**时 **字符串直连文件名** 拼成 **`…prod` + `js/foo.js` → `…prodjs/foo.js`** 的病态 URL（线上表现为路径缺一层目录、404）；实现上需在 **`joinAssetPrefix`** 中 **按需补 `/`**，并在 **`swap` 剥前缀后走同一拼接**。
 
 ---
 
@@ -393,7 +390,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 2. **manifest 预置进 SW 文件**
 
-   Vite/Webpack 插件构建时生成 `ResourceFallbackManifest`，再通过 `buildServiceWorkerAssets()` 把 `{ manifest, runtimeConfig, serviceWorker }` 写入 `self.__RF_SW_PRELOAD__`，拼在 SW bundle 前面。这里不能用普通 `JSON.stringify`：`RegExp` 会被序列化成 `{}`，导致 SW 中的 `match` 规则失效；当前使用 JS 表达式序列化，保留正则字面量。
+   Vite/Webpack 插件构建时生成 `ResourceFallbackManifest`，再通过 `buildServiceWorkerAssets()` 把 `{ manifest, runtimeConfig, serviceWorker }` 写入 `self.__RF_SW_PRELOAD__`，拼在 SW bundle 前面。规则侧仅使用 string 形式的 rule `base`（不再有 RegExp / 函数 match），配置可按 JSON 语义预置进 SW。
 
    `packages/core/src/sw/entry.ts` 在模块初始化时优先读取这个 preload：
    - 有 preload：SW 第一个 fetch 事件前就有 ownership 信息；
@@ -455,7 +452,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 这套 Hybrid SW 的亮点不是“多写一个 SW”，而是 **把每种资源的 owner、时机和可观测性拆清楚**：
 
 - manifest 让 SW 不靠后缀猜资源归属；
-- preload 消除页面 `postMessage` 竞态，并保留 `RegExp` 规则语义；
+- preload 消除页面 `postMessage` 竞态，并预置含 rule `base` 的配置；
 - `fallbackOnOpaque` 把平台不可见性变成显式策略；
 - `clientId` 定向事件和 `Response.error()` 兜底让观测更准确；
 - manifest version + cache namespace 让 rules/cache 策略变化能自然失效；
