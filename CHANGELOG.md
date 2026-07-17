@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Packages (`@resource-fallback/core`, `@resource-fallback/vite-plugin`, `@resource-fallback/webpack-plugin`) are released with the same version number.
 
+## [0.2.1](https://github.com/ben-lau/resource-fallback/compare/v0.2.0...v0.2.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **ci:** 修改 release-please 配置 ([e8b9476](https://github.com/ben-lau/resource-fallback/commit/e8b947677a168ce646078b66de57b2c9c0082af6))
+* **ci:** 将 publish 和 docs 部署合并进 release-please workflow ([265e546](https://github.com/ben-lau/resource-fallback/commit/265e546506f47ccb337f7650913005f120b1c135))
+* **core:** 规则收口为 string base，runtime 改用原生 import ([7734b15](https://github.com/ben-lau/resource-fallback/commit/7734b159079cf35d63a9841044089070ffa2a704))
+
 ## [0.2.0](https://github.com/ben-lau/resource-fallback/compare/v0.1.5...v0.2.0) (2026-06-15)
 
 ### Bug Fixes
