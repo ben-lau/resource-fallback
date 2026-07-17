@@ -1,6 +1,6 @@
 {
   "name": "resource-fallback",
-  "version": "0.0.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Frontend resource fallback monorepo: retry + multi-CDN + origin recovery for Webpack & Vite",
   "homepage": "https://github.com/ben-lau/resource-fallback#readme",
