@@ -27,11 +27,15 @@ export function mergeRetry(
  * delay = min(maxDelay, baseDelay * 2^(attempt - 1))
  * 可选 ±25% 抖动（防止多个客户端同步重试）。
  */
-export function backoff(attempt: number, opts: Required<RetryOptions>): number {
+export function backoff(
+  attempt: number,
+  opts: Required<RetryOptions>,
+  random: () => number = Math.random,
+): number {
   const safeAttempt = Math.max(1, attempt);
   const exp = opts.baseDelay * Math.pow(2, safeAttempt - 1);
   const capped = Math.min(opts.maxDelay, exp);
   if (!opts.jitter) return capped;
-  const jitter = capped * 0.25 * (Math.random() * 2 - 1);
+  const jitter = capped * 0.25 * (random() * 2 - 1);
   return Math.max(0, Math.round(capped + jitter));
 }
