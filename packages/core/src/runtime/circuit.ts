@@ -31,6 +31,8 @@ export interface CircuitBreaker {
   dispose(): void;
 }
 
+export interface CircuitRegistry extends CircuitBreaker {}
+
 export function mergeCircuit(
   defaults: CircuitOptions | undefined,
   rule: CircuitOptions | undefined,
@@ -170,4 +172,9 @@ export function createCircuitBreaker(opts: Required<CircuitOptions>): CircuitBre
       }
     },
   };
+}
+
+/** Shared naming for new runtime services; kept as an alias for compatibility. */
+export function createCircuitRegistry(opts: Required<CircuitOptions>): CircuitRegistry {
+  return createCircuitBreaker(opts);
 }

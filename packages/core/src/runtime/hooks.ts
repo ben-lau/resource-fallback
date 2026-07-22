@@ -8,7 +8,20 @@ export interface HookBus {
   emitError(e: ErrorEvent): void;
 }
 
-export function createHookBus(hooks: RuntimeHooks | undefined, log: Logger): HookBus {
+export type RecoveryEvent =
+  | { type: 'retry'; event: RetryEvent }
+  | { type: 'fallback'; event: FallbackEvent }
+  | { type: 'success'; event: SuccessEvent }
+  | { type: 'error'; event: ErrorEvent };
+
+export interface EventBus extends HookBus {
+  transition(sessionId: string, event: RecoveryEvent): void;
+  close(sessionId: string): void;
+  dispose(): void;
+}
+
+export function createHookBus(hooks: RuntimeHooks | undefined, log: Logger): EventBus {
+  const sessions = new Map<string, { terminal: boolean }>();
   const safeCall = <T>(fn: ((e: T) => void) | undefined, e: T, name: string) => {
     if (!fn) return;
     try {
@@ -31,7 +44,7 @@ export function createHookBus(hooks: RuntimeHooks | undefined, log: Logger): Hoo
     }
   };
 
-  return {
+  const bus: EventBus = {
     emitRetry(e) {
       log.debug('retry', e);
       dispatch('rf:retry', e);
@@ -52,5 +65,29 @@ export function createHookBus(hooks: RuntimeHooks | undefined, log: Logger): Hoo
       dispatch('rf:error', e);
       safeCall(hooks?.onError, e, 'onError');
     },
+    transition(sessionId, event) {
+      const session = sessions.get(sessionId) || { terminal: false };
+      sessions.set(sessionId, session);
+      if (session.terminal) return;
+      if (event.type === 'retry') bus.emitRetry(event.event);
+      else if (event.type === 'fallback') bus.emitFallback(event.event);
+      else if (event.type === 'success') {
+        session.terminal = true;
+        bus.emitSuccess(event.event);
+      } else {
+        session.terminal = true;
+        bus.emitError(event.event);
+      }
+    },
+    close(sessionId) {
+      const session = sessions.get(sessionId) || { terminal: false };
+      session.terminal = true;
+      sessions.set(sessionId, session);
+    },
+    dispose() {
+      sessions.clear();
+    },
   };
+
+  return bus;
 }

@@ -12,6 +12,7 @@ export default defineConfig({
       exclude: [
         'packages/core/src/**/*.test.ts',
         'packages/core/src/types.ts',
+        'packages/core/src/internal/recovery-types.ts',
         'packages/core/src/sw/entry.ts',
       ],
       thresholds: {

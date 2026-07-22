@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createCircuitBreaker,
+  createCircuitRegistry,
   hostOf,
   mergeCircuit,
   CIRCUIT_DEFAULTS,
@@ -261,5 +262,19 @@ describe('circuit', () => {
     expect(() => breaker.dispose()).not.toThrow();
     // Calling dispose twice should not throw
     expect(() => breaker.dispose()).not.toThrow();
+  });
+
+  it('exposes the same host semantics through CircuitRegistry', () => {
+    const registry = createCircuitRegistry({
+      threshold: 1,
+      cooldown: 1000,
+      shareAcrossTabs: false,
+      storageTtl: 120_000,
+    });
+    registry.recordFailure('registry.test');
+    expect(registry.isOpen('registry.test')).toBe(true);
+    registry.recordSuccess('registry.test');
+    expect(registry.isOpen('registry.test')).toBe(false);
+    registry.dispose();
   });
 });
