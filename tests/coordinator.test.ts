@@ -180,4 +180,109 @@ describe('recovery coordinator', () => {
     expect(bus.emitError).toHaveBeenCalledTimes(1);
     expect(bus.emitSuccess).not.toHaveBeenCalled();
   });
+
+  it('uses an explicit rule id and waits for a positive retry delay', async () => {
+    const bus = createBus();
+    const circuit = createCircuit();
+    const transport = {
+      attempt: vi.fn().mockResolvedValueOnce(failure()).mockResolvedValueOnce(success('module')),
+    };
+    const coordinator = createRecoveryCoordinator({
+      config: compileRuntimeConfig({
+        rules: [
+          {
+            base: 'https://a.test/',
+            urls: ['https://a.test/'],
+            retry: { max: 1, baseDelay: 10, maxDelay: 10, jitter: false },
+          },
+        ],
+      }),
+      bus,
+      circuit,
+    });
+    const promise = coordinator.recover({
+      ...request(transport),
+      initialUrl: 'https://not-matching.test/chunk.js',
+      ruleId: 'rule-0',
+      logicalKey: 'delayed-chunk',
+    });
+
+    await Promise.resolve();
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(9);
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promise).resolves.toBe('module');
+    expect(bus.emitRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends a session at the session deadline and ignores the pending transport', async () => {
+    const bus = createBus();
+    const circuit = createCircuit();
+    const pending = deferred<AttemptResult<string>>();
+    const coordinator = createRecoveryCoordinator({
+      config: createConfig(),
+      bus,
+      circuit,
+      attemptTimeoutMs: 30_000,
+      sessionTimeoutMs: 100,
+    });
+    const promise = coordinator.recover({
+      ...request({ attempt: vi.fn(() => pending.promise) }),
+      logicalKey: 'session-timeout',
+    });
+
+    await vi.advanceTimersByTimeAsync(101);
+    await expect(promise).rejects.toMatchObject({ kind: 'timeout' });
+    pending.resolve(success('late'));
+    await Promise.resolve();
+    expect(bus.emitError).toHaveBeenCalledTimes(1);
+    expect(bus.emitSuccess).not.toHaveBeenCalled();
+  });
+
+  it('handles missing rules, thrown transports, open circuits, and disposal', async () => {
+    const noMatchCoordinator = createRecoveryCoordinator({ config: createConfig() });
+    await expect(
+      noMatchCoordinator.recover({
+        ...request({ attempt: vi.fn() }),
+        initialUrl: 'https://unknown.test/chunk.js',
+        logicalKey: 'missing-rule',
+      }),
+    ).rejects.toMatchObject({ kind: 'unknown' });
+
+    const bus = createBus();
+    const circuit = createCircuit();
+    circuit.isOpen.mockImplementation((host) => host === 'b.test');
+    const coordinator = createRecoveryCoordinator({
+      config: createConfig(),
+      bus,
+      circuit,
+    });
+    const thrown = coordinator.recover({
+      ...request({ attempt: vi.fn(() => Promise.reject(new Error('network down'))) }),
+      logicalKey: 'thrown-transport',
+    });
+    await expect(thrown).rejects.toMatchObject({ kind: 'unknown' });
+    expect(bus.emitError).toHaveBeenCalledTimes(1);
+    expect(circuit.recordFailure).toHaveBeenCalledTimes(1);
+
+    coordinator.dispose();
+    coordinator.dispose();
+    expect(circuit.dispose).toHaveBeenCalledTimes(1);
+    await expect(
+      coordinator.recover({
+        ...request({ attempt: vi.fn() }),
+        logicalKey: 'after-dispose',
+      }),
+    ).rejects.toMatchObject({ kind: 'aborted' });
+  });
+
+  it('maps an AbortError thrown by a transport to cancellation', async () => {
+    const coordinator = createRecoveryCoordinator({ config: createConfig() });
+    const promise = coordinator.recover({
+      ...request({ attempt: vi.fn(() => Promise.reject({ name: 'AbortError' })) }),
+      logicalKey: 'abort-error',
+    });
+    await expect(promise).rejects.toMatchObject({ kind: 'aborted' });
+  });
 });

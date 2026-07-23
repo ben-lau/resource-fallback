@@ -1,5 +1,7 @@
 import type { PreparedRule } from './config';
 
+export type RecoveryOwner = 'observer' | 'vite' | 'webpack' | 'systemjs' | 'sw';
+
 export type FailureKind =
   | 'network'
   | 'timeout'
