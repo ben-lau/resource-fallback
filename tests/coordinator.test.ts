@@ -6,7 +6,7 @@ import {
   type CircuitRegistry,
   type RecoveryRequest,
 } from '../packages/core/src/internal/coordinator';
-import type { HookBus } from '../packages/core/src/runtime/hooks';
+import type { EventBus, RecoveryEvent } from '../packages/core/src/runtime/hooks';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -27,12 +27,21 @@ function success<T>(value: T): AttemptResult<T> {
 }
 
 function createBus() {
-  return {
+  const bus = {
     emitRetry: vi.fn(),
     emitFallback: vi.fn(),
     emitSuccess: vi.fn(),
     emitError: vi.fn(),
-  } satisfies HookBus;
+    transition: vi.fn((_sessionId: string, event: RecoveryEvent) => {
+      if (event.type === 'retry') bus.emitRetry(event.event);
+      else if (event.type === 'fallback') bus.emitFallback(event.event);
+      else if (event.type === 'success') bus.emitSuccess(event.event);
+      else bus.emitError(event.event);
+    }),
+    close: vi.fn(),
+    dispose: vi.fn(),
+  } satisfies EventBus;
+  return bus;
 }
 
 function createCircuit(): CircuitRegistry & {
@@ -100,6 +109,46 @@ describe('recovery coordinator', () => {
     expect(bus.emitError).not.toHaveBeenCalled();
     expect(circuit.recordFailure).toHaveBeenCalledTimes(1);
     expect(circuit.recordSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts an externally completed failure before starting recovery', async () => {
+    const bus = createBus();
+    const circuit = createCircuit();
+    const transport = {
+      attempt: vi.fn().mockResolvedValue(success('fallback-module')),
+    };
+    const coordinator = createRecoveryCoordinator({
+      config: createConfig(0),
+      bus,
+      circuit,
+    });
+
+    const result = await coordinator.recover({
+      ...request(transport),
+      initialFailure: { kind: 'load-error', error: new Event('error') },
+    });
+
+    expect(result).toBe('fallback-module');
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+    expect(transport.attempt.mock.calls[0][0]).toMatchObject({
+      attempt: 1,
+      totalAttempts: 2,
+      phase: 'fallback',
+    });
+    expect(bus.emitFallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not emit recovery success for a native first-attempt success', async () => {
+    const bus = createBus();
+    const coordinator = createRecoveryCoordinator({
+      config: createConfig(0),
+      bus,
+      circuit: createCircuit(),
+    });
+
+    await coordinator.recover(request({ attempt: vi.fn().mockResolvedValue(success('native')) }));
+
+    expect(bus.transition).not.toHaveBeenCalled();
   });
 
   it('ignores a success callback after an attempt deadline', async () => {

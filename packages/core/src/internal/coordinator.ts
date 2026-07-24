@@ -1,5 +1,5 @@
 import { hostOf } from '../runtime/circuit';
-import type { HookBus } from '../runtime/hooks';
+import type { EventBus } from '../runtime/hooks';
 import type { PreparedRuntimeConfig, PreparedRule } from './config';
 import { createInFlightRegistry, type InFlightSession } from './inflight-registry';
 import {
@@ -35,6 +35,7 @@ export interface RecoveryRequest<T> {
   readonly logicalKey: string;
   readonly initialUrl: string;
   readonly ruleId?: string;
+  readonly initialFailure?: AttemptFailure;
   readonly transport: RecoveryTransport<T>;
 }
 
@@ -47,7 +48,7 @@ export interface CircuitRegistry {
 
 export interface CoordinatorDeps {
   readonly config: PreparedRuntimeConfig;
-  readonly bus?: HookBus;
+  readonly bus?: EventBus;
   readonly circuit?: CircuitRegistry;
   readonly attemptTimeoutMs?: number;
   readonly sessionTimeoutMs?: number;
@@ -60,11 +61,14 @@ export interface RecoveryCoordinator {
   dispose(): void;
 }
 
-const NOOP_BUS: HookBus = {
+const NOOP_BUS: EventBus = {
   emitRetry() {},
   emitFallback() {},
   emitSuccess() {},
   emitError() {},
+  transition() {},
+  close() {},
+  dispose() {},
 };
 
 const NOOP_CIRCUIT: CircuitRegistry = {
@@ -115,9 +119,16 @@ export function recoveryKey(owner: RecoveryOwner, logicalKey: string): string {
   return `${owner}\0${logicalKey}`;
 }
 
+let sessionSequence = 0;
+
+function nextSessionId(): string {
+  sessionSequence += 1;
+  return `recovery-${sessionSequence}`;
+}
+
 interface SessionDeps {
   readonly config: PreparedRuntimeConfig;
-  readonly bus: HookBus;
+  readonly bus: EventBus;
   readonly circuit: CircuitRegistry;
   readonly attemptTimeoutMs: number;
   readonly sessionTimeoutMs: number;
@@ -139,19 +150,26 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
   let cancelDelay: (() => void) | null = null;
   let currentUrl = request.initialUrl;
   let state: RecoveryState | undefined;
+  const sessionId = nextSessionId();
   let errorEmitted = false;
   let successEmitted = false;
 
   const emitErrorOnce = (reason: unknown) => {
     if (errorEmitted) return;
     errorEmitted = true;
-    deps.bus.emitError({ url: currentUrl, reason });
+    deps.bus.transition(sessionId, {
+      type: 'error',
+      event: { url: currentUrl, reason },
+    });
   };
 
   const emitSuccessOnce = (attempts: number) => {
     if (successEmitted) return;
     successEmitted = true;
-    deps.bus.emitSuccess({ url: currentUrl, attempts });
+    deps.bus.transition(sessionId, {
+      type: 'success',
+      event: { url: currentUrl, attempts },
+    });
   };
 
   const finishReject = (failure: AttemptFailure, emitError: boolean) => {
@@ -165,6 +183,7 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
     cancelDelay = null;
     controller.abort();
     if (emitError && failure.kind !== 'aborted') emitErrorOnce(failure);
+    deps.bus.close(sessionId);
     rejectOuter(failure);
   };
 
@@ -176,6 +195,7 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
     cancelDelay?.();
     cancelDelay = null;
     controller.abort();
+    deps.bus.close(sessionId);
     resolveOuter(value);
   };
 
@@ -188,13 +208,21 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
   } else {
     state = createRecoveryState(rule, request.initialUrl);
     sessionTimer = setTimeout(() => finishReject({ kind: 'timeout' }, true), deps.sessionTimeoutMs);
-    void execute(rule);
+    void start(rule);
   }
 
   return {
     promise,
     cancel: () => finishReject({ kind: 'aborted' }, false),
   };
+
+  async function start(ruleForSession: PreparedRule): Promise<void> {
+    if (request.initialFailure && state && !settled) {
+      state = beginAttempt(state);
+      await handleFailure(request.initialFailure, ruleForSession);
+    }
+    if (!settled) await execute(ruleForSession);
+  }
 
   async function execute(ruleForSession: PreparedRule): Promise<void> {
     while (!settled && state && state.phase !== 'done') {
@@ -218,50 +246,64 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
         return;
       }
 
-      const failure = result.failure;
-      const exhausted = state.attemptOnUrl + 1 > ruleForSession.retry.max;
-      if (exhausted) deps.circuit.recordFailure(hostOf(currentUrl));
-      const transition = transitionAfterFailure(
-        state,
-        failure,
-        openHosts(ruleForSession, deps.circuit),
-        ruleForSession,
-        deps.random,
-      );
-      state = transition.state;
+      if (!(await handleFailure(result.failure, ruleForSession))) return;
+    }
+  }
 
-      if (transition.action.kind === 'retry') {
-        deps.bus.emitRetry({
+  async function handleFailure(
+    failure: AttemptFailure,
+    ruleForSession: PreparedRule,
+  ): Promise<boolean> {
+    if (settled || !state) return false;
+
+    const exhausted = state.attemptOnUrl + 1 > ruleForSession.retry.max;
+    if (exhausted) deps.circuit.recordFailure(hostOf(currentUrl));
+    const transition = transitionAfterFailure(
+      state,
+      failure,
+      openHosts(ruleForSession, deps.circuit),
+      ruleForSession,
+      deps.random,
+    );
+    state = transition.state;
+
+    if (transition.action.kind === 'retry') {
+      deps.bus.transition(sessionId, {
+        type: 'retry',
+        event: {
           url: transition.action.url,
           attempt: transition.action.attempt,
-        });
-        await wait(transition.action.delay);
-        continue;
-      }
+        },
+      });
+      await wait(transition.action.delay);
+      return !settled;
+    }
 
-      if (transition.action.kind === 'fallback') {
-        currentUrl = transition.action.url;
-        deps.bus.emitFallback({
+    if (transition.action.kind === 'fallback') {
+      currentUrl = transition.action.url;
+      deps.bus.transition(sessionId, {
+        type: 'fallback',
+        event: {
           from: transition.action.from,
           to: transition.action.url,
           reason: 'retry-budget-exhausted',
-        });
-        await wait(transition.action.delay);
-        continue;
-      }
-
-      if (transition.action.kind === 'error') {
-        currentUrl = state.currentUrl;
-        emitErrorOnce(transition.action.failure);
-        finishReject(transition.action.failure, false);
-        return;
-      }
-
-      if (transition.action.kind === 'cancelled') {
-        finishReject(transition.action.failure, false);
-      }
-      return;
+        },
+      });
+      await wait(transition.action.delay);
+      return !settled;
     }
+
+    if (transition.action.kind === 'error') {
+      currentUrl = state.currentUrl;
+      emitErrorOnce(transition.action.failure);
+      finishReject(transition.action.failure, false);
+      return false;
+    }
+
+    if (transition.action.kind === 'cancelled') {
+      finishReject(transition.action.failure, false);
+    }
+    return false;
   }
 
   function wait(delay: number): Promise<void> {
