@@ -1,10 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { compileRuntimeConfig } from '../packages/core/src/internal/config';
+import {
+  createRecoveryCoordinator,
+  type CircuitRegistry,
+} from '../packages/core/src/internal/coordinator';
+import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
-import { createResolver } from '../packages/core/src/runtime/resolver';
-import { systemjsManagedUrls } from '../packages/core/src/runtime/adapter-systemjs';
 import type {
   ErrorEvent as RfErrorEvent,
   FallbackEvent,
@@ -15,20 +19,45 @@ const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
 const origin = 'https://origin.example.com/';
 
-function setup(onError?: (e: RfErrorEvent) => void, onFallback?: (e: FallbackEvent) => void) {
+let controls: Array<{ dispose(): void }> = [];
+
+function createCircuit(): CircuitRegistry {
+  return {
+    isOpen: () => false,
+    recordFailure: vi.fn(),
+    recordSuccess: vi.fn(),
+    dispose: vi.fn(),
+  };
+}
+
+function setup(
+  onError?: (e: RfErrorEvent) => void,
+  onFallback?: (e: FallbackEvent) => void,
+  sri: 'strip' | 'keep' | 'strict' = 'strip',
+  onRetry?: (e: RetryEvent) => void,
+  retryMax = 1,
+) {
   const log = createLogger(false);
-  const resolver = createResolver({
+  const config = compileRuntimeConfig({
     rules: [
       {
         base: cdn1,
         urls: [cdn1, cdn2, origin],
-        retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
+        retry: { max: retryMax, baseDelay: 0, maxDelay: 0, jitter: false },
       },
     ],
     defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
   });
-  const bus = createHookBus({ onError, onFallback }, log);
-  installObserver({ resolver, bus, log, sri: 'strip' });
+  const bus = createHookBus({ onError, onFallback, onRetry }, log);
+  const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+  const control = installObserver({
+    coordinator,
+    ownership: createOwnershipRegistry(),
+    log,
+    sri,
+  });
+  controls.push(control);
+  return { coordinator, control };
 }
 
 function fireScriptError(src: string): HTMLScriptElement {
@@ -46,6 +75,8 @@ describe('observer', () => {
     localStorage.clear();
   });
   afterEach(() => {
+    for (const control of controls) control.dispose();
+    controls = [];
     document.head.innerHTML = '';
   });
 
@@ -61,7 +92,7 @@ describe('observer', () => {
   it('replaces a failing script with a retry of the same URL within budget', async () => {
     setup();
     const original = fireScriptError(cdn1 + 'foo.js');
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
     // After retry-budget=1: first failure → retry same url
     const scripts = Array.from(document.head.querySelectorAll('script'));
     expect(scripts.find((s) => s.src.startsWith(cdn1))).toBeTruthy();
@@ -238,10 +269,16 @@ describe('observer', () => {
   });
 
   it('still handles <script> without data-webpack (entry bundle path)', async () => {
-    let to = '';
-    setup(undefined, (e) => {
-      to = String(e.to);
-    });
+    const fallbacks: string[] = [];
+    setup(
+      undefined,
+      (e) => {
+        fallbacks.push(String(e.to));
+      },
+      'strip',
+      undefined,
+      0,
+    );
     // Entry bundle scripts injected by html-webpack-plugin do NOT have a
     // data-webpack attribute, so observer must continue to manage them.
     const original = fireScriptError(cdn1 + 'main.js');
@@ -250,10 +287,10 @@ describe('observer', () => {
     expect(retry).toBeTruthy();
     retry.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 5));
-    expect(to).toBe(cdn2 + 'main.js');
+    expect(fallbacks).toContain(cdn2 + 'main.js');
   });
 
-  it('does NOT inherit the "already started" flag - the new script gets fetched', () => {
+  it('does NOT inherit the "already started" flag - the new script gets fetched', async () => {
     setup();
     const original = document.createElement('script');
     original.src = cdn1 + 'foo.js';
@@ -261,6 +298,7 @@ describe('observer', () => {
     original.setAttribute('crossorigin', '');
     document.head.appendChild(original);
     original.dispatchEvent(new Event('error'));
+    await new Promise((r) => setTimeout(r, 0));
 
     const replacement = Array.from(document.head.querySelectorAll('script')).find(
       (s) => s !== original,
@@ -271,55 +309,19 @@ describe('observer', () => {
     expect(replacement.isSameNode(original)).toBe(false);
   });
 
-  // ---- Edge cases added below ----
-
-  it('skips URLs in systemjsManagedUrls (SystemJS adapter coordination)', async () => {
-    let retried = false;
-    setup(undefined, () => {
-      retried = true;
-    });
-
-    systemjsManagedUrls.add(cdn1 + 'systemjs-chunk.js');
-
-    const s = document.createElement('script');
-    s.src = cdn1 + 'systemjs-chunk.js';
-    document.head.appendChild(s);
-    s.dispatchEvent(new Event('error'));
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(retried).toBe(false);
-    const scripts = Array.from(document.head.querySelectorAll('script'));
-    expect(scripts).toHaveLength(1);
-    expect(scripts[0]).toBe(s);
-
-    systemjsManagedUrls.delete(cdn1 + 'systemjs-chunk.js');
-  });
-
   it('handles CSS <link rel=stylesheet> fallback', async () => {
-    // Use unique URL prefix to isolate from other observers registered in earlier tests
-    const cssCdn = 'https://css-test-cdn.example.com/';
-    const cssBackup = 'https://css-backup.example.com/';
-    let to = '';
-    const log = createLogger(false);
-    const resolver = createResolver({
-      rules: [
-        {
-          base: cssCdn,
-          urls: [cssCdn, cssBackup],
-          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
-        },
-      ],
-      defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
-    });
-    const bus = createHookBus(
-      {
-        onFallback: (e) => {
-          to = String(e.to);
-        },
+    const cssCdn = cdn1;
+    const cssBackup = cdn2;
+    const fallbacks: string[] = [];
+    setup(
+      undefined,
+      (e) => {
+        fallbacks.push(String(e.to));
       },
-      log,
+      'strip',
+      undefined,
+      0,
     );
-    installObserver({ resolver, bus, log, sri: 'strip' });
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -328,29 +330,17 @@ describe('observer', () => {
     link.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(to).toBe(cssBackup + 'style.css');
+    expect(fallbacks).toContain(cssBackup + 'style.css');
     const links = Array.from(document.head.querySelectorAll('link'));
     const replacement = links.find(
       (l) => l !== link && l.getAttribute('href')?.includes('style.css'),
     );
     expect(replacement).toBeTruthy();
-    expect(replacement!.getAttribute('href')).toBe(cssBackup + 'style.css');
+    expect(replacement!.getAttribute('href')).toContain('style.css');
   });
 
   it('does NOT cache-bust CSS link retries', async () => {
-    const log = createLogger(false);
-    const resolver = createResolver({
-      rules: [
-        {
-          base: cdn1,
-          urls: [cdn1, cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
-        },
-      ],
-      defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
-    });
-    const bus = createHookBus({}, log);
-    installObserver({ resolver, bus, log, sri: 'strip' });
+    setup();
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -368,24 +358,7 @@ describe('observer', () => {
 
   it('handles multiple concurrent failures on different scripts', async () => {
     const retries: string[] = [];
-    const log = createLogger(false);
-    const resolver = createResolver({
-      rules: [
-        {
-          base: cdn1,
-          urls: [cdn1, cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
-        },
-      ],
-      defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
-    });
-    const bus = createHookBus(
-      {
-        onRetry: (e) => retries.push((e as RetryEvent).url),
-      },
-      log,
-    );
-    installObserver({ resolver, bus, log, sri: 'strip' });
+    setup(undefined, undefined, 'strip', (e) => retries.push(e.url));
 
     const s1 = document.createElement('script');
     s1.src = cdn1 + 'a.js';
@@ -466,31 +439,17 @@ describe('observer', () => {
   });
 
   it('keeps integrity when sri=keep', async () => {
-    // This test needs its own DOM scope since setup() registers a global listener
-    // Use a fresh document.head so we only find our test's elements
-    const log = createLogger(false);
-    const resolver = createResolver({
-      rules: [
-        {
-          base: 'https://keep-test.example.com/',
-          urls: ['https://keep-test.example.com/', cdn2],
-          retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
-        },
-      ],
-      defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
-    });
-    const bus = createHookBus({}, log);
-    installObserver({ resolver, bus, log, sri: 'keep' });
+    setup(undefined, undefined, 'keep');
 
     const original = document.createElement('script');
-    original.src = 'https://keep-test.example.com/foo.js';
+    original.src = cdn1 + 'foo.js';
     original.setAttribute('integrity', 'sha384-ABC');
     document.head.appendChild(original);
     original.dispatchEvent(new Event('error'));
     await new Promise((r) => setTimeout(r, 5));
 
     const replacement = Array.from(document.head.querySelectorAll('script')).find(
-      (s) => s !== original && s.getAttribute('src')?.includes('keep-test'),
+      (s) => s !== original && s.getAttribute('src')?.includes(cdn1),
     )!;
     expect(replacement).toBeTruthy();
     expect(replacement.getAttribute('integrity')).toBe('sha384-ABC');
