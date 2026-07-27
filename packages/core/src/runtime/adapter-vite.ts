@@ -1,19 +1,23 @@
-import type { HookBus } from './hooks';
+import type { RecoveryCoordinator, RecoveryTransport } from '../internal/coordinator';
+import type { PreparedRuntimeConfig } from '../internal/config';
+import type { OwnershipRegistry } from '../internal/ownership';
 import type { Logger } from './logger';
-import type { Resolver } from './resolver';
 import { appendRetryParam } from './utils';
 
-interface AdapterDeps {
-  resolver: Resolver;
-  bus: HookBus;
+export interface ViteAdapterDeps {
+  config: PreparedRuntimeConfig;
+  coordinator: RecoveryCoordinator;
+  ownership: OwnershipRegistry;
   log: Logger;
+  target: Record<string, unknown>;
+  resolveUrl(filename: string): string;
 }
+
+export type ImportModule = (url: string) => Promise<unknown>;
 
 interface VitePreloadErrorEvent extends Event {
   payload?: unknown;
 }
-
-type ImportModule = (url: string) => Promise<unknown>;
 
 let importModule: ImportModule = (url) => import(/* @vite-ignore */ /* webpackIgnore: true */ url);
 
@@ -22,112 +26,117 @@ export function setViteImportModule(fn: ImportModule | null): void {
   importModule = fn || ((url) => import(/* @vite-ignore */ /* webpackIgnore: true */ url));
 }
 
-/**
- * Vite 特有的运行时钩子。
- *
- * 插件通过 `writeBundle` hook（在 Vite 完成 `__vitePreload` / `__vite__mapDeps`
- * 生成之后）将 `import("./chunk.js")` 替换为
- * `window.__RF__.load("assets/chunk.js")`。这保证了：
- * - `__vitePreload` 的 CSS deps 正常生成（异步组件的 CSS 不丢失）
- * - `__RF__.load` 对 JS 动态 import 提供 retry/fallback 能力
- *
- * `__RF__.url` 可选，用于外部代码将 filename 解析为完整 URL。
- */
-export function installViteAdapter(deps: AdapterDeps): { dispose(): void } {
-  if (typeof window === 'undefined') return { dispose() {} };
-  const w = window as unknown as Record<string, unknown> & { __RF__?: Record<string, unknown> };
+export function createViteTransport(importer: ImportModule): RecoveryTransport<unknown> {
+  return {
+    async attempt(input, signal) {
+      if (signal.aborted) return { ok: false, failure: { kind: 'aborted' } };
 
-  if (!w.__RF__) w.__RF__ = {};
-  w.__RF__.url = (filename: string) => deps.resolver.resolveBuiltUrl(filename);
-
-  w.__RF__.load = async (filename: string) => {
-    let currentUrl = deps.resolver.resolveBuiltUrl(filename);
-    let isFallback = false;
-    let attempt = 1;
-    let totalAttempts = 0;
-
-    for (;;) {
+      const importUrl =
+        input.attempt > 1 ? appendRetryParam(input.url, input.attempt - 1) : input.url;
       try {
-        // 浏览器 ES Module Map 会缓存失败的 import() 结果：
-        // 对同一 URL 的后续 import() 直接返回缓存的失败，不发网络请求。
-        // 添加 cache-busting 参数（与 observer 的 appendRetryParam 格式一致）
-        // 强制浏览器将其视为新的 module record。
-        const importUrl =
-          totalAttempts > 0 ? appendRetryParam(currentUrl, totalAttempts) : currentUrl;
-        const mod = await importModule(importUrl);
-        deps.resolver.recordSuccess(currentUrl);
-        deps.bus.emitSuccess({ url: currentUrl, attempts: attempt });
-        return mod;
-      } catch (err) {
-        totalAttempts++;
-        const result = deps.resolver.resolve(currentUrl, attempt, isFallback);
-
-        if (result.kind === 'giveup') {
-          deps.bus.emitError({ url: currentUrl, reason: result.reason });
-          throw err;
-        }
-
-        if (result.kind === 'retry') {
-          attempt = result.attempt + 1;
-          deps.bus.emitRetry({ url: result.url, attempt: result.attempt });
-        } else {
-          isFallback = true;
-          attempt = 1;
-          deps.bus.emitFallback({
-            from: result.from,
-            to: result.url,
-            reason: 'retry-budget-exhausted',
-          });
-        }
-
-        currentUrl = result.url;
-        if (result.delay > 0) {
-          await new Promise<void>((r) => setTimeout(r, result.delay));
-        }
+        return { ok: true, value: await importer(importUrl) };
+      } catch (error) {
+        return { ok: false, failure: { kind: 'load-error', error } };
       }
+    },
+  };
+}
+
+/**
+ * Vite 产物将动态 import 改写为 window.__RF__.load(filename)。
+ * 这里仅连接全局函数、原生 importer 和 RecoveryCoordinator。
+ */
+export function installViteAdapter(deps: ViteAdapterDeps): { dispose(): void } {
+  if (typeof window === 'undefined') return { dispose() {} };
+
+  const target = deps.target;
+  const installedUrl = (filename: string) => deps.resolveUrl(filename);
+  const transport = createViteTransport((url) => importModule(url));
+  const installedLoad = (filename: string): Promise<unknown> => {
+    const initialUrl = deps.resolveUrl(filename);
+    const logicalKey = 'url:' + initialUrl;
+    const lease = deps.ownership.claim('vite', logicalKey);
+
+    let recovery: Promise<unknown>;
+    try {
+      recovery = deps.coordinator.recover({
+        owner: 'vite',
+        logicalKey,
+        initialUrl,
+        transport,
+      });
+    } catch (error) {
+      lease?.release();
+      return Promise.reject(error);
     }
+
+    if (lease) {
+      void recovery
+        .finally(() => lease.release())
+        .catch(() => {
+          // load() 的返回 promise 负责把原生失败交给调用方。
+        });
+    }
+
+    return recovery.catch((reason) => Promise.reject(unwrapFailure(reason)));
   };
 
-  function onPreloadError(event: Event) {
-    // Vite 的 __vitePreload 在 CSS 预加载失败时调用:
-    //   const e = new Event('vite:preloadError', { cancelable: true });
-    //   e.payload = error;
-    //   dispatchEvent(e);
-    //   if (!e.defaultPrevented) throw error;
-    //
-    // 必须 preventDefault，否则 throw 会阻断后续的 __RF__.load() 调用，
-    // 导致 JS 模块永远不加载。CSS 由 observer 通过 <link> error 事件重试。
-    event.preventDefault();
+  target.url = installedUrl;
+  target.load = installedLoad;
 
+  const onPreloadError = (event: Event) => {
     const reason = (event as VitePreloadErrorEvent).payload;
     const url = extractUrlFromError(reason);
     if (!url) {
       deps.log.warn('vite:preloadError could not extract URL', reason);
       return;
     }
-    deps.bus.emitFallback({ from: url, to: '<deferred>', reason: 'vite-preload-failure' });
-    deps.resolver.recordFailure(url);
-  }
+    if (!matchesPreparedRule(deps.config, url)) return;
+
+    // CSS 实体仍由 Observer 处理；这里只阻止 Vite 在后续 __RF__.load() 之前抛错。
+    event.preventDefault();
+  };
 
   window.addEventListener('vite:preloadError', onPreloadError);
 
   return {
     dispose() {
       window.removeEventListener('vite:preloadError', onPreloadError);
+      deps.coordinator.cancelOwner('vite');
+      if (target.url === installedUrl) delete target.url;
+      if (target.load === installedLoad) delete target.load;
     },
   };
+}
+
+function matchesPreparedRule(config: PreparedRuntimeConfig, url: string): boolean {
+  return config.rules.some(
+    (rule) => url.startsWith(rule.base) || rule.urls.some((candidate) => url.startsWith(candidate)),
+  );
+}
+
+function unwrapFailure(reason: unknown): unknown {
+  if (!reason || typeof reason !== 'object') return reason;
+  const error = (reason as { error?: unknown }).error;
+  return error === undefined ? reason : error;
 }
 
 function extractUrlFromError(reason: unknown): string | null {
   if (!reason) return null;
   if (typeof reason === 'string') return matchUrl(reason);
-  const r = reason as { message?: string; target?: { src?: string; href?: string } };
-  if (r.target && (r.target.src || r.target.href)) return r.target.src || r.target.href || null;
-  if (r.message) return matchUrl(r.message);
+
+  const value = reason as {
+    message?: string;
+    target?: { src?: string; href?: string };
+  };
+  if (value.target && (value.target.src || value.target.href)) {
+    return value.target.src || value.target.href || null;
+  }
+  if (value.message) return matchUrl(value.message);
   return null;
 }
 
 function matchUrl(text: string): string | null {
-  const m = text.match(/(https?:\/\/\S+|\/[\w./?=&%-]+)/);
-  return m ? m[1] : null;
+  const match = text.match(/(https?:\/\/\S+|\/[\w./?=&%-]+)/);
+  return match ? match[1] : null;
 }

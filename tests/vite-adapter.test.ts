@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { compileRuntimeConfig } from '../packages/core/src/internal/config';
+import {
+  createRecoveryCoordinator,
+  type CircuitRegistry,
+} from '../packages/core/src/internal/coordinator';
+import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installViteAdapter, setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
-import { createResolver } from '../packages/core/src/runtime/resolver';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
 const origin = '/';
+
+let controls: Array<{ dispose(): void }> = [];
 
 interface RfGlobal {
   url?: (filename: string) => string;
@@ -20,6 +27,15 @@ function getGlobal(): RfGlobal {
   return (w.__RF__ || {}) as RfGlobal;
 }
 
+function createCircuit(): CircuitRegistry {
+  return {
+    isOpen: () => false,
+    recordFailure: vi.fn(),
+    recordSuccess: vi.fn(),
+    dispose: vi.fn(),
+  };
+}
+
 function setup(opts?: {
   retryMax?: number;
   circuitThreshold?: number;
@@ -29,7 +45,7 @@ function setup(opts?: {
   onSuccess?: (e: unknown) => void;
 }) {
   const log = createLogger(false);
-  const resolver = createResolver({
+  const config = compileRuntimeConfig({
     rules: [
       {
         base: cdn1,
@@ -61,8 +77,17 @@ function setup(opts?: {
     },
     log,
   );
-  installViteAdapter({ resolver, bus, log });
-  return { resolver, bus, log };
+  const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+  const control = installViteAdapter({
+    config,
+    coordinator,
+    ownership: createOwnershipRegistry(),
+    log,
+    target: getGlobal(),
+    resolveUrl: (filename) => cdn1 + filename,
+  });
+  controls.push(control);
+  return { coordinator, bus, log, control };
 }
 
 describe('vite-adapter', () => {
@@ -73,6 +98,8 @@ describe('vite-adapter', () => {
   });
 
   afterEach(() => {
+    for (const control of controls) control.dispose();
+    controls = [];
     setViteImportModule(null);
     delete (window as unknown as Record<string, unknown>).__RF__;
   });
@@ -86,9 +113,18 @@ describe('vite-adapter', () => {
 
     it('returns filename as-is when no rules', () => {
       const log = createLogger(false);
-      const resolver = createResolver({ rules: [] });
+      const config = compileRuntimeConfig({ rules: [] });
       const bus = createHookBus({}, log);
-      installViteAdapter({ resolver, bus, log });
+      const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+      const control = installViteAdapter({
+        config,
+        coordinator,
+        ownership: createOwnershipRegistry(),
+        log,
+        target: getGlobal(),
+        resolveUrl: (filename) => filename,
+      });
+      controls.push(control);
       expect(getGlobal().url!('random-file.js')).toBe('random-file.js');
     });
   });
@@ -106,6 +142,7 @@ describe('vite-adapter', () => {
       expect(importMock).toHaveBeenCalledTimes(1);
       const calledUrl = importMock.mock.calls[0][0] as string;
       expect(calledUrl).not.toContain('__rf=');
+      expect(successes).toEqual([]);
     });
 
     it('adds cache-bust param on retry attempts', async () => {
@@ -180,7 +217,7 @@ describe('vite-adapter', () => {
       expect(evt.defaultPrevented).toBe(true);
     });
 
-    it('records failure from Error message containing URL', () => {
+    it('does not emit a recovery event for the CSS preload signal', () => {
       const events: string[] = [];
       setup({
         onFallback: (e) => events.push('fallback:' + (e as { from: string }).from),
@@ -190,10 +227,10 @@ describe('vite-adapter', () => {
         new Error('Unable to preload CSS for https://cdn1.example.com/assets/chunk.css'),
       );
 
-      expect(events.some((e) => e.includes('cdn1.example.com'))).toBe(true);
+      expect(events).toEqual([]);
     });
 
-    it('handles preloadError with target.src', () => {
+    it('prevents a managed preloadError with target.src', () => {
       const events: string[] = [];
       setup({
         onFallback: (e) => events.push('fallback:' + (e as { from: string }).from),
@@ -201,13 +238,13 @@ describe('vite-adapter', () => {
 
       dispatchPreloadError({ target: { src: cdn1 + 'assets/chunk.js' } });
 
-      expect(events).toContain('fallback:' + cdn1 + 'assets/chunk.js');
+      expect(events).toEqual([]);
     });
 
-    it('warns when URL cannot be extracted but still prevents default', () => {
+    it('leaves an unparseable preloadError uncancelled', () => {
       setup();
       const evt = dispatchPreloadError(null);
-      expect(evt.defaultPrevented).toBe(true);
+      expect(evt.defaultPrevented).toBe(false);
     });
   });
 });
