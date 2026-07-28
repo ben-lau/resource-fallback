@@ -1,17 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { compileRuntimeConfig } from '../packages/core/src/internal/config';
+import {
+  createRecoveryCoordinator,
+  type CircuitRegistry,
+} from '../packages/core/src/internal/coordinator';
+import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
-import {
-  installSystemJSAdapter,
-  systemjsManagedUrls,
-} from '../packages/core/src/runtime/adapter-systemjs';
-import { createResolver } from '../packages/core/src/runtime/resolver';
+import { installSystemJSAdapter } from '../packages/core/src/runtime/adapter-systemjs';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
 const origin = 'https://origin.example.com/';
+
+let disposeFns: Array<() => void> = [];
+
+function createCircuit(): CircuitRegistry {
+  return {
+    isOpen: () => false,
+    recordFailure: () => {},
+    recordSuccess: () => {},
+    dispose: () => {},
+  };
+}
 
 type InstantiateResult = [deps: string[], declare: unknown];
 
@@ -59,7 +72,7 @@ function setup(opts?: {
   circuitThreshold?: number;
 }) {
   const log = createLogger(false);
-  const resolver = createResolver({
+  const config = compileRuntimeConfig({
     rules: [
       {
         base: cdn1,
@@ -86,19 +99,27 @@ function setup(opts?: {
     },
     log,
   );
-  return { resolver, bus, log };
+  const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+  return { config, coordinator, ownership: createOwnershipRegistry(), bus, log };
+}
+
+function installAdapter(deps: ReturnType<typeof setup>) {
+  const control = installSystemJSAdapter(deps);
+  disposeFns.push(() => control.dispose());
+  return control;
 }
 
 describe('systemjs-adapter', () => {
   beforeEach(() => {
     localStorage.clear();
-    systemjsManagedUrls.clear();
+    disposeFns = [];
     document.head.innerHTML = '';
     delete (window as unknown as Record<string, unknown>).System;
   });
 
   afterEach(() => {
-    systemjsManagedUrls.clear();
+    for (const dispose of disposeFns) dispose();
+    disposeFns = [];
     document.head.innerHTML = '';
     delete (window as unknown as Record<string, unknown>).System;
   });
@@ -109,7 +130,7 @@ describe('systemjs-adapter', () => {
       const { system, proto, scriptRequests } = createFakeSystem({ shouldFail: () => false });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       const result = await proto.instantiate(cdn1 + 'chunk.js');
@@ -136,7 +157,7 @@ describe('systemjs-adapter', () => {
       });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       const result = await proto.instantiate(cdn1 + 'chunk.js');
@@ -159,7 +180,7 @@ describe('systemjs-adapter', () => {
       });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       await expect(proto.instantiate(cdn1 + 'chunk.js')).rejects.toThrow();
@@ -180,7 +201,7 @@ describe('systemjs-adapter', () => {
       });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       const result = await proto.instantiate('https://other.example.com/lib.js');
@@ -194,14 +215,14 @@ describe('systemjs-adapter', () => {
       const { system, proto } = createFakeSystem({ shouldFail: () => false });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
       expect(proto.__rfHooked).toBe(true);
 
       // Save reference to the hooked instantiate
       const hookedInstantiate = proto.instantiate;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       // Should be the same function (not wrapped again)
@@ -209,25 +230,25 @@ describe('systemjs-adapter', () => {
     });
   });
 
-  describe('systemjsManagedUrls (observer coordination)', () => {
-    it('cleans URL from managedUrls after success', async () => {
+  describe('ownership coordination', () => {
+    it('releases the URL lease after success', async () => {
       const deps = setup();
       const { system, proto } = createFakeSystem({ shouldFail: () => false });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       await proto.instantiate(cdn1 + 'chunk.js');
-      expect(systemjsManagedUrls.has(cdn1 + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed('url:' + cdn1 + 'chunk.js')).toBe(false);
     });
 
-    it('cleans URL from managedUrls after giveup', async () => {
+    it('releases every candidate lease after giveup', async () => {
       const deps = setup({ retryMax: 0 });
       const { system, proto } = createFakeSystem({ shouldFail: () => true });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       try {
@@ -235,16 +256,21 @@ describe('systemjs-adapter', () => {
       } catch {
         // expected
       }
-      expect(systemjsManagedUrls.has(cdn1 + 'chunk.js')).toBe(false);
-      expect(systemjsManagedUrls.has(cdn2 + 'chunk.js')).toBe(false);
-      expect(systemjsManagedUrls.has(origin + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed('url:' + cdn1 + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed('url:' + cdn2 + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed('url:' + origin + 'chunk.js')).toBe(false);
     });
 
-    it('observer skips URLs present in systemjsManagedUrls', async () => {
+    it('observer skips a URL leased by SystemJS', async () => {
       const deps = setup();
-      installObserver({ resolver: deps.resolver, bus: deps.bus, log: deps.log, sri: 'strip' });
-
-      systemjsManagedUrls.add(cdn1 + 'test.js');
+      const observerControl = installObserver({
+        coordinator: deps.coordinator,
+        ownership: deps.ownership,
+        log: deps.log,
+        sri: 'strip',
+      });
+      disposeFns.push(() => observerControl.dispose());
+      const lease = deps.ownership.claim('systemjs', 'url:' + cdn1 + 'test.js');
 
       const s = document.createElement('script');
       s.src = cdn1 + 'test.js';
@@ -256,15 +282,14 @@ describe('systemjs-adapter', () => {
       const scripts = Array.from(document.head.querySelectorAll('script'));
       expect(scripts).toHaveLength(1);
       expect(scripts[0]).toBe(s);
-
-      systemjsManagedUrls.delete(cdn1 + 'test.js');
+      lease?.release();
     });
   });
 
   describe('polling for System global', () => {
     it('hooks System when it becomes available later', async () => {
       const deps = setup();
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
 
       await new Promise((r) => setTimeout(r, 30));
 
@@ -291,7 +316,7 @@ describe('systemjs-adapter', () => {
 
       const deps = setup();
       (window as unknown as Record<string, unknown>).System = system;
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
 
       await new Promise((r) => setTimeout(r, 150));
 
@@ -315,7 +340,7 @@ describe('systemjs-adapter', () => {
 
       const deps = setup();
       (window as unknown as Record<string, unknown>).System = system;
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       expect(importedSrcs).toHaveLength(0);
@@ -324,15 +349,21 @@ describe('systemjs-adapter', () => {
   });
 
   describe('edge cases', () => {
-    it('records success to resolver on successful load', async () => {
+    it('emits success only after a SystemJS recovery', async () => {
       const successes: string[] = [];
       const deps = setup({
         onSuccess: (e) => successes.push((e as { url: string }).url),
       });
-      const { system, proto } = createFakeSystem({ shouldFail: () => false });
+      let attempts = 0;
+      const { system, proto } = createFakeSystem({
+        shouldFail: () => {
+          attempts++;
+          return attempts === 1;
+        },
+      });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       await proto.instantiate(cdn1 + 'ok.js');
@@ -344,7 +375,7 @@ describe('systemjs-adapter', () => {
       const { system, proto } = createFakeSystem({ shouldFail: () => true });
       (window as unknown as Record<string, unknown>).System = system;
 
-      installSystemJSAdapter(deps);
+      installAdapter(deps);
       await new Promise((r) => setTimeout(r, 100));
 
       try {
@@ -358,7 +389,7 @@ describe('systemjs-adapter', () => {
     it('handles System without proper constructor gracefully', () => {
       (window as unknown as Record<string, unknown>).System = { version: '1.0' };
       const deps = setup();
-      expect(() => installSystemJSAdapter(deps)).not.toThrow();
+      expect(() => installAdapter(deps)).not.toThrow();
     });
 
     it('handles System.constructor.prototype without instantiate gracefully', () => {
@@ -368,7 +399,7 @@ describe('systemjs-adapter', () => {
       badSystem.constructor = BadConstructor;
       (window as unknown as Record<string, unknown>).System = badSystem;
       const deps = setup();
-      expect(() => installSystemJSAdapter(deps)).not.toThrow();
+      expect(() => installAdapter(deps)).not.toThrow();
     });
   });
 });
