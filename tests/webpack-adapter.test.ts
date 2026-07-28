@@ -1,19 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { compileRuntimeConfig } from '../packages/core/src/internal/config';
+import {
+  createRecoveryCoordinator,
+  type CircuitRegistry,
+} from '../packages/core/src/internal/coordinator';
+import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
 import { installWebpackAdapter } from '../packages/core/src/runtime/adapter-webpack';
-import { createResolver } from '../packages/core/src/runtime/resolver';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
 
 let disposeFns: Array<() => void> = [];
 
+function createCircuit(): CircuitRegistry {
+  return {
+    isOpen: () => false,
+    recordFailure: () => {},
+    recordSuccess: () => {},
+    dispose: () => {},
+  };
+}
+
 function setup(globals: string[]) {
   const log = createLogger(false);
-  const resolver = createResolver({
+  const config = compileRuntimeConfig({
     rules: [
       {
         base: cdn1,
@@ -24,7 +38,13 @@ function setup(globals: string[]) {
     defaults: { circuit: { threshold: 100, cooldown: 1000, shareAcrossTabs: false } },
   });
   const bus = createHookBus({}, log);
-  const ctl = installWebpackAdapter({ resolver, bus, log, chunkLoadingGlobals: globals });
+  const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+  const ctl = installWebpackAdapter({
+    coordinator,
+    ownership: createOwnershipRegistry(),
+    log,
+    chunkLoadingGlobals: globals,
+  });
   disposeFns.push(() => ctl.dispose());
 }
 
@@ -77,7 +97,7 @@ describe('webpack adapter', () => {
     // owned exclusively by the adapter, so the per-attempt event count is
     // exactly 1 (no doubling).
     const log = createLogger(false);
-    const resolver = createResolver({
+    const config = compileRuntimeConfig({
       rules: [
         {
           base: cdn1,
@@ -105,10 +125,13 @@ describe('webpack adapter', () => {
       },
       log,
     );
-    installObserver({ resolver, bus, log, sri: 'strip' });
+    const coordinator = createRecoveryCoordinator({ config, bus, circuit: createCircuit() });
+    const ownership = createOwnershipRegistry();
+    const observerCtl = installObserver({ coordinator, ownership, log, sri: 'strip' });
+    disposeFns.push(() => observerCtl.dispose());
     const ctl = installWebpackAdapter({
-      resolver,
-      bus,
+      coordinator,
+      ownership,
       log,
       chunkLoadingGlobals: ['webpackChunk_demo'],
     });

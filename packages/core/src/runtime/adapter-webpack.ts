@@ -1,18 +1,28 @@
-import type { HookBus } from './hooks';
+import type {
+  AttemptResult,
+  RecoveryCoordinator,
+  RecoveryTransport,
+} from '../internal/coordinator';
+import type { OwnershipRegistry } from '../internal/ownership';
 import type { Logger } from './logger';
-import type { Resolver } from './resolver';
 
-interface WebpackRequireLike {
+export interface WebpackRequireLike {
   l?: (
     url: string,
-    done: (event?: Event | { type: string }) => void,
+    done: (event?: WebpackEvent) => void,
     key?: string,
     chunkId?: string | number,
   ) => void;
   __rfWrapped?: boolean;
-  // Module Federation v2 扩展点——此处保留以兼容后续版本
-  f?: { remotes?: unknown };
+  __rf_wrapped?: boolean;
+  nc?: string;
+  crossOrigin?: string;
+  referrerPolicy?: string;
+  charset?: string;
+  trustedScriptUrl?: unknown;
 }
+
+export type WebpackEvent = Event | { type: string } | undefined;
 
 type ChunkPushArg = [
   chunkIds: Array<string | number>,
@@ -24,196 +34,317 @@ interface ChunkArrayLike extends Array<ChunkPushArg> {
   __rfHooked?: boolean;
 }
 
-interface AdapterDeps {
-  resolver: Resolver;
-  bus: HookBus;
+export interface WebpackLoadMetadata {
+  readonly key?: string;
+  readonly chunkId?: string | number;
+  readonly nonce?: string;
+  readonly crossOrigin?: string;
+  readonly referrerPolicy?: string;
+  readonly charset?: string;
+  readonly trustedScriptUrl?: unknown;
+}
+
+export interface WebpackAdapterDeps {
+  coordinator: RecoveryCoordinator;
+  ownership: OwnershipRegistry;
   log: Logger;
-  /**
-   * 要预创建并包装的 `chunkLoadingGlobal` 名称。webpack 插件会将实际值注入此处，
-   * 以便在运行时 chunk 首次 push 之前（`__webpack_require__` 可用之前）就拦截。
-   */
   chunkLoadingGlobals?: string[];
 }
 
-/**
- * 钩入 webpack 5 的 chunk loader，使异步 chunk（React.lazy / Vue
- * defineAsyncComponent / `import()`）能够透明地重试和回退。
- *
- * 策略：
- *  - 预创建 `window[chunkLoadingGlobal]` 并包装其 `push` 方法。
- *  - 当 webpack 推入运行时 chunk 时会调用 `chunk[2](__webpack_require__)`，
- *    我们拦截该调用并包装 `__webpack_require__.l`。
- *
- * 如果 `chunkLoadingGlobals` 未知（例如运行时未通过 webpack 插件加载），
- * 则回退到扫描 window 上可枚举的 `webpackChunk*` 属性，并进行短时间轮询。
- */
-export function installWebpackAdapter(deps: AdapterDeps): { dispose: () => void } {
-  if (typeof window === 'undefined') return { dispose() {} };
-  const w = window as unknown as Record<string, unknown>;
+interface ArrayPatch {
+  array: ChunkArrayLike;
+  originalPush: ChunkArrayLike['push'];
+  wrapper: ChunkArrayLike['push'];
+  hadMarker: boolean;
+  markerValue: boolean | undefined;
+}
 
-  const knownGlobals = deps.chunkLoadingGlobals || [];
-  for (let i = 0; i < knownGlobals.length; i++) {
-    const name = knownGlobals[i];
-    const existing = (w[name] as ChunkArrayLike | undefined) || ([] as ChunkArrayLike);
-    w[name] = existing;
-    hookArray(existing, deps);
-  }
+interface RuntimePatch {
+  chunk: ChunkPushArg;
+  original: NonNullable<ChunkPushArg[2]>;
+  wrapper: NonNullable<ChunkPushArg[2]>;
+}
 
-  scanAndHook(deps);
+interface RequirePatch {
+  require: WebpackRequireLike;
+  originalL: NonNullable<WebpackRequireLike['l']>;
+  wrapper: NonNullable<WebpackRequireLike['l']>;
+  hadMarker: boolean;
+  markerValue: boolean | undefined;
+}
 
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  const intervals = [50, 150, 400, 1000];
-  for (let i = 0; i < intervals.length; i++) {
-    timers.push(setTimeout(() => scanAndHook(deps), intervals[i]));
-  }
-
+export function createWebpackScriptTransport(
+  firstAttempt: (url: string, done: (event?: WebpackEvent) => void) => void,
+  metadata: WebpackLoadMetadata,
+): RecoveryTransport<WebpackEvent> {
   return {
-    dispose() {
-      for (let i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+    attempt(input, signal) {
+      if (signal.aborted) return Promise.resolve({ ok: false, failure: { kind: 'aborted' } });
+
+      if (input.attempt === 1) {
+        return new Promise((resolve) => {
+          let settled = false;
+          const settle = (result: AttemptResult<WebpackEvent>) => {
+            if (settled) return;
+            settled = true;
+            resolve(result);
+          };
+          try {
+            firstAttempt(input.url, (event) => settle(classifyWebpackEvent(event)));
+          } catch (error) {
+            settle({ ok: false, failure: { kind: 'unknown', error } });
+          }
+        });
+      }
+
+      return loadFreshWebpackScript(input.url, metadata, signal);
     },
   };
 }
 
-function scanAndHook(deps: AdapterDeps): void {
-  const w = window as unknown as Record<string, unknown>;
-  for (const key in w) {
-    if (key.indexOf('webpackChunk') !== 0) continue;
-    try {
-      const candidate = w[key];
-      if (Array.isArray(candidate)) hookArray(candidate as ChunkArrayLike, deps);
-    } catch {
-      /* 访问某些 window 属性可能抛异常（跨域 frame 等） */
-    }
-  }
-}
-
-function hookArray(arr: ChunkArrayLike, deps: AdapterDeps): void {
-  if (arr.__rfHooked) return;
-  arr.__rfHooked = true;
-
-  const origPush = arr.push;
-  arr.push = function (...args: ChunkPushArg[]) {
-    const chunk = args[0];
-    if (chunk && typeof chunk[2] === 'function') {
-      const origRuntime = chunk[2];
-      chunk[2] = function (req: WebpackRequireLike) {
-        const ret = origRuntime(req);
-        wrapRequire(req, deps);
-        return ret;
-      };
-    }
-    return origPush.apply(this, args);
-  };
-}
-
-function wrapRequire(req: WebpackRequireLike, deps: AdapterDeps): void {
-  if (!req || req.__rfWrapped) return;
-  req.__rfWrapped = true;
-
-  if (typeof req.l !== 'function') {
-    deps.log.warn('webpack runtime detected but .l is missing — skip chunk hook');
-    return;
-  }
-
-  // webpack 插件的 `RuntimeModule` 已经从 bundle *内部*包装了 `__webpack_require__.l`
-  // 并用 `__rf_wrapped` 标记。如果已有该包装则无需再次包装——否则会导致每次
-  // retry/success 事件被重复触发，并且争抢重试预算。保留现有包装即可。
-  if ((req.l as { __rf_wrapped?: boolean }).__rf_wrapped) {
-    deps.log.debug('webpack plugin already wrapped .l; chunk-array adapter yields');
-    return;
-  }
-
-  const origL = req.l;
-  const wrapped = function (
-    url: string,
-    done: (event?: Event | { type: string }) => void,
-    key?: string,
-    chunkId?: string | number,
-  ) {
-    let attempt = 1;
-    let isFallback = false;
-    // 跟踪当前尝试的 URL。如果闭包捕获 `url` 不变，resolver 会始终基于
-    // *原始*主 URL 做决策——即使我们已经 fallback 到备用 CDN，resolver 仍然
-    // 回答 "fallback primary -> secondary"，导致死循环。
-    let currentUrl = url;
-
-    function onComplete(event?: Event | { type: string }) {
-      if (!event || (event.type !== 'error' && event.type !== 'timeout')) {
-        deps.bus.emitSuccess({ url: currentUrl, attempts: attempt });
-        deps.resolver.recordSuccess(currentUrl);
-        return done(event);
-      }
-
-      const result = deps.resolver.resolve(currentUrl, attempt, isFallback);
-
-      if (result.kind === 'giveup') {
-        deps.bus.emitError({ url: currentUrl, reason: result.reason });
-        return done(event);
-      }
-
-      if (result.kind === 'retry') {
-        attempt = result.attempt + 1;
-        deps.bus.emitRetry({ url: result.url, attempt: result.attempt });
-      } else {
-        isFallback = true;
-        attempt = 1;
-        deps.bus.emitFallback({
-          from: result.from,
-          to: result.url,
-          reason: 'retry-budget-exhausted',
-        });
-      }
-      currentUrl = result.url;
-      retryWith(result.url, result.delay, key, chunkId, onComplete);
-    }
-
-    origL(url, onComplete, key, chunkId);
-  };
-  // 匹配 webpack 插件 RuntimeModule 使用的标记，这样任一侧的后续扫描
-  // 都能识别该包装已安装。
-  (wrapped as { __rf_wrapped?: boolean }).__rf_wrapped = true;
-  req.l = wrapped;
-}
-
 /**
- * 通过自建 `<script>` 元素加载脚本，而非再次调用 webpack 的
- * `__webpack_require__.l`。绕过原始 loader 是因为它会缓存正在加载的 URL，
- * 后续尝试会被短路。
+ * 包装 webpack 的 chunk array 与 __webpack_require__.l。
+ * 恢复决策全部委托给 RecoveryCoordinator；本文件只保留原生 loader 和新 script
+ * 的回调/属性语义。
  */
-function retryWith(
+export function installWebpackAdapter(deps: WebpackAdapterDeps): { dispose(): void } {
+  if (typeof window === 'undefined') return { dispose() {} };
+
+  const w = window as unknown as Record<string, unknown>;
+  const arrayPatches: ArrayPatch[] = [];
+  const runtimePatches: RuntimePatch[] = [];
+  const requirePatches: RequirePatch[] = [];
+  const createdGlobals: Array<{ name: string; array: ChunkArrayLike }> = [];
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  let active = true;
+
+  const knownGlobals = deps.chunkLoadingGlobals || [];
+  for (const name of knownGlobals) {
+    const existing = w[name] as ChunkArrayLike | undefined;
+    const array = existing || ([] as ChunkArrayLike);
+    if (!existing) {
+      w[name] = array;
+      createdGlobals.push({ name, array });
+    }
+    hookArray(array);
+  }
+
+  scanAndHook();
+  for (const delay of [50, 150, 400, 1000]) {
+    timers.push(setTimeout(scanAndHook, delay));
+  }
+
+  return {
+    dispose() {
+      if (!active) return;
+      active = false;
+      for (const timer of timers) clearTimeout(timer);
+      deps.coordinator.cancelOwner('webpack');
+
+      for (let i = requirePatches.length - 1; i >= 0; i--) {
+        const patch = requirePatches[i];
+        if (patch.require.l === patch.wrapper) patch.require.l = patch.originalL;
+        if (patch.hadMarker) patch.require.__rfWrapped = patch.markerValue;
+        else delete patch.require.__rfWrapped;
+      }
+
+      for (let i = runtimePatches.length - 1; i >= 0; i--) {
+        const patch = runtimePatches[i];
+        if (patch.chunk[2] === patch.wrapper) patch.chunk[2] = patch.original;
+      }
+
+      for (let i = arrayPatches.length - 1; i >= 0; i--) {
+        const patch = arrayPatches[i];
+        if (patch.array.push === patch.wrapper) patch.array.push = patch.originalPush;
+        if (patch.hadMarker) patch.array.__rfHooked = patch.markerValue;
+        else delete patch.array.__rfHooked;
+      }
+
+      for (const created of createdGlobals) {
+        if (w[created.name] === created.array) delete w[created.name];
+      }
+    },
+  };
+
+  function scanAndHook(): void {
+    if (!active) return;
+    for (const key in w) {
+      if (!key.startsWith('webpackChunk')) continue;
+      try {
+        const candidate = w[key];
+        if (Array.isArray(candidate)) hookArray(candidate as ChunkArrayLike);
+      } catch {
+        // 某些 window 属性可能因跨域访问而抛异常。
+      }
+    }
+  }
+
+  function hookArray(array: ChunkArrayLike): void {
+    if (!active || array.__rfHooked) return;
+
+    const originalPush = array.push;
+    const hadMarker = Object.prototype.hasOwnProperty.call(array, '__rfHooked');
+    const markerValue = array.__rfHooked;
+    const wrapper = function (this: ChunkArrayLike, ...args: ChunkPushArg[]) {
+      const chunk = args[0];
+      if (chunk && typeof chunk[2] === 'function') {
+        const originalRuntime = chunk[2];
+        const runtimeWrapper = function (req: WebpackRequireLike) {
+          const result = originalRuntime(req);
+          wrapRequire(req);
+          return result;
+        };
+        chunk[2] = runtimeWrapper;
+        runtimePatches.push({ chunk, original: originalRuntime, wrapper: runtimeWrapper });
+      }
+      return originalPush.apply(this, args);
+    };
+
+    array.__rfHooked = true;
+    array.push = wrapper;
+    arrayPatches.push({ array, originalPush, wrapper, hadMarker, markerValue });
+  }
+
+  function wrapRequire(req: WebpackRequireLike): void {
+    if (!active || !req || req.__rfWrapped) return;
+    if (typeof req.l !== 'function') {
+      deps.log.warn('webpack runtime detected but .l is missing — skip chunk hook');
+      return;
+    }
+    if ((req.l as NonNullable<WebpackRequireLike['l']> & { __rf_wrapped?: boolean }).__rf_wrapped) {
+      deps.log.debug('webpack plugin already wrapped .l; chunk-array adapter yields');
+      return;
+    }
+
+    const originalL = req.l;
+    const hadMarker = Object.prototype.hasOwnProperty.call(req, '__rfWrapped');
+    const markerValue = req.__rfWrapped;
+    const wrapper = function (
+      url: string,
+      done: (event?: WebpackEvent) => void,
+      key?: string,
+      chunkId?: string | number,
+    ): void {
+      const logicalKey = key
+        ? 'chunk:' + key
+        : chunkId !== undefined
+          ? 'chunk:' + String(chunkId)
+          : 'url:' + url;
+      const lease = deps.ownership.claim('webpack', logicalKey);
+      const metadata: WebpackLoadMetadata = {
+        key,
+        chunkId,
+        nonce: req.nc,
+        crossOrigin: req.crossOrigin,
+        referrerPolicy: req.referrerPolicy,
+        charset: req.charset,
+        trustedScriptUrl: req.trustedScriptUrl,
+      };
+      const transport = createWebpackScriptTransport(
+        (firstUrl, complete) => originalL(firstUrl, complete, key, chunkId),
+        metadata,
+      );
+
+      let recovery: Promise<WebpackEvent>;
+      try {
+        recovery = deps.coordinator.recover({
+          owner: 'webpack',
+          logicalKey,
+          initialUrl: url,
+          transport,
+        });
+      } catch (error) {
+        lease?.release();
+        if (active) done(error as WebpackEvent);
+        return;
+      }
+
+      if (lease) {
+        void recovery
+          .finally(() => lease.release())
+          .catch(() => {
+            // callback 分支会把终端错误交回 webpack。
+          });
+      }
+
+      void recovery.then(
+        (event) => {
+          if (active) done(event);
+        },
+        (reason) => {
+          if (active) done(toWebpackFailure(reason));
+        },
+      );
+    };
+
+    (wrapper as NonNullable<WebpackRequireLike['l']> & { __rf_wrapped?: boolean }).__rf_wrapped =
+      true;
+    req.__rfWrapped = true;
+    req.l = wrapper;
+    requirePatches.push({ require: req, originalL, wrapper, hadMarker, markerValue });
+  }
+}
+
+function classifyWebpackEvent(event: WebpackEvent): AttemptResult<WebpackEvent> {
+  if (event && (event.type === 'error' || event.type === 'timeout')) {
+    return { ok: false, failure: { kind: 'load-error', error: event } };
+  }
+  return { ok: true, value: event };
+}
+
+function toWebpackFailure(reason: unknown): WebpackEvent {
+  if (reason && typeof reason === 'object') {
+    const error = (reason as { error?: unknown }).error;
+    if (error !== undefined) return error as WebpackEvent;
+  }
+  return { type: 'error' };
+}
+
+function loadFreshWebpackScript(
   url: string,
-  delay: number,
-  key: string | undefined,
-  _chunkId: string | number | undefined,
-  cb: (event: Event | { type: string }) => void,
-): void {
-  const run = () => {
+  metadata: WebpackLoadMetadata,
+  signal: AbortSignal,
+): Promise<AttemptResult<WebpackEvent>> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve({ ok: false, failure: { kind: 'aborted' } });
+      return;
+    }
+
     const script = document.createElement('script');
-    script.charset = 'utf-8';
+    script.charset = metadata.charset || 'utf-8';
     script.async = true;
-    if (key) script.setAttribute('data-webpack', key);
-    script.src = url;
+    if (metadata.key) script.setAttribute('data-webpack', metadata.key);
+    if (metadata.nonce) script.nonce = metadata.nonce;
+    if (metadata.crossOrigin) script.crossOrigin = metadata.crossOrigin;
+    if (metadata.referrerPolicy) script.referrerPolicy = metadata.referrerPolicy;
+
+    const trustedUrl = metadata.trustedScriptUrl === undefined ? url : metadata.trustedScriptUrl;
+    (script as unknown as { src: unknown }).src = trustedUrl;
+    let settled = false;
 
     const cleanup = () => {
       script.onload = null;
       script.onerror = null;
+      signal.removeEventListener('abort', onAbort);
+    };
+    const settle = (result: AttemptResult<WebpackEvent>) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+    const onLoad = (event: Event) => settle({ ok: true, value: event });
+    const onError = () =>
+      settle({ ok: false, failure: { kind: 'load-error', error: { type: 'error' } } });
+    const onAbort = () => {
       if (script.parentNode) script.parentNode.removeChild(script);
+      settle({ ok: false, failure: { kind: 'aborted' } });
     };
 
-    script.onload = (e) => {
-      cleanup();
-      cb(e);
-    };
-    script.onerror = () => {
-      cleanup();
-      // 脚本加载失败的 DOM 事件不携带 HTTP 状态码，
-      // 构造一个符合 webpack `{ type: 'error' }` 契约的对象。
-      cb({ type: 'error' });
-    };
-
+    script.onload = onLoad;
+    script.onerror = onError;
+    signal.addEventListener('abort', onAbort, { once: true });
     (document.head || document.body || document.documentElement).appendChild(script);
-  };
-
-  if (delay > 0) setTimeout(run, delay);
-  else run();
+  });
 }
