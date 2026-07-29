@@ -1,13 +1,17 @@
-import type { FallbackRule, RuntimeConfig } from '../types';
-import { installObserver } from './observer';
+import { compileRuntimeConfig, type PreparedRuntimeConfig } from '../internal/config';
+import { createRecoveryCoordinator } from '../internal/coordinator';
+import { createLifecycleManager } from '../internal/lifecycle';
+import { createOwnershipRegistry } from '../internal/ownership';
+import type { RuntimeConfig } from '../types';
+import { installSystemJSAdapter } from './adapter-systemjs';
 import { installViteAdapter } from './adapter-vite';
 import { installWebpackAdapter } from './adapter-webpack';
-import { installSystemJSAdapter } from './adapter-systemjs';
 import { installSwAdapter } from './adapter-sw';
+import { createCircuitRegistry, mergeCircuit } from './circuit';
 import { createHookBus } from './hooks';
-import { createLogger, type Logger } from './logger';
-import { createResolver } from './resolver';
 import { isDisabled } from './kill-switch';
+import { createLogger } from './logger';
+import { installObserver } from './observer';
 
 interface InstallOptions extends RuntimeConfig {
   /** 可选的 webpack chunkLoadingGlobal 名称列表，用于包装。由 webpack 插件设置。 */
@@ -17,7 +21,6 @@ interface InstallOptions extends RuntimeConfig {
 interface RfGlobal {
   install: (config: InstallOptions) => void;
   url: (filename: string) => string;
-  resolver?: ReturnType<typeof createResolver>;
   /** 卸载运行时：移除所有监听器、清理全局状态。 */
   dispose: () => void;
   /** 标记位，供消费者/测试检测是否已安装。 */
@@ -35,8 +38,8 @@ const w =
     ? (window as unknown as Record<string, unknown> & { __RF__?: RfGlobal })
     : null;
 
-function noop(): string {
-  return '';
+function noop(filename: string): string {
+  return filename;
 }
 
 function ensureGlobal(): RfGlobal | null {
@@ -62,68 +65,112 @@ export function install(config: InstallOptions): void {
     return;
   }
 
+  // 编译必须发生在任何适配器接线之前。配置错误时保留可重试的 stub，
+  // 不让页面得到一个只安装了一半的运行时。
+  const prepared = compileRuntimeConfig(config);
+
   if (isDisabled(config)) {
     // Kill switch 激活——保留全局 stub 但不接线任何逻辑
+    let disposed = false;
     g.installed = true;
-    g.url = (f) => f;
+    g.url = noop;
+    g.dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      if (w?.__RF__ === g) delete w.__RF__;
+    };
     return;
   }
 
   const log = createLogger(config.debug);
-  warnDuplicateRules(config.rules, log);
-  const resolver = createResolver(config);
   const bus = createHookBus(config.hooks, log);
-
-  installSwAdapter({ config, bus, log });
-  const observerCtl = installObserver({
-    resolver,
+  const ownership = createOwnershipRegistry();
+  const circuitOptions = prepared.rules[0]
+    ? { ...prepared.rules[0].circuit }
+    : mergeCircuit(config.defaults?.circuit, undefined);
+  const circuit = createCircuitRegistry(circuitOptions);
+  const coordinator = createRecoveryCoordinator({
+    config: prepared,
     bus,
-    log,
-    sri: config.sri || 'strip',
+    circuit,
   });
-  const webpackCtl = installWebpackAdapter({
-    resolver,
-    bus,
-    log,
-    chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
-  });
-  const viteCtl = installViteAdapter({ resolver, bus, log });
-  installSystemJSAdapter({ resolver, bus, log });
+  const controls: Array<{ dispose(): void }> = [];
 
-  g.url = (filename) => resolver.resolveBuiltUrl(filename);
-  g.resolver = resolver;
-  g.installed = true;
-  g.dispose = () => {
-    observerCtl.dispose();
-    viteCtl.dispose();
-    webpackCtl.dispose();
-    // systemjs adapter 覆写了 System.constructor.prototype，无法安全还原。
-    // sw adapter 的 message listener 绑定在 navigator.serviceWorker 上，
-    // 页面卸载时自动回收。
-    if (w) delete w.__RF__;
-  };
+  try {
+    const swCtl = installSwAdapter({ config, bus, log });
+    controls.push(swCtl);
+    const observerCtl = installObserver({
+      coordinator,
+      ownership,
+      log,
+      sri: prepared.sri,
+    });
+    controls.push(observerCtl);
+    const webpackCtl = installWebpackAdapter({
+      coordinator,
+      ownership,
+      log,
+      chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
+    });
+    controls.push(webpackCtl);
+    const viteCtl = installViteAdapter({
+      config: prepared,
+      coordinator,
+      ownership,
+      log,
+      target: g as unknown as Record<string, unknown>,
+      resolveUrl: (filename) => resolveBuiltUrl(prepared, filename),
+    });
+    controls.push(viteCtl);
+    const systemJsCtl = installSystemJSAdapter({
+      config: prepared,
+      coordinator,
+      ownership,
+      log,
+    });
+    controls.push(systemJsCtl);
 
-  log.info('installed', {
-    version: RUNTIME_VERSION,
-    rules: (config.rules || []).length,
-  });
-}
+    const lifecycle = createLifecycleManager();
+    lifecycle.add(() => {
+      if (w.__RF__ === g) delete w.__RF__;
+    });
+    lifecycle.add(() => bus.dispose());
+    lifecycle.add(() => ownership.dispose());
+    lifecycle.add(() => swCtl.dispose());
+    lifecycle.add(() => systemJsCtl.dispose());
+    lifecycle.add(() => viteCtl.dispose());
+    lifecycle.add(() => webpackCtl.dispose());
+    lifecycle.add(() => observerCtl.dispose());
+    lifecycle.add(() => coordinator.dispose());
 
-function matchKey(rule: FallbackRule): string {
-  return rule.base;
-}
+    g.url = (filename) => resolveBuiltUrl(prepared, filename);
+    g.installed = true;
+    g.dispose = () => lifecycle.dispose();
 
-function warnDuplicateRules(rules: FallbackRule[] | undefined, log: Logger): void {
-  if (!rules || rules.length < 2) return;
-  const seen = new Map<string, number>();
-  for (let i = 0; i < rules.length; i++) {
-    const key = matchKey(rules[i]);
-    const prev = seen.get(key);
-    if (prev !== undefined) {
-      log.warn('duplicate base rule; last one wins', { base: key, indices: [prev, i] });
-    }
-    seen.set(key, i);
+    log.info('installed', {
+      version: RUNTIME_VERSION,
+      rules: prepared.rules.length,
+    });
+  } catch (error) {
+    for (let i = controls.length - 1; i >= 0; i--) controls[i].dispose();
+    coordinator.dispose();
+    ownership.dispose();
+    bus.dispose();
+    throw error;
   }
+}
+
+function resolveBuiltUrl(config: PreparedRuntimeConfig, filename: string): string {
+  if (!filename || /^https?:\/\//.test(filename) || filename[0] === '/') return filename;
+  const prefix = config.rules[0]?.base;
+  return prefix ? joinAssetPrefix(prefix, filename) : filename;
+}
+
+function joinAssetPrefix(prefix: string, filename: string): string {
+  if (!filename) return prefix.replace(/\/?$/, '') || '/';
+  const name = filename.replace(/^\/+/, '');
+  const separator = /[/\\]$/.test(prefix) ? '' : '/';
+  return `${prefix}${separator}${name}`;
 }
 
 // 让 install 函数在 IIFE 运行时即可访问——即使嵌入的 `install(...)` 调用

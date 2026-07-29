@@ -135,17 +135,45 @@ describe('sw adapter', () => {
 
     expect(fallbacks).toEqual(['/logo.png']);
   });
+
+  it('returns a controller that removes the exact message listener', () => {
+    let messageHandler: ((event: MessageEvent) => void) | undefined;
+    const removeEventListener = vi.fn();
+    mockServiceWorkerNavigator(
+      vi.fn(async () => ({ active: null })),
+      (type, handler) => {
+        if (type === 'message') messageHandler = handler as (event: MessageEvent) => void;
+      },
+      removeEventListener,
+    );
+
+    const control = installSwAdapter({
+      config: {
+        rules: manifest.rules,
+        serviceWorker: true,
+        serviceWorkerManifest: manifest,
+      },
+      bus: createHookBus({}, createLogger(false)),
+      log: createLogger(false),
+    });
+
+    control.dispose();
+
+    expect(removeEventListener).toHaveBeenCalledWith('message', messageHandler);
+  });
 });
 
 function mockServiceWorkerNavigator(
   register: ReturnType<typeof vi.fn>,
   addEventListener: (type: string, handler: EventListenerOrEventListenerObject) => void = () => {},
+  removeEventListener: ReturnType<typeof vi.fn> = vi.fn(),
 ) {
   Object.defineProperty(window, 'navigator', {
     value: {
       serviceWorker: {
         register,
         addEventListener,
+        removeEventListener,
         ready: Promise.resolve({ active: undefined }),
       },
     },

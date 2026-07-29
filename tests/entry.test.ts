@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { install } from '../packages/core/src/runtime/entry';
 
@@ -9,7 +9,6 @@ interface RfGlobal {
   url: (filename: string) => string;
   installed: boolean;
   version: string;
-  resolver?: unknown;
 }
 
 function getGlobal(): RfGlobal {
@@ -32,7 +31,6 @@ describe('entry (install)', () => {
     const g = w.__RF__ as RfGlobal | undefined;
     if (g) {
       g.installed = false;
-      g.resolver = undefined;
       g.url = () => '';
     }
     delete w.__RF_DISABLE__;
@@ -56,28 +54,51 @@ describe('entry (install)', () => {
     document.cookie = '__rf_disable=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
 
-  it('install sets installed=true and exposes resolver', () => {
+  it('install sets installed=true without exposing the legacy resolver', () => {
     install({
       rules: [{ base: cdn1, urls: [cdn1] }],
     });
 
     const g = getGlobal();
     expect(g.installed).toBe(true);
-    expect(g.resolver).toBeTruthy();
+    expect((g as RfGlobal & { resolver?: unknown }).resolver).toBeUndefined();
   });
 
   it('install is idempotent — second call is a no-op', () => {
     install({
       rules: [{ base: cdn1, urls: [cdn1, 'https://cdn2.example.com/'] }],
     });
-    const resolver1 = getGlobal().resolver;
+    const global1 = getGlobal();
 
     install({
       rules: [{ base: 'https://other.example.com/', urls: ['https://other.example.com/'] }],
     });
-    const resolver2 = getGlobal().resolver;
+    const global2 = getGlobal();
 
-    expect(resolver2).toBe(resolver1);
+    expect(global2).toBe(global1);
+  });
+
+  it('does not leave a partially installed global after invalid config', () => {
+    expect(() =>
+      install({
+        rules: [{ base: cdn1, urls: [cdn1, cdn1] }],
+      }),
+    ).toThrow(/duplicate candidate/);
+
+    expect(getGlobal().installed).toBe(false);
+  });
+
+  it('dispose removes the global and allows a fresh install', () => {
+    install({ rules: [{ base: cdn1, urls: [cdn1] }] });
+    const firstGlobal = getGlobal();
+
+    firstGlobal.dispose();
+
+    const w = window as unknown as Record<string, unknown>;
+    expect(w.__RF__).toBeUndefined();
+
+    install({ rules: [{ base: cdn1, urls: [cdn1] }] });
+    expect(getGlobal().installed).toBe(true);
   });
 
   it('__RF__.url returns correct URL after install', () => {
@@ -99,7 +120,6 @@ describe('entry (install)', () => {
     const g = getGlobal();
     expect(g.installed).toBe(true);
     expect(g.url('test.js')).toBe('test.js');
-    expect(g.resolver).toBeUndefined();
   });
 
   it('kill-switch: ?__rf=off disables runtime', () => {
@@ -112,7 +132,6 @@ describe('entry (install)', () => {
     const g = getGlobal();
     expect(g.installed).toBe(true);
     expect(g.url('test.js')).toBe('test.js');
-    expect(g.resolver).toBeUndefined();
   });
 
   it('kill-switch: cookie __rf_disable=1 disables runtime', () => {
@@ -124,47 +143,29 @@ describe('entry (install)', () => {
 
     const g = getGlobal();
     expect(g.installed).toBe(true);
-    expect(g.resolver).toBeUndefined();
   });
 
-  it('warns about duplicate rules in console', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    install({
-      rules: [
-        { base: cdn1, urls: [cdn1] },
-        { base: cdn1, urls: [cdn1, 'https://backup.example.com/'] },
-      ],
-      debug: true,
-    });
-
-    const warnCalls = warnSpy.mock.calls;
-    const duplicateWarning = warnCalls.find(
-      (args) => typeof args[1] === 'string' && args[1].includes('duplicate'),
-    );
-    expect(duplicateWarning).toBeTruthy();
-
-    warnSpy.mockRestore();
+  it('rejects duplicate rules before wiring adapters', () => {
+    expect(() =>
+      install({
+        rules: [
+          { base: cdn1, urls: [cdn1] },
+          { base: cdn1, urls: [cdn1, 'https://backup.example.com/'] },
+        ],
+      }),
+    ).toThrow(/duplicates/);
+    expect(getGlobal().installed).toBe(false);
   });
 
-  it('does not warn when all rules have unique base prefixes', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('accepts unique base prefixes', () => {
     install({
       rules: [
         { base: cdn1, urls: [cdn1] },
         { base: 'https://other.example.com/', urls: ['https://other.example.com/'] },
       ],
-      debug: true,
     });
 
-    const warnCalls = warnSpy.mock.calls;
-    const duplicateWarning = warnCalls.find(
-      (args) => typeof args[1] === 'string' && args[1].includes('duplicate'),
-    );
-    expect(duplicateWarning).toBeUndefined();
-
-    warnSpy.mockRestore();
+    expect(getGlobal().installed).toBe(true);
   });
 
   it('install with empty rules still completes', () => {

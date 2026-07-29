@@ -9,6 +9,10 @@ interface SwAdapterDeps {
   log: Logger;
 }
 
+export interface SwAdapterControl {
+  dispose(): void;
+}
+
 interface ServiceWorkerContainerLike {
   register(
     scriptURL: string,
@@ -17,6 +21,7 @@ interface ServiceWorkerContainerLike {
   getRegistrations?(): Promise<ServiceWorkerRegistrationLike[]>;
   ready?: Promise<ServiceWorkerRegistrationLike>;
   addEventListener(type: string, listener: (event: MessageEvent) => void): void;
+  removeEventListener?(type: string, listener: (event: MessageEvent) => void): void;
 }
 
 interface ServiceWorkerRegistrationLike {
@@ -27,33 +32,36 @@ interface ServiceWorkerRegistrationLike {
   unregister?(): Promise<boolean>;
 }
 
-export function installSwAdapter(deps: SwAdapterDeps): void {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+export function installSwAdapter(deps: SwAdapterDeps): SwAdapterControl {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return noopControl();
 
   const options = normalizeServiceWorkerOptions(deps.config.serviceWorker);
   if (!options.enabled) {
     unregisterStaleWorkers(deps.log, options.path);
-    return;
+    return noopControl();
   }
   if (!deps.config.serviceWorkerManifest) {
     deps.log.warn('Service Worker enabled but manifest is missing; skip registration');
-    return;
+    return noopControl();
   }
 
   const container = (navigator as unknown as { serviceWorker?: ServiceWorkerContainerLike })
     .serviceWorker;
   if (!container || typeof container.register !== 'function') {
     deps.log.warn('Service Worker is not supported in this environment');
-    return;
+    return noopControl();
   }
   if (!isSecureServiceWorkerContext()) {
     deps.log.warn('Service Worker requires HTTPS or localhost');
-    return;
+    return noopControl();
   }
 
-  container.addEventListener('message', (event: MessageEvent) => {
+  let active = true;
+  const messageHandler = (event: MessageEvent) => {
+    if (!active) return;
     bridgeEvent(event.data, deps.bus);
-  });
+  };
+  container.addEventListener('message', messageHandler);
 
   const message = {
     type: 'RF_SW_CONFIG',
@@ -68,13 +76,16 @@ export function installSwAdapter(deps: SwAdapterDeps): void {
       updateViaCache: 'none' as ServiceWorkerUpdateViaCache,
     })
     .then((registration) => {
+      if (!active) return;
       postConfig(registration, message);
       if (registration.update) {
         registration.update().catch(() => {});
       }
       if (container.ready) {
         container.ready
-          .then((readyRegistration) => postConfig(readyRegistration, message))
+          .then((readyRegistration) => {
+            if (active) postConfig(readyRegistration, message);
+          })
           .catch((err) => {
             deps.log.warn('waiting for Service Worker ready failed', err);
           });
@@ -83,6 +94,18 @@ export function installSwAdapter(deps: SwAdapterDeps): void {
     .catch((err) => {
       deps.log.warn('Service Worker registration failed', err);
     });
+
+  return {
+    dispose() {
+      if (!active) return;
+      active = false;
+      container.removeEventListener?.('message', messageHandler);
+    },
+  };
+}
+
+function noopControl(): SwAdapterControl {
+  return { dispose() {} };
 }
 
 function postConfig(registration: ServiceWorkerRegistrationLike, message: unknown): void {
