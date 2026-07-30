@@ -79,7 +79,7 @@ interface RfGlobal {
   install(config: RuntimeConfig): void;
   url(filename: string): string;
   load(filename: string): Promise<unknown>; // Vite 专用
-  resolver?: Resolver;
+  dispose(): void;
   installed: boolean;
   version: string;
 }
@@ -87,26 +87,26 @@ interface RfGlobal {
 
 ### 运行时模块
 
-| 模块                 | 职责                                                                                                                        |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **entry**            | 初始化 `window.__RF__` 全局对象，调度各适配器安装                                                                           |
-| **observer**         | 监听 `window` 上的 `error` 事件（捕获阶段），拦截 `<script>` 和 `<link rel="stylesheet">` 加载失败，原地替换为重试/回退 URL |
-| **resolver**         | 规则匹配引擎，决定下一步操作（retry / fallback / giveup）                                                                   |
-| **circuit**          | per-host 熔断器，通过 `localStorage` 实现跨标签页状态共享                                                                   |
-| **retry**            | 指数退避延迟计算（`baseDelay × 2^(attempt-1)`），可选 ±25% 抖动                                                             |
-| **hooks**            | 事件总线，同时分发 DOM `CustomEvent` 和 JS 函数钩子                                                                         |
-| **kill-switch**      | 三重紧急开关检测（全局变量 / 查询参数 / Cookie）                                                                            |
-| **logger**           | 可选的日志输出，支持 `debug: 'auto'`（通过 `localStorage.__RF_DEBUG__` 控制）                                               |
-| **adapter-vite**     | Vite 动态 import 回退循环（`__RF__.load`）+ `vite:preloadError` 处理                                                        |
-| **adapter-webpack**  | 拦截 `chunkLoadingGlobal` 的 `push` 方法 + 包装 `__webpack_require__.l`                                                     |
-| **adapter-systemjs** | hook `System.constructor.prototype.instantiate`，为 legacy bundle 提供回退                                                  |
+| 模块                 | 职责                                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **entry**            | 初始化 `window.__RF__` 全局对象，创建共享 coordinator/ownership/lifecycle 并调度各适配器安装                     |
+| **observer**         | 监听 `window` 上的 `error` 事件（捕获阶段），把 `<script>` 和 `<link rel="stylesheet">` 失败交给共享 coordinator |
+| **coordinator**      | 统一负责规则匹配、重试、回退、熔断、超时、取消和恢复事件；适配器只提供原生 transport                             |
+| **circuit**          | per-host 熔断器，通过 `localStorage` 实现跨标签页状态共享                                                        |
+| **retry**            | 指数退避延迟计算（`baseDelay × 2^(attempt-1)`），可选 ±25% 抖动                                                  |
+| **hooks**            | 事件总线，同时分发 DOM `CustomEvent` 和 JS 函数钩子                                                              |
+| **kill-switch**      | 三重紧急开关检测（全局变量 / 查询参数 / Cookie）                                                                 |
+| **logger**           | 可选的日志输出，支持 `debug: 'auto'`（通过 `localStorage.__RF_DEBUG__` 控制）                                    |
+| **adapter-vite**     | 通过共享 coordinator 执行 Vite 动态 import（`__RF__.load`）+ `vite:preloadError` 处理                            |
+| **adapter-webpack**  | 拦截 `chunkLoadingGlobal` 的 `push` 方法 + 包装 `__webpack_require__.l`                                          |
+| **adapter-systemjs** | hook `System.constructor.prototype.instantiate`，为 legacy bundle 提供回退                                       |
 
 ### Observer 行为细节
 
 - 仅处理顶层 `<script>` 和 `<link rel="stylesheet">` 的 `error` 事件
 - 自动跳过 `<link rel="preload|prefetch|modulepreload">` 等预加载提示
 - 自动跳过带 `data-webpack` 属性的 `<script>`（由 webpack adapter 处理）
-- 自动跳过 `systemjsManagedUrls` 中的 URL（由 systemjs adapter 处理）
+- 通过共享 ownership registry 避免与 Webpack/SystemJS 等运行时适配器重复接管同一资源
 - ES Module 脚本重试时自动添加 `__rf=` 查询参数，绕过浏览器模块缓存
 - 经典脚本和 CSS 不添加 cache-bust 参数，避免降低 CDN 缓存命中率
 - 替换标签使用 `createElement` 而非 `cloneNode`，避免浏览器的 "already started" 标记

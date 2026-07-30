@@ -79,7 +79,7 @@ interface RfGlobal {
   install(config: RuntimeConfig): void;
   url(filename: string): string;
   load(filename: string): Promise<unknown>; // Vite only
-  resolver?: Resolver;
+  dispose(): void;
   installed: boolean;
   version: string;
 }
@@ -87,26 +87,26 @@ interface RfGlobal {
 
 ### Runtime Modules
 
-| Module               | Responsibility                                                                                                                                                        |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **entry**            | Initializes the `window.__RF__` global object, dispatches adapter installation                                                                                        |
-| **observer**         | Listens for `error` events on `window` (capture phase), intercepts `<script>` and `<link rel="stylesheet">` load failures, replaces with retry/fallback URLs in-place |
-| **resolver**         | Rule matching engine, decides next action (retry / fallback / giveup)                                                                                                 |
-| **circuit**          | Per-host circuit breaker with `localStorage` cross-tab state sharing                                                                                                  |
-| **retry**            | Exponential backoff delay calculation (`baseDelay × 2^(attempt-1)`), optional ±25% jitter                                                                             |
-| **hooks**            | Event bus; dispatches both DOM `CustomEvent` and JS function hooks                                                                                                    |
-| **kill-switch**      | Triple kill-switch detection (global variable / query parameter / cookie)                                                                                             |
-| **logger**           | Optional logging output, supports `debug: 'auto'` (controlled via `localStorage.__RF_DEBUG__`)                                                                        |
-| **adapter-vite**     | Vite dynamic import fallback loop (`__RF__.load`) + `vite:preloadError` handling                                                                                      |
-| **adapter-webpack**  | Intercepts `chunkLoadingGlobal` `push` method + wraps `__webpack_require__.l`                                                                                         |
-| **adapter-systemjs** | Hooks `System.constructor.prototype.instantiate` for legacy bundle fallback                                                                                           |
+| Module               | Responsibility                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **entry**            | Initializes the `window.__RF__`, creates the shared coordinator/ownership/lifecycle services, and dispatches adapter installation            |
+| **observer**         | Listens for `error` events on `window` (capture phase) and hands `<script>` and `<link rel="stylesheet">` failures to the shared coordinator |
+| **coordinator**      | Owns rule matching, retry, fallback, circuit breaking, deadlines, cancellation, and recovery events; adapters provide transports only        |
+| **circuit**          | Per-host circuit breaker with `localStorage` cross-tab state sharing                                                                         |
+| **retry**            | Exponential backoff delay calculation (`baseDelay × 2^(attempt-1)`), optional ±25% jitter                                                    |
+| **hooks**            | Event bus; dispatches both DOM `CustomEvent` and JS function hooks                                                                           |
+| **kill-switch**      | Triple kill-switch detection (global variable / query parameter / cookie)                                                                    |
+| **logger**           | Optional logging output, supports `debug: 'auto'` (controlled via `localStorage.__RF_DEBUG__`)                                               |
+| **adapter-vite**     | Runs Vite dynamic imports (`__RF__.load`) through the shared coordinator + `vite:preloadError` handling                                      |
+| **adapter-webpack**  | Intercepts `chunkLoadingGlobal` `push` method + wraps `__webpack_require__.l`                                                                |
+| **adapter-systemjs** | Hooks `System.constructor.prototype.instantiate` for legacy bundle fallback                                                                  |
 
 ### Observer Behavior Details
 
 - Only handles `error` events on top-level `<script>` and `<link rel="stylesheet">`
 - Automatically skips `<link rel="preload|prefetch|modulepreload">` and other preload hints
 - Automatically skips `<script>` tags with `data-webpack` attribute (handled by webpack adapter)
-- Automatically skips URLs in `systemjsManagedUrls` (handled by systemjs adapter)
+- Uses the shared ownership registry to avoid competing with Webpack/SystemJS adapters for the same resource
 - ES Module scripts add `__rf=` query parameter on retry to bypass browser module cache
 - Classic scripts and CSS do not add cache-bust parameters to avoid reducing CDN cache hit rates
 - Replacement tags use `createElement` instead of `cloneNode` to avoid the browser's "already started" flag
