@@ -18,9 +18,9 @@ export function normalizeResourceUrl(value: string, baseUrl?: string): string {
     return url.href;
   } catch {
     return value
+      .replace(/#.*$/, '')
       .replace(/([?&])__rf=[^&#]*&?/g, '$1')
-      .replace(/[?&]$/, '')
-      .replace(/#.*$/, '');
+      .replace(/[?&]$/, '');
   }
 }
 
