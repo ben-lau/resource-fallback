@@ -36,6 +36,7 @@ export interface RecoveryRequest<T> {
   readonly initialUrl: string;
   readonly ruleId?: string;
   readonly initialFailure?: AttemptFailure;
+  readonly mapFailure?: (failure: AttemptFailure) => unknown;
   readonly transport: RecoveryTransport<T>;
 }
 
@@ -184,7 +185,7 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
     controller.abort();
     if (emitError && failure.kind !== 'aborted') emitErrorOnce(failure);
     deps.bus.close(sessionId);
-    rejectOuter(failure);
+    rejectOuter(request.mapFailure?.(failure) ?? failure);
   };
 
   const finishResolve = (value: T) => {

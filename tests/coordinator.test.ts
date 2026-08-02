@@ -230,6 +230,36 @@ describe('recovery coordinator', () => {
     expect(bus.emitSuccess).not.toHaveBeenCalled();
   });
 
+  it('shares the mapped typed Promise for same-entrance callers', async () => {
+    const mapped = new Error('native failure');
+    const transport = { attempt: vi.fn().mockResolvedValue(failure()) };
+    const coordinator = createRecoveryCoordinator({
+      config: compileRuntimeConfig({
+        rules: [
+          {
+            base: 'https://a.test/',
+            urls: ['https://a.test/'],
+            retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          },
+        ],
+      }),
+      circuit: createCircuit(),
+    });
+    const requestWithMapping = {
+      ...request(transport),
+      logicalKey: 'mapped-promise',
+      mapFailure: () => mapped,
+    };
+
+    const first = coordinator.recover(requestWithMapping);
+    const second = coordinator.recover(requestWithMapping);
+
+    expect(first).toBe(second);
+    await expect(first).rejects.toBe(mapped);
+    await expect(second).rejects.toBe(mapped);
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+  });
+
   it('uses an explicit rule id and waits for a positive retry delay', async () => {
     const bus = createBus();
     const circuit = createCircuit();

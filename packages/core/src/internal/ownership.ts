@@ -6,8 +6,13 @@ export interface OwnershipLease {
   release(): void;
 }
 
+export type OwnershipAdmission =
+  | { readonly kind: 'acquired'; readonly lease: OwnershipLease }
+  | { readonly kind: 'joined' }
+  | { readonly kind: 'denied' };
+
 export interface OwnershipRegistry {
-  claim(owner: RecoveryOwner, logicalKey: string): OwnershipLease | undefined;
+  admit(owner: RecoveryOwner, logicalKey: string): OwnershipAdmission;
   isClaimed(logicalKey: string): boolean;
   dispose(): void;
 }
@@ -22,23 +27,30 @@ export function createOwnershipRegistry(): OwnershipRegistry {
   let disposed = false;
 
   return {
-    claim(owner, logicalKey) {
-      if (disposed || active.has(logicalKey)) return undefined;
+    admit(owner, logicalKey) {
+      if (disposed) return { kind: 'denied' } as const;
+      const current = active.get(logicalKey);
+      if (current) {
+        return current.owner === owner
+          ? ({ kind: 'joined' } as const)
+          : ({ kind: 'denied' } as const);
+      }
 
       const token = Symbol(logicalKey);
       active.set(logicalKey, { owner, token });
       let released = false;
-
-      return {
+      const lease: OwnershipLease = {
         owner,
         logicalKey,
         release() {
           if (released) return;
           released = true;
-          const current = active.get(logicalKey);
-          if (current?.token === token) active.delete(logicalKey);
+          const activeLease = active.get(logicalKey);
+          if (activeLease?.token === token) active.delete(logicalKey);
         },
       };
+
+      return { kind: 'acquired', lease } as const;
     },
 
     isClaimed(logicalKey) {
