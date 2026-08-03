@@ -175,6 +175,12 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
 
   const finishReject = (failure: AttemptFailure, emitError: boolean) => {
     if (settled) return;
+    let rejection: unknown;
+    try {
+      rejection = request.mapFailure?.(failure) ?? failure;
+    } catch (error) {
+      rejection = error;
+    }
     settled = true;
     if (sessionTimer) clearTimeout(sessionTimer);
     sessionTimer = undefined;
@@ -185,7 +191,7 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
     controller.abort();
     if (emitError && failure.kind !== 'aborted') emitErrorOnce(failure);
     deps.bus.close(sessionId);
-    rejectOuter(request.mapFailure?.(failure) ?? failure);
+    rejectOuter(rejection);
   };
 
   const finishResolve = (value: T) => {

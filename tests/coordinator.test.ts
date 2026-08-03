@@ -233,6 +233,7 @@ describe('recovery coordinator', () => {
   it('shares the mapped typed Promise for same-entrance callers', async () => {
     const mapped = new Error('native failure');
     const transport = { attempt: vi.fn().mockResolvedValue(failure()) };
+    const bus = createBus();
     const coordinator = createRecoveryCoordinator({
       config: compileRuntimeConfig({
         rules: [
@@ -243,6 +244,7 @@ describe('recovery coordinator', () => {
           },
         ],
       }),
+      bus,
       circuit: createCircuit(),
     });
     const requestWithMapping = {
@@ -258,6 +260,64 @@ describe('recovery coordinator', () => {
     await expect(first).rejects.toBe(mapped);
     await expect(second).rejects.toBe(mapped);
     expect(transport.attempt).toHaveBeenCalledTimes(1);
+    expect(bus.emitError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: expect.objectContaining({ kind: 'network' }),
+      }),
+    );
+  });
+
+  it('rejects shared waiters when mapFailure throws', async () => {
+    const mapped = new Error('mapper exploded');
+    const transport = { attempt: vi.fn().mockResolvedValue(failure()) };
+    const bus = createBus();
+    const coordinator = createRecoveryCoordinator({
+      config: compileRuntimeConfig({
+        rules: [
+          {
+            base: 'https://a.test/',
+            urls: ['https://a.test/'],
+            retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          },
+        ],
+      }),
+      bus,
+      circuit: createCircuit(),
+    });
+    const requestWithThrowingMapper = {
+      ...request(transport),
+      logicalKey: 'throwing-mapped-promise',
+      mapFailure: () => {
+        throw mapped;
+      },
+    };
+
+    const first = coordinator.recover(requestWithThrowingMapper);
+    const second = coordinator.recover(requestWithThrowingMapper);
+
+    expect(first).toBe(second);
+
+    const outcomePromise = Promise.race([
+      first.then(
+        (value) => ({ status: 'resolved' as const, value }),
+        (reason) => ({ status: 'rejected' as const, reason }),
+      ),
+      new Promise<{ status: 'pending' }>((resolve) => {
+        setTimeout(() => resolve({ status: 'pending' }), 0);
+      }),
+    ]);
+    await vi.advanceTimersByTimeAsync(0);
+    const outcome = await outcomePromise;
+
+    expect(outcome).toEqual({ status: 'rejected', reason: mapped });
+    await expect(first).rejects.toBe(mapped);
+    await expect(second).rejects.toBe(mapped);
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+    expect(bus.emitError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: expect.objectContaining({ kind: 'network' }),
+      }),
+    );
   });
 
   it('uses an explicit rule id and waits for a positive retry delay', async () => {
