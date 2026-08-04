@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compileRuntimeConfig } from '../packages/core/src/internal/config';
 import {
   createRecoveryCoordinator,
+  type RecoveryCoordinator,
   type CircuitRegistry,
 } from '../packages/core/src/internal/coordinator';
 import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
+import { urlResourceKey } from '../packages/core/src/internal/resource-identity';
 import { installViteAdapter, setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
@@ -22,13 +24,17 @@ function createCircuit(): CircuitRegistry {
   };
 }
 
-function createRuntime(importer: (url: string) => Promise<unknown>, onSuccess?: () => void) {
+function createRuntime(
+  importer: (url: string) => Promise<unknown>,
+  onSuccess?: () => void,
+  retryMax = 1,
+) {
   const config = compileRuntimeConfig({
     rules: [
       {
         base: cdn1,
         urls: [cdn1, cdn2],
-        retry: { max: 1, baseDelay: 0, maxDelay: 0, jitter: false },
+        retry: { max: retryMax, baseDelay: 0, maxDelay: 0, jitter: false },
       },
     ],
   });
@@ -68,6 +74,7 @@ describe('vite coordinator transport', () => {
 
     const first = load('assets/a.js');
     const second = load('assets/a.js');
+    expect(first).toBe(second);
     expect(importer).toHaveBeenCalledTimes(1);
 
     resolveImport({ default: 'A' });
@@ -75,6 +82,22 @@ describe('vite coordinator transport', () => {
       { default: 'A' },
       { default: 'A' },
     ]);
+    control.dispose();
+  });
+
+  it('shares the same mapped rejection Promise for concurrent callers', async () => {
+    const error = new Error('load failed');
+    const importer = vi.fn().mockRejectedValue(error);
+    const { target, control } = createRuntime(importer, undefined, 0);
+    const load = target.load as (filename: string) => Promise<unknown>;
+
+    const first = load('assets/fail.js');
+    const second = load('assets/fail.js');
+
+    expect(first).toBe(second);
+    await expect(first).rejects.toBe(error);
+    await expect(second).rejects.toBe(error);
+    expect(importer).toHaveBeenCalledTimes(2);
     control.dispose();
   });
 
@@ -112,5 +135,37 @@ describe('vite coordinator transport', () => {
 
     expect(event.defaultPrevented).toBe(false);
     control.dispose();
+  });
+
+  it('uses native import when another entrance already owns the resource', async () => {
+    const ownership = createOwnershipRegistry();
+    const key = urlResourceKey(cdn1 + 'assets/a.js');
+    const admission = ownership.admit('observer', key);
+    expect(admission.kind).toBe('acquired');
+
+    const importer = vi.fn().mockResolvedValue({ default: 'native' });
+    const coordinator = {
+      recover: vi.fn(),
+      cancelOwner: vi.fn(),
+      dispose: vi.fn(),
+    } satisfies RecoveryCoordinator;
+    setViteImportModule(importer);
+    const target: Record<string, unknown> = {};
+    const control = installViteAdapter({
+      config: compileRuntimeConfig({ rules: [{ base: cdn1, urls: [cdn1] }] }),
+      coordinator,
+      ownership,
+      log: createLogger(false),
+      target,
+      resolveUrl: (filename) => cdn1 + filename,
+    });
+
+    const result = await (target.load as (filename: string) => Promise<unknown>)('assets/a.js');
+
+    expect(coordinator.recover).not.toHaveBeenCalled();
+    expect(importer).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ default: 'native' });
+    control.dispose();
+    if (admission.kind === 'acquired') admission.lease.release();
   });
 });

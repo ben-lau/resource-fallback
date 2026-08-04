@@ -1,6 +1,7 @@
 import type { RecoveryCoordinator, RecoveryTransport } from '../internal/coordinator';
 import type { PreparedRuntimeConfig } from '../internal/config';
 import type { OwnershipRegistry } from '../internal/ownership';
+import { urlResourceKey } from '../internal/resource-identity';
 import type { Logger } from './logger';
 import { appendRetryParam } from './utils';
 
@@ -54,8 +55,10 @@ export function installViteAdapter(deps: ViteAdapterDeps): { dispose(): void } {
   const transport = createViteTransport((url) => importModule(url));
   const installedLoad = (filename: string): Promise<unknown> => {
     const initialUrl = deps.resolveUrl(filename);
-    const logicalKey = 'url:' + initialUrl;
-    const lease = deps.ownership.claim('vite', logicalKey);
+    const logicalKey = urlResourceKey(initialUrl);
+    const admission = deps.ownership.admit('vite', logicalKey);
+
+    if (admission.kind === 'denied') return importModule(initialUrl);
 
     let recovery: Promise<unknown>;
     try {
@@ -63,22 +66,23 @@ export function installViteAdapter(deps: ViteAdapterDeps): { dispose(): void } {
         owner: 'vite',
         logicalKey,
         initialUrl,
+        mapFailure: unwrapFailure,
         transport,
       });
     } catch (error) {
-      lease?.release();
+      if (admission.kind === 'acquired') admission.lease.release();
       return Promise.reject(error);
     }
 
-    if (lease) {
+    if (admission.kind === 'acquired') {
       void recovery
-        .finally(() => lease.release())
+        .finally(() => admission.lease.release())
         .catch(() => {
           // load() 的返回 promise 负责把原生失败交给调用方。
         });
     }
 
-    return recovery.catch((reason) => Promise.reject(unwrapFailure(reason)));
+    return recovery;
   };
 
   target.url = installedUrl;
