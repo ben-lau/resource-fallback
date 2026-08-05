@@ -6,6 +6,7 @@ import {
   type CircuitRegistry,
 } from '../packages/core/src/internal/coordinator';
 import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
+import { urlResourceKey } from '../packages/core/src/internal/resource-identity';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
 import { installObserver } from '../packages/core/src/runtime/observer';
@@ -240,7 +241,7 @@ describe('systemjs-adapter', () => {
       await new Promise((r) => setTimeout(r, 100));
 
       await proto.instantiate(cdn1 + 'chunk.js');
-      expect(deps.ownership.isClaimed('url:' + cdn1 + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed(urlResourceKey(cdn1 + 'chunk.js'))).toBe(false);
     });
 
     it('releases every candidate lease after giveup', async () => {
@@ -256,9 +257,9 @@ describe('systemjs-adapter', () => {
       } catch {
         // expected
       }
-      expect(deps.ownership.isClaimed('url:' + cdn1 + 'chunk.js')).toBe(false);
-      expect(deps.ownership.isClaimed('url:' + cdn2 + 'chunk.js')).toBe(false);
-      expect(deps.ownership.isClaimed('url:' + origin + 'chunk.js')).toBe(false);
+      expect(deps.ownership.isClaimed(urlResourceKey(cdn1 + 'chunk.js'))).toBe(false);
+      expect(deps.ownership.isClaimed(urlResourceKey(cdn2 + 'chunk.js'))).toBe(false);
+      expect(deps.ownership.isClaimed(urlResourceKey(origin + 'chunk.js'))).toBe(false);
     });
 
     it('observer skips a URL leased by SystemJS', async () => {
@@ -270,7 +271,8 @@ describe('systemjs-adapter', () => {
         sri: 'strip',
       });
       disposeFns.push(() => observerControl.dispose());
-      const lease = deps.ownership.claim('systemjs', 'url:' + cdn1 + 'test.js');
+      const admission = deps.ownership.admit('systemjs', urlResourceKey(cdn1 + 'test.js'));
+      expect(admission.kind).toBe('acquired');
 
       const s = document.createElement('script');
       s.src = cdn1 + 'test.js';
@@ -282,7 +284,7 @@ describe('systemjs-adapter', () => {
       const scripts = Array.from(document.head.querySelectorAll('script'));
       expect(scripts).toHaveLength(1);
       expect(scripts[0]).toBe(s);
-      lease?.release();
+      if (admission.kind === 'acquired') admission.lease.release();
     });
   });
 

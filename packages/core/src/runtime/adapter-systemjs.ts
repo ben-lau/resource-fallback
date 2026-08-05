@@ -1,6 +1,7 @@
 import type { RecoveryCoordinator, RecoveryTransport } from '../internal/coordinator';
 import type { PreparedRuntimeConfig } from '../internal/config';
 import type { OwnershipRegistry } from '../internal/ownership';
+import { urlResourceKey } from '../internal/resource-identity';
 import type { Logger } from './logger';
 
 export interface SystemJSProto {
@@ -120,8 +121,13 @@ function proxyInstantiate(this: SystemJSLike, url: string, parentUrl?: string): 
   }
 
   const self = this;
-  const logicalKey = 'url:' + url;
-  const lease = registration.deps.ownership.claim('systemjs', logicalKey);
+  const logicalKey = urlResourceKey(url);
+  const admission = registration.deps.ownership.admit('systemjs', logicalKey);
+
+  if (admission.kind === 'denied') {
+    return registration.original.call(self, url, parentUrl);
+  }
+
   const transport: RecoveryTransport<unknown> = {
     attempt(input, signal) {
       if (signal.aborted) return Promise.resolve({ ok: false, failure: { kind: 'aborted' } });
@@ -138,21 +144,22 @@ function proxyInstantiate(this: SystemJSLike, url: string, parentUrl?: string): 
       owner: 'systemjs',
       logicalKey,
       initialUrl: url,
+      mapFailure: unwrapFailure,
       transport,
     });
   } catch (error) {
-    lease?.release();
+    if (admission.kind === 'acquired') admission.lease.release();
     return Promise.reject(error);
   }
 
-  if (lease) {
+  if (admission.kind === 'acquired') {
     void recovery
-      .finally(() => lease.release())
+      .finally(() => admission.lease.release())
       .catch(() => {
-        // SystemJS 调用方会收到下面的原始错误。
+        // instantiate() 的返回 promise 负责把原生失败交给调用方。
       });
   }
-  return recovery.catch((reason) => Promise.reject(unwrapFailure(reason)));
+  return recovery;
 }
 
 function matchesPreparedRule(config: PreparedRuntimeConfig, url: string): boolean {
