@@ -7,9 +7,11 @@ import {
   type RecoveryCoordinator,
 } from '../packages/core/src/internal/coordinator';
 import { createOwnershipRegistry } from '../packages/core/src/internal/ownership';
+import { urlResourceKey } from '../packages/core/src/internal/resource-identity';
 import { installObserver } from '../packages/core/src/runtime/observer';
 import { createHookBus } from '../packages/core/src/runtime/hooks';
 import { createLogger } from '../packages/core/src/runtime/logger';
+import type { FallbackEvent } from '../packages/core/src/types';
 
 const cdn1 = 'https://cdn1.example.com/';
 const cdn2 = 'https://cdn2.example.com/';
@@ -23,7 +25,10 @@ function createCircuit(): CircuitRegistry {
   };
 }
 
-function createCoordinator(onSuccess?: (url: string) => void): RecoveryCoordinator {
+function createCoordinator(
+  onSuccess?: (url: string) => void,
+  onFallback?: (event: FallbackEvent) => void,
+): RecoveryCoordinator {
   const config = compileRuntimeConfig({
     rules: [
       {
@@ -36,6 +41,7 @@ function createCoordinator(onSuccess?: (url: string) => void): RecoveryCoordinat
   const bus = createHookBus(
     {
       onSuccess: (event) => onSuccess?.(event.url),
+      onFallback,
     },
     createLogger(false),
   );
@@ -128,6 +134,59 @@ describe('observer coordinator transport', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(recoveredUrls).toEqual([cdn2 + 'chunk.js']);
+    control.dispose();
+  });
+
+  it('does not recover or replace when another entrance owns the canonical URL', async () => {
+    const ownership = createOwnershipRegistry();
+    const admission = ownership.admit('vite', urlResourceKey(cdn1 + 'shared.js'));
+    expect(admission.kind).toBe('acquired');
+    const coordinator = {
+      recover: vi.fn(() => Promise.resolve(undefined)),
+      cancelOwner: vi.fn(),
+      dispose: vi.fn(),
+    } satisfies RecoveryCoordinator;
+    const control = installObserver({
+      coordinator,
+      ownership,
+      log: createLogger(false),
+      sri: 'strip',
+    });
+    const source = document.createElement('script');
+    source.setAttribute('src', cdn1 + 'shared.js#entry');
+    document.head.appendChild(source);
+
+    dispatchError(source);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(coordinator.recover).not.toHaveBeenCalled();
+    expect(Array.from(document.head.querySelectorAll('script'))).toEqual([source]);
+    control.dispose();
+    if (admission.kind === 'acquired') admission.lease.release();
+  });
+
+  it('joins duplicate synchronous script errors into one fallback replacement', async () => {
+    const fallbacks: string[] = [];
+    const coordinator = createCoordinator(undefined, (event) => fallbacks.push(String(event.to)));
+    const control = installObserver({
+      coordinator,
+      ownership: createOwnershipRegistry(),
+      log: createLogger(false),
+      sri: 'strip',
+    });
+    const source = document.createElement('script');
+    source.src = cdn1 + 'shared.js';
+    document.head.appendChild(source);
+
+    dispatchError(source);
+    dispatchError(source);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fallbacks).toEqual([cdn2 + 'shared.js']);
+    const scripts = Array.from(document.head.querySelectorAll('script'));
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).not.toBe(source);
+    expect(scripts[0].src).toBe(cdn2 + 'shared.js');
     control.dispose();
   });
 });

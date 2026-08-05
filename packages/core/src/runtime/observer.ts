@@ -1,5 +1,6 @@
 import type { RecoveryCoordinator, RecoveryTransport } from '../internal/coordinator';
 import type { OwnershipRegistry } from '../internal/ownership';
+import { urlResourceKey } from '../internal/resource-identity';
 import type { SriPolicy } from '../types';
 import type { Logger } from './logger';
 import { appendRetryParam, stripRetryParam } from './utils';
@@ -39,9 +40,9 @@ export function installObserver(deps: ObserverDeps): { dispose(): void } {
     const initialUrl = readUrl(element);
     if (!initialUrl) return;
 
-    const logicalKey = 'url:' + initialUrl;
-    const lease = deps.ownership.claim('observer', logicalKey);
-    if (!lease) return;
+    const logicalKey = urlResourceKey(initialUrl);
+    const admission = deps.ownership.admit('observer', logicalKey);
+    if (admission.kind === 'denied') return;
 
     const request = {
       owner: 'observer' as const,
@@ -55,12 +56,14 @@ export function installObserver(deps: ObserverDeps): { dispose(): void } {
     try {
       recovery = deps.coordinator.recover(request);
     } catch {
-      lease.release();
+      if (admission.kind === 'acquired') admission.lease.release();
       return;
     }
 
     void recovery
-      .finally(() => lease.release())
+      .finally(() => {
+        if (admission.kind === 'acquired') admission.lease.release();
+      })
       .catch(() => {
         // 终端错误已经由 EventBus 发送；Observer 不把它重新抛到 window。
       });
