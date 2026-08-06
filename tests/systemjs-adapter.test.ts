@@ -35,11 +35,13 @@ function createFakeSystem(behavior: {
 }) {
   const registration: InstantiateResult = behavior.registration ?? [[], () => ({})];
   const scriptRequests: string[] = [];
+  const instantiateCalls: Array<{ url: string; parentUrl?: string }> = [];
 
   function SystemConstructor() {}
   SystemConstructor.prototype = {
-    instantiate(url: string) {
+    instantiate(url: string, parentUrl?: string) {
       scriptRequests.push(url);
+      instantiateCalls.push({ url, parentUrl });
       if (behavior.shouldFail?.(url)) {
         return Promise.reject(new Error('load failed: ' + url));
       }
@@ -61,7 +63,7 @@ function createFakeSystem(behavior: {
   system.import = (id: string) => proto.instantiate(id);
   system.getRegister = () => registration;
 
-  return { system, proto, scriptRequests, SystemConstructor };
+  return { system, proto, scriptRequests, instantiateCalls, SystemConstructor };
 }
 
 function setup(opts?: {
@@ -137,6 +139,35 @@ describe('systemjs-adapter', () => {
       const result = await proto.instantiate(cdn1 + 'chunk.js');
       expect(result).toEqual([[], expect.any(Function)]);
       expect(scriptRequests).toContain(cdn1 + 'chunk.js');
+    });
+
+    it('forwards the original parentUrl through acquired and denied paths', async () => {
+      const deps = setup();
+      const { system, proto, instantiateCalls } = createFakeSystem({ shouldFail: () => false });
+      (window as unknown as Record<string, unknown>).System = system;
+
+      installAdapter(deps);
+      await new Promise((r) => setTimeout(r, 100));
+
+      const acquiredUrl = cdn1 + 'acquired.js';
+      const acquiredParentUrl = 'https://app.example.com/acquired-parent.js';
+      await proto.instantiate(acquiredUrl, acquiredParentUrl);
+
+      const deniedUrl = cdn1 + 'denied.js';
+      const deniedParentUrl = 'https://app.example.com/denied-parent.js';
+      const admission = deps.ownership.admit('observer', urlResourceKey(deniedUrl));
+      expect(admission.kind).toBe('acquired');
+
+      try {
+        await proto.instantiate(deniedUrl, deniedParentUrl);
+      } finally {
+        if (admission.kind === 'acquired') admission.lease.release();
+      }
+
+      expect(instantiateCalls).toEqual([
+        { url: acquiredUrl, parentUrl: acquiredParentUrl },
+        { url: deniedUrl, parentUrl: deniedParentUrl },
+      ]);
     });
 
     it('retries via origInstantiate on failure then succeeds', async () => {
