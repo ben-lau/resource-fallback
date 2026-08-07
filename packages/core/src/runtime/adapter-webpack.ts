@@ -4,6 +4,7 @@ import type {
   RecoveryTransport,
 } from '../internal/coordinator';
 import type { OwnershipRegistry } from '../internal/ownership';
+import { webpackResourceKey } from '../internal/resource-identity';
 import type { Logger } from './logger';
 
 export interface WebpackRequireLike {
@@ -225,12 +226,13 @@ export function installWebpackAdapter(deps: WebpackAdapterDeps): { dispose(): vo
       key?: string,
       chunkId?: string | number,
     ): void {
-      const logicalKey = key
-        ? 'chunk:' + key
-        : chunkId !== undefined
-          ? 'chunk:' + String(chunkId)
-          : 'url:' + url;
-      const lease = deps.ownership.claim('webpack', logicalKey);
+      const logicalKey = webpackResourceKey(url, { key, chunkId });
+      const admission = deps.ownership.admit('webpack', logicalKey);
+      if (admission.kind === 'denied') {
+        originalL(url, done, key, chunkId);
+        return;
+      }
+
       const metadata: WebpackLoadMetadata = {
         key,
         chunkId,
@@ -254,14 +256,14 @@ export function installWebpackAdapter(deps: WebpackAdapterDeps): { dispose(): vo
           transport,
         });
       } catch (error) {
-        lease?.release();
+        if (admission.kind === 'acquired') admission.lease.release();
         if (active) done(error as WebpackEvent);
         return;
       }
 
-      if (lease) {
+      if (admission.kind === 'acquired') {
         void recovery
-          .finally(() => lease.release())
+          .finally(() => admission.lease.release())
           .catch(() => {
             // callback 分支会把终端错误交回 webpack。
           });
