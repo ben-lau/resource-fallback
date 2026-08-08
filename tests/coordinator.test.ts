@@ -111,6 +111,33 @@ describe('recovery coordinator', () => {
     expect(circuit.recordSuccess).toHaveBeenCalledTimes(1);
   });
 
+  it('publishes the shared Promise before a synchronous transport can reenter recovery', async () => {
+    const coordinator = createRecoveryCoordinator({
+      config: createConfig(),
+      bus: createBus(),
+      circuit: createCircuit(),
+    });
+    let nested: Promise<string> | undefined;
+    let reentered = false;
+    let reentrantRequest!: RecoveryRequest<string>;
+    const transport = {
+      attempt: vi.fn(() => {
+        if (!reentered) {
+          reentered = true;
+          nested = coordinator.recover(reentrantRequest);
+        }
+        return Promise.resolve(success('module'));
+      }),
+    };
+    reentrantRequest = request(transport);
+
+    const first = coordinator.recover(reentrantRequest);
+
+    expect(nested).toBe(first);
+    await expect(first).resolves.toBe('module');
+    expect(transport.attempt).toHaveBeenCalledTimes(1);
+  });
+
   it('counts an externally completed failure before starting recovery', async () => {
     const bus = createBus();
     const circuit = createCircuit();
@@ -317,6 +344,74 @@ describe('recovery coordinator', () => {
       expect.objectContaining({
         reason: expect.objectContaining({ kind: 'network' }),
       }),
+    );
+  });
+
+  it('does not reenter failure mapping when the mapper cancels its owner', async () => {
+    const mapped = new Error('mapped native failure');
+    const bus = createBus();
+    const coordinator = createRecoveryCoordinator({
+      config: compileRuntimeConfig({
+        rules: [
+          {
+            base: 'https://a.test/',
+            urls: ['https://a.test/'],
+            retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          },
+        ],
+      }),
+      bus,
+      circuit: createCircuit(),
+    });
+    let mappingCalls = 0;
+    const promise = coordinator.recover({
+      ...request({ attempt: vi.fn().mockResolvedValue(failure()) }),
+      logicalKey: 'cancel-from-mapper',
+      mapFailure: () => {
+        mappingCalls += 1;
+        if (mappingCalls === 1) coordinator.cancelOwner('vite');
+        return mapped;
+      },
+    });
+
+    await expect(promise).rejects.toBe(mapped);
+    expect(mappingCalls).toBe(1);
+    expect(bus.emitError).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: expect.objectContaining({ kind: 'network' }) }),
+    );
+  });
+
+  it('does not reenter a throwing failure mapper when it disposes the coordinator', async () => {
+    const mapped = new Error('mapper disposed the coordinator');
+    const bus = createBus();
+    const coordinator = createRecoveryCoordinator({
+      config: compileRuntimeConfig({
+        rules: [
+          {
+            base: 'https://a.test/',
+            urls: ['https://a.test/'],
+            retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+          },
+        ],
+      }),
+      bus,
+      circuit: createCircuit(),
+    });
+    let mappingCalls = 0;
+    const promise = coordinator.recover({
+      ...request({ attempt: vi.fn().mockResolvedValue(failure()) }),
+      logicalKey: 'dispose-from-mapper',
+      mapFailure: () => {
+        mappingCalls += 1;
+        if (mappingCalls === 1) coordinator.dispose();
+        throw mapped;
+      },
+    });
+
+    await expect(promise).rejects.toBe(mapped);
+    expect(mappingCalls).toBe(1);
+    expect(bus.emitError).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: expect.objectContaining({ kind: 'network' }) }),
     );
   });
 

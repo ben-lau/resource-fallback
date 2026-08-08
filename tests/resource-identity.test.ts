@@ -55,4 +55,16 @@ describe('resource identity', () => {
       'chunk.js?lang=en',
     );
   });
+
+  it.each([
+    ['chunk.js?__rf=1-a&__rf=2-b&lang=en#module', 'chunk.js?lang=en'],
+    ['chunk.js?lang=en&__rf=1-a&__rf=2-b&mode=dark#module', 'chunk.js?lang=en&mode=dark'],
+    ['chunk.js?lang=en&__rf=1-a&__rf=2-b#module', 'chunk.js?lang=en'],
+    [
+      'chunk.js?__rf=1-a&__rf=2-b&lang=en&__rf=3-c&mode=dark&__rf=4-d&__rf=5-e#module',
+      'chunk.js?lang=en&mode=dark',
+    ],
+  ])('removes every retry parameter when URL parsing fails: %s', (value, expected) => {
+    expect(normalizeResourceUrl(value, 'not a url')).toBe(expected);
+  });
 });

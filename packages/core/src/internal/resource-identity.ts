@@ -17,10 +17,17 @@ export function normalizeResourceUrl(value: string, baseUrl?: string): string {
     url.searchParams.delete('__rf');
     return url.href;
   } catch {
-    return value
-      .replace(/#.*$/, '')
-      .replace(/([?&])__rf=[^&#]*&?/g, '$1')
-      .replace(/[?&]$/, '');
+    const fragmentless = value.replace(/#.*$/, '');
+    const queryStart = fragmentless.indexOf('?');
+    if (queryStart === -1) return fragmentless;
+
+    const parameters = fragmentless
+      .slice(queryStart + 1)
+      .split('&')
+      .filter((parameter) => parameter && parameter.split('=', 1)[0] !== '__rf');
+    return parameters.length
+      ? `${fragmentless.slice(0, queryStart)}?${parameters.join('&')}`
+      : fragmentless.slice(0, queryStart);
   }
 }
 

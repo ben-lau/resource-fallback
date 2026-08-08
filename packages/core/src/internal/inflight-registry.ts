@@ -1,6 +1,7 @@
 export interface InFlightSession<T> {
   readonly promise: Promise<T>;
   readonly cancel: () => void;
+  readonly start?: () => void;
 }
 
 export type InFlightKey = string;
@@ -32,6 +33,7 @@ export function createInFlightRegistry(): InFlightRegistry {
       if (entries.get(key) === entry) entries.delete(key);
     };
     session.promise.then(remove, remove);
+    session.start?.();
     return session.promise;
   }
 

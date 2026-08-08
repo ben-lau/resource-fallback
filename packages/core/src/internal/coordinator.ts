@@ -175,13 +175,13 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
 
   const finishReject = (failure: AttemptFailure, emitError: boolean) => {
     if (settled) return;
+    settled = true;
     let rejection: unknown;
     try {
       rejection = request.mapFailure?.(failure) ?? failure;
     } catch (error) {
       rejection = error;
     }
-    settled = true;
     if (sessionTimer) clearTimeout(sessionTimer);
     sessionTimer = undefined;
     cancelAttempt?.(failure);
@@ -206,21 +206,26 @@ function createSession<T>(request: RecoveryRequest<T>, deps: SessionDeps): InFli
     resolveOuter(value);
   };
 
-  const rule = findRule(deps.config, request);
-  if (!rule) {
-    finishReject(
-      { kind: 'unknown', error: new Error(`no recovery rule matches ${request.initialUrl}`) },
-      true,
-    );
-  } else {
+  const beginSession = () => {
+    if (settled) return;
+    const rule = findRule(deps.config, request);
+    if (!rule) {
+      finishReject(
+        { kind: 'unknown', error: new Error(`no recovery rule matches ${request.initialUrl}`) },
+        true,
+      );
+      return;
+    }
+
     state = createRecoveryState(rule, request.initialUrl);
     sessionTimer = setTimeout(() => finishReject({ kind: 'timeout' }, true), deps.sessionTimeoutMs);
     void start(rule);
-  }
+  };
 
   return {
     promise,
     cancel: () => finishReject({ kind: 'aborted' }, false),
+    start: beginSession,
   };
 
   async function start(ruleForSession: PreparedRule): Promise<void> {

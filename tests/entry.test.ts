@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
 import { install } from '../packages/core/src/runtime/entry';
 
 const cdn1 = 'https://cdn1.example.com/';
@@ -7,8 +8,18 @@ const cdn1 = 'https://cdn1.example.com/';
 interface RfGlobal {
   install: typeof install;
   url: (filename: string) => string;
+  load?: (filename: string) => Promise<unknown>;
+  dispose: () => void;
   installed: boolean;
   version: string;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 function getGlobal(): RfGlobal {
@@ -17,6 +28,9 @@ function getGlobal(): RfGlobal {
     w.__RF__ = {
       install,
       url: () => '',
+      dispose: () => {
+        delete w.__RF__;
+      },
       installed: false,
       version: '0.0.0',
     };
@@ -26,6 +40,7 @@ function getGlobal(): RfGlobal {
 
 describe('entry (install)', () => {
   beforeEach(() => {
+    setViteImportModule(null);
     const w = window as unknown as Record<string, unknown>;
     // Reset installed state but keep __RF__ alive (entry.ts ensureGlobal runs at import-time)
     const g = w.__RF__ as RfGlobal | undefined;
@@ -47,6 +62,8 @@ describe('entry (install)', () => {
     const w = window as unknown as Record<string, unknown>;
     const g = w.__RF__ as { dispose?: () => void } | undefined;
     if (g?.dispose) g.dispose();
+    delete w.__RF__;
+    setViteImportModule(null);
     delete w.__RF_DISABLE__;
     delete w.__CUSTOM_DISABLE__;
     delete w.webpackChunk_test;
@@ -99,6 +116,71 @@ describe('entry (install)', () => {
 
     install({ rules: [{ base: cdn1, urls: [cdn1] }] });
     expect(getGlobal().installed).toBe(true);
+  });
+
+  it('isolates a deferred Vite load from dispose and a fresh installation', async () => {
+    const oldImport = deferred<unknown>();
+    const newImport = deferred<unknown>();
+    const importer = vi
+      .fn<(url: string) => Promise<unknown>>()
+      .mockImplementationOnce(() => oldImport.promise)
+      .mockImplementationOnce(() => newImport.promise);
+    setViteImportModule(importer);
+    const config = {
+      rules: [
+        {
+          base: cdn1,
+          urls: [cdn1],
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+        },
+      ],
+    };
+
+    install(config);
+    const oldGlobal = getGlobal();
+    const oldRecovery = oldGlobal.load!('shared.js');
+    await Promise.resolve();
+    expect(importer).toHaveBeenCalledTimes(1);
+
+    const source = document.createElement('script');
+    source.src = cdn1 + 'shared.js#observer';
+    document.head.appendChild(source);
+    source.dispatchEvent(new Event('error'));
+    await Promise.resolve();
+    expect(Array.from(document.head.querySelectorAll('script'))).toEqual([source]);
+
+    oldGlobal.dispose();
+    await expect(oldRecovery).rejects.toMatchObject({ kind: 'aborted' });
+    expect((window as unknown as Record<string, unknown>).__RF__).toBeUndefined();
+
+    install(config);
+    const newGlobal = getGlobal();
+    expect(newGlobal).not.toBe(oldGlobal);
+    const newRecovery = newGlobal.load!('shared.js');
+    let newSettled = false;
+    void newRecovery.then(
+      () => {
+        newSettled = true;
+      },
+      () => {
+        newSettled = true;
+      },
+    );
+    await Promise.resolve();
+    expect(importer).toHaveBeenCalledTimes(2);
+
+    oldImport.resolve({ default: 'old' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(newSettled).toBe(false);
+
+    source.dispatchEvent(new Event('error'));
+    await Promise.resolve();
+    expect(Array.from(document.head.querySelectorAll('script'))).toEqual([source]);
+
+    const newModule = { default: 'new' };
+    newImport.resolve(newModule);
+    await expect(newRecovery).resolves.toBe(newModule);
   });
 
   it('__RF__.url returns correct URL after install', () => {
