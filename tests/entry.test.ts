@@ -4,6 +4,7 @@ import { setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
 import { install } from '../packages/core/src/runtime/entry';
 
 const cdn1 = 'https://cdn1.example.com/';
+const cdn2 = 'https://cdn2.example.com/';
 
 interface RfGlobal {
   install: typeof install;
@@ -121,6 +122,7 @@ describe('entry (install)', () => {
   it('isolates a deferred Vite load from dispose and a fresh installation', async () => {
     const oldImport = deferred<unknown>();
     const newImport = deferred<unknown>();
+    const fallbackUrls: string[] = [];
     const importer = vi
       .fn<(url: string) => Promise<unknown>>()
       .mockImplementationOnce(() => oldImport.promise)
@@ -130,10 +132,13 @@ describe('entry (install)', () => {
       rules: [
         {
           base: cdn1,
-          urls: [cdn1],
+          urls: [cdn1, cdn2],
           retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
         },
       ],
+      hooks: {
+        onFallback: (event) => fallbackUrls.push(event.to),
+      },
     };
 
     install(config);
@@ -147,6 +152,7 @@ describe('entry (install)', () => {
     document.head.appendChild(source);
     source.dispatchEvent(new Event('error'));
     await Promise.resolve();
+    expect(fallbackUrls).toHaveLength(0);
     expect(Array.from(document.head.querySelectorAll('script'))).toEqual([source]);
 
     oldGlobal.dispose();
@@ -176,6 +182,7 @@ describe('entry (install)', () => {
 
     source.dispatchEvent(new Event('error'));
     await Promise.resolve();
+    expect(fallbackUrls).toHaveLength(0);
     expect(Array.from(document.head.querySelectorAll('script'))).toEqual([source]);
 
     const newModule = { default: 'new' };

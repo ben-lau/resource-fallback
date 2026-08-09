@@ -33,7 +33,17 @@ export function createInFlightRegistry(): InFlightRegistry {
       if (entries.get(key) === entry) entries.delete(key);
     };
     session.promise.then(remove, remove);
-    session.start?.();
+    try {
+      session.start?.();
+    } catch (error) {
+      if (entries.get(key) === entry) entries.delete(key);
+      try {
+        session.cancel();
+      } catch {
+        // Preserve the startup error as the original failure.
+      }
+      throw error;
+    }
     return session.promise;
   }
 

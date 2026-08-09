@@ -79,4 +79,33 @@ describe('in-flight registry', () => {
     registry.dispose();
     expect(registry.size()).toBe(0);
   });
+
+  it('rolls back a published entry when session startup throws', async () => {
+    const registry = createInFlightRegistry();
+    const pending = deferred<string>();
+    const startError = new Error('startup failed');
+    const cancelError = new Error('cancel failed');
+    let cancelCalls = 0;
+
+    expect(() =>
+      registry.getOrCreate('vite\0startup-failure', () => ({
+        promise: pending.promise,
+        cancel() {
+          cancelCalls += 1;
+          throw cancelError;
+        },
+        start() {
+          throw startError;
+        },
+      })),
+    ).toThrow(startError);
+    expect(cancelCalls).toBe(1);
+    expect(registry.size()).toBe(0);
+
+    const next = registry.getOrCreate('vite\0startup-failure', () => ({
+      promise: Promise.resolve('fresh'),
+      cancel() {},
+    }));
+    await expect(next).resolves.toBe('fresh');
+  });
 });
