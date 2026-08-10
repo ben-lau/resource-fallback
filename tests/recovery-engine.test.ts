@@ -73,6 +73,33 @@ describe('recovery engine', () => {
     expect(result.state.currentUrl).toBe('https://a.test/x.js');
   });
 
+  it('keeps the origin-relative fallback available when the current CDN host is open', () => {
+    const candidateRule = compileRuntimeConfig({
+      rules: [
+        {
+          base: 'https://primary.test/',
+          urls: ['https://secondary.test/', 'https://backup.test/', '/'],
+          retry: { max: 0, baseDelay: 0, maxDelay: 0, jitter: false },
+        },
+      ],
+    }).rules[0];
+    const initialUrl = 'https://backup.test/assets/index.js';
+
+    const result = transitionAfterFailure(
+      beginAttempt(createRecoveryState(candidateRule, initialUrl)),
+      failure(),
+      new Set(['backup.test']),
+      candidateRule,
+      () => 0.5,
+    );
+
+    expect(result.action).toMatchObject({
+      kind: 'fallback',
+      from: initialUrl,
+      url: '/assets/index.js',
+    });
+  });
+
   it('does not count an initial success as recovered behavior', () => {
     const result = transitionAfterSuccess(
       stateWithAttempts(createRecoveryState(rule(), 'https://a.test/x.js')),

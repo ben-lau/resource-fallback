@@ -1,4 +1,5 @@
 import { backoff } from '../runtime/retry';
+import { hostOf } from '../runtime/circuit';
 import type { PreparedRule } from './config';
 import type {
   AttemptFailure,
@@ -129,7 +130,10 @@ function pickNextCandidate(
   openHosts: OpenCircuitHosts,
 ): number {
   for (let index = state.candidateIndex + 1; index < rule.urls.length; index++) {
-    if (!openHosts.has(hostOfCandidate(rule.urls[index], state.currentUrl))) return index;
+    // Relative candidates such as "/" are resolved against the page, not the
+    // CDN URL that just failed. The fallback target must keep one stable host
+    // identity across every recovery step.
+    if (!openHosts.has(hostOf(rule.urls[index]))) return index;
   }
   return -1;
 }
@@ -148,13 +152,4 @@ function joinPrefix(prefix: string, suffix: string): string {
   if (!suffix) return prefix.replace(/\/?$/, '') || '/';
   const separator = /[/\\]$/.test(prefix) ? '' : '/';
   return `${prefix}${separator}${suffix}`;
-}
-
-function hostOfCandidate(url: string, referenceUrl: string): string {
-  try {
-    const base = new URL(referenceUrl, 'http://resource-fallback.invalid/');
-    return new URL(url, base).host;
-  } catch {
-    return url;
-  }
 }

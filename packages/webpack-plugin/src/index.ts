@@ -11,6 +11,7 @@ import {
   type HtmlTag,
   type PluginOptions,
 } from '@resource-fallback/core';
+import { generateWebpackRuntimeBridge } from './runtime-bridge';
 
 const PLUGIN = 'ResourceFallbackWebpackPlugin';
 
@@ -274,80 +275,7 @@ function injectRuntimeModule(compiler: Compiler, webpack: typeof import('webpack
   const stage =
     (webpack.RuntimeModule as unknown as { STAGE_TRIGGER?: number }).STAGE_TRIGGER ?? 20;
 
-  const runtimeSource = [
-    '/* @resource-fallback 运行时钩子 */',
-    'if (typeof window !== "undefined" && window.__RF__ && window.__RF__.resolver) {',
-    '  try {',
-    '    var __rf_orig_l = __webpack_require__.l;',
-    '    if (__rf_orig_l && !__rf_orig_l.__rf_wrapped) {',
-    '      var __rf_wrapped_l = function(url, done, key, chunkId) {',
-    '        var attempt = 1;',
-    '        var isFallback = false;',
-    // 关键：跟踪当前尝试的 URL（fallback 后会变）。
-    // 如果闭包始终捕获 `url` 不变，所有 retry/fallback 决策都基于*原始*主 URL，
-    // 导致 resolver 不断回答 "fallback primary -> secondary" 的死循环。
-    '        var currentUrl = url;',
-    '        function onComplete(event) {',
-    '          if (!event || (event.type !== "error" && event.type !== "timeout")) {',
-    '            window.__RF__.resolver.recordSuccess(currentUrl);',
-    '            return done(event);',
-    '          }',
-    '          var result = window.__RF__.resolver.resolve(currentUrl, attempt, isFallback);',
-    '          if (!result || result.kind === "giveup") return done(event);',
-    '          var nextUrl = result.url, delay = result.delay || 0;',
-    '          if (result.kind === "retry") attempt = (result.attempt || attempt) + 1;',
-    '          else { isFallback = true; attempt = 1; }',
-    '          currentUrl = nextUrl;',
-    '          setTimeout(function() {',
-    '            var s = document.createElement("script");',
-    '            s.charset = "utf-8"; s.async = true;',
-    '            if (key) s.setAttribute("data-webpack", key);',
-    '            s.src = nextUrl;',
-    '            var cleanup = function() { s.onload = null; s.onerror = null; if (s.parentNode) s.parentNode.removeChild(s); };',
-    '            s.onload = function(e) { cleanup(); onComplete(e); };',
-    '            s.onerror = function() { cleanup(); onComplete({ type: "error" }); };',
-    '            (document.head || document.body || document.documentElement).appendChild(s);',
-    '          }, delay);',
-    '        }',
-    '        __rf_orig_l(url, onComplete, key, chunkId);',
-    '      };',
-    '      __rf_wrapped_l.__rf_wrapped = true;',
-    '      __webpack_require__.l = __rf_wrapped_l;',
-    '    }',
-    '',
-    // 包装 __webpack_require__.f 中所有非 JS 的 chunk loader（CSS 等）。
-    // mini-css-extract-plugin 注册在 f.miniCss，webpack 原生 CSS 在 f.css，
-    // 其他 CSS 插件可能使用任意 key。统一遍历所有非 "j" 的 loader，
-    // 将其 promise 的 CSS 错误抑制——与 Vite 的 vite:preloadError + preventDefault() 同理。
-    // 实际 CSS 重试由 observer 通过 DOM 层面的 <link> 替换完成。
-    '    var __rf_fKeys = Object.keys(__webpack_require__.f);',
-    '    for (var __rf_i = 0; __rf_i < __rf_fKeys.length; __rf_i++) {',
-    '      (function(fk) {',
-    '        if (fk === "j") return;',
-    '        var origFn = __webpack_require__.f[fk];',
-    '        if (typeof origFn !== "function" || origFn.__rf_css) return;',
-    '        var wrapped = function(chunkId, promises) {',
-    '          var before = promises.length;',
-    '          origFn(chunkId, promises);',
-    '          for (var pi = before; pi < promises.length; pi++) {',
-    '            promises[pi] = promises[pi].catch(function(err) {',
-    '              var isCss = err && (',
-    '                err.code === "CSS_CHUNK_LOAD_FAILED" ||',
-    '                (err.request && /\\.css([?#]|$)/.test(err.request))',
-    '              );',
-    '              if (!isCss) throw err;',
-    '              try { window.__RF__.resolver.recordFailure(err.request || ""); } catch(e) {}',
-    '            });',
-    '          }',
-    '        };',
-    '        wrapped.__rf_css = true;',
-    '        __webpack_require__.f[fk] = wrapped;',
-    '      })(__rf_fKeys[__rf_i]);',
-    '    }',
-    '',
-    '  } catch (e) { /* 吞掉异常——降级到 observer */ }',
-    '}',
-  ].join('\n');
+  const runtimeSource = generateWebpackRuntimeBridge();
 
   compiler.hooks.thisCompilation.tap(PLUGIN, (compilation: Compilation) => {
     compilation.hooks.runtimeRequirementInTree.for('__webpack_require__.l').tap(PLUGIN, (chunk) => {

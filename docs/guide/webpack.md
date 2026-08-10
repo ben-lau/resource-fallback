@@ -69,6 +69,8 @@ module.exports = {
 
 注入一个 Webpack `RuntimeModule`（stage = `STAGE_TRIGGER`），在 webpack 的 bootstrap 内部 patch `__webpack_require__.l`——在其定义之后、首次 chunk 加载触发之前。这比从外部 monkey-patch 可靠得多。
 
+注入代码只负责把 Webpack 的加载回调接到 core 的私有 `window.__RF__.internal` 桥接；重试、回退、熔断、事件和并发 Promise 共享仍由 core 的 Coordinator 统一处理。
+
 ### 运行时 — 双层保护
 
 #### 第一层：`__webpack_require__.l` 包装
@@ -81,8 +83,8 @@ chunk 加载请求
   ├── __webpack_require__.l(url, done, key, chunkId)
   │   │
   │   ├── 原始 <script> 加载
-  │   │   ├── 成功 → recordSuccess → done(event)
-  │   │   └── 失败 → resolver.resolve()
+  │   │   ├── 成功 → Coordinator → done(event)
+  │   │   └── 失败 → Coordinator recovery
   │   │       ├── retry → 创建新 <script>，延迟重试
   │   │       ├── fallback → 创建新 <script>，切换 URL
   │   │       └── giveup → done(event)（让 webpack 处理错误）

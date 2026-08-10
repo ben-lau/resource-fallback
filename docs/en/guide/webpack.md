@@ -69,6 +69,8 @@ If `html-webpack-plugin` is not detected, the plugin logs a warning and does not
 
 Injects a Webpack `RuntimeModule` (stage = `STAGE_TRIGGER`) that patches `__webpack_require__.l` inside webpack's bootstrap — after it is defined but before the first chunk load. This is more reliable than external monkey-patching.
 
+The injected code only connects Webpack's loader callbacks to core's private `window.__RF__.internal` bridge. Retry, fallback, circuit state, events, and shared recovery Promises remain owned by the core Coordinator.
+
 ### Runtime — dual-layer protection
 
 #### Layer 1: `__webpack_require__.l` wrapping
@@ -81,8 +83,8 @@ Chunk load request
   ├── __webpack_require__.l(url, done, key, chunkId)
   │   │
   │   ├── Original <script> load
-  │   │   ├── Success → recordSuccess → done(event)
-  │   │   └── Failure → resolver.resolve()
+  │   │   ├── Success → Coordinator → done(event)
+  │   │   └── Failure → Coordinator recovery
   │   │       ├── retry → create new <script>, delay and retry
   │   │       ├── fallback → create new <script>, switch URL
   │   │       └── giveup → done(event) (let webpack handle the error)
@@ -104,7 +106,7 @@ Retry/fallback `<script>` elements get a `data-webpack` attribute (chunk loading
 
 `mini-css-extract-plugin` and webpack `experiments.css` register non-`j` loaders on `__webpack_require__.f` (e.g. `miniCss`, `css`). When an async chunk includes a separate `.css` chunk, `__webpack_require__.e(chunkId)` runs `Promise.all` over JS and CSS loader promises.
 
-If CSS `<link>` load fails, webpack's generated `onerror` **rejects with `ChunkLoadError`** (`code: 'CSS_CHUNK_LOAD_FAILED'`). Observer can replace the `<link>` and fix the DOM, but **`Promise.all` has already rejected** — lazy routes still fail with ChunkLoadError even if JS fallback succeeded.
+If CSS `<link>` load fails, webpack's generated `onerror` **rejects with `ChunkLoadError`** (`code: 'CSS_CHUNK_LOAD_FAILED'`). The injected wrapper below consumes that CSS rejection so `Promise.all` can continue while Observer replaces the `<link>`; otherwise lazy routes can fail even when JS fallback succeeds.
 
 The injected `RuntimeModule` wraps every non-`j` loader on `__webpack_require__.f`:
 
@@ -122,10 +124,8 @@ for (const fk of Object.keys(__webpack_require__.f)) {
           err?.code === 'CSS_CHUNK_LOAD_FAILED' ||
           (err?.request && /\.css([?#]|$)/.test(err.request));
         if (!isCss) throw err;
-        try {
-          window.__RF__.resolver.recordFailure(err.request || '');
-        } catch {}
-        // swallow reject so Promise.all does not fail
+        // The Observer owns the CSS link replacement. Swallow the original
+        // rejection so Promise.all does not fail before that replacement.
       });
     }
   };

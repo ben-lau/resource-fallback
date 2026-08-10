@@ -61,6 +61,8 @@ If `html-webpack-plugin` is not detected, the plugin outputs a warning and won't
 
 Injects a Webpack `RuntimeModule` (stage = `STAGE_TRIGGER`) that patches `__webpack_require__.l` inside webpack's bootstrap — after its definition but before the first chunk load triggers. This is far more reliable than monkey-patching from outside.
 
+The injected code only connects Webpack's loader callbacks to core's private `window.__RF__.internal` bridge. Retry, fallback, circuit state, events, and shared recovery Promises remain owned by the core Coordinator.
+
 ### Runtime — Dual-Layer Protection
 
 #### Layer 1: `__webpack_require__.l` Wrapping
@@ -73,8 +75,8 @@ Chunk load request
   ├── __webpack_require__.l(url, done, key, chunkId)
   │   │
   │   ├── Original <script> load
-  │   │   ├── Success → recordSuccess → done(event)
-  │   │   └── Failure → resolver.resolve()
+  │   │   ├── Success → Coordinator → done(event)
+  │   │   └── Failure → Coordinator recovery
   │   │       ├── retry → create new <script>, delay and retry
   │   │       ├── fallback → create new <script>, switch URL
   │   │       └── giveup → done(event) (let webpack handle the error)

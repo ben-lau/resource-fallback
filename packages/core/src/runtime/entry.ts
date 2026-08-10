@@ -1,5 +1,9 @@
 import { compileRuntimeConfig, type PreparedRuntimeConfig } from '../internal/config';
-import { createRecoveryCoordinator } from '../internal/coordinator';
+import {
+  createRecoveryCoordinator,
+  type RecoveryCoordinator,
+  type RecoveryRequest,
+} from '../internal/coordinator';
 import { createLifecycleManager } from '../internal/lifecycle';
 import { createOwnershipRegistry } from '../internal/ownership';
 import type { RuntimeConfig } from '../types';
@@ -18,9 +22,19 @@ interface InstallOptions extends RuntimeConfig {
   webpackChunkLoadingGlobals?: string[];
 }
 
+/**
+ * 构建器适配器使用的私有桥接。它不属于公开运行时 API，只把构建器的
+ * 加载语义接入同一个 coordinator，避免在插件里复制另一套回退状态机。
+ */
+type RuntimeBridge = Pick<RecoveryCoordinator, 'cancelOwner'> & {
+  recover<T>(request: RecoveryRequest<T>): Promise<T>;
+};
+
 interface RfGlobal {
   install: (config: InstallOptions) => void;
   url: (filename: string) => string;
+  /** 构建器运行时桥接；不作为公开 semver API。 */
+  internal?: RuntimeBridge;
   /** 卸载运行时：移除所有监听器、清理全局状态。 */
   dispose: () => void;
   /** 标记位，供消费者/测试检测是否已安装。 */
@@ -94,6 +108,10 @@ export function install(config: InstallOptions): void {
     bus,
     circuit,
   });
+  const internal: RuntimeBridge = {
+    recover: (request) => coordinator.recover(request),
+    cancelOwner: (owner) => coordinator.cancelOwner(owner),
+  };
   const controls: Array<{ dispose(): void }> = [];
 
   try {
@@ -134,6 +152,9 @@ export function install(config: InstallOptions): void {
     lifecycle.add(() => {
       if (w.__RF__ === g) delete w.__RF__;
     });
+    lifecycle.add(() => {
+      if (g.internal === internal) delete g.internal;
+    });
     lifecycle.add(() => bus.dispose());
     lifecycle.add(() => ownership.dispose());
     lifecycle.add(() => swCtl.dispose());
@@ -144,6 +165,7 @@ export function install(config: InstallOptions): void {
     lifecycle.add(() => coordinator.dispose());
 
     g.url = (filename) => resolveBuiltUrl(prepared, filename);
+    g.internal = internal;
     g.installed = true;
     g.dispose = () => lifecycle.dispose();
 

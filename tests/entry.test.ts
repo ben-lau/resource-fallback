@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { RecoveryCoordinator } from '../packages/core/src/internal/coordinator';
 import { setViteImportModule } from '../packages/core/src/runtime/adapter-vite';
 import { install } from '../packages/core/src/runtime/entry';
 
@@ -10,6 +11,7 @@ interface RfGlobal {
   install: typeof install;
   url: (filename: string) => string;
   load?: (filename: string) => Promise<unknown>;
+  internal?: Pick<RecoveryCoordinator, 'recover' | 'cancelOwner'>;
   dispose: () => void;
   installed: boolean;
   version: string;
@@ -82,6 +84,33 @@ describe('entry (install)', () => {
     expect((g as RfGlobal & { resolver?: unknown }).resolver).toBeUndefined();
   });
 
+  it('exposes a private coordinator bridge for build adapters', async () => {
+    install({
+      rules: [{ base: cdn1, urls: [cdn1] }],
+    });
+
+    const g = getGlobal();
+    expect(g.internal).toBeDefined();
+    expect(typeof g.internal?.recover).toBe('function');
+    expect(typeof g.internal?.cancelOwner).toBe('function');
+
+    const requested: string[] = [];
+    const result = await g.internal!.recover({
+      owner: 'webpack',
+      logicalKey: 'chunk:bridge-test',
+      initialUrl: cdn1 + 'lazy.js',
+      transport: {
+        attempt(input) {
+          requested.push(input.url);
+          return Promise.resolve({ ok: true as const, value: 'loaded' });
+        },
+      },
+    });
+
+    expect(result).toBe('loaded');
+    expect(requested).toEqual([cdn1 + 'lazy.js']);
+  });
+
   it('install is idempotent — second call is a no-op', () => {
     install({
       rules: [{ base: cdn1, urls: [cdn1, 'https://cdn2.example.com/'] }],
@@ -114,6 +143,7 @@ describe('entry (install)', () => {
 
     const w = window as unknown as Record<string, unknown>;
     expect(w.__RF__).toBeUndefined();
+    expect(firstGlobal.internal).toBeUndefined();
 
     install({ rules: [{ base: cdn1, urls: [cdn1] }] });
     expect(getGlobal().installed).toBe(true);
