@@ -39,53 +39,63 @@ export default defineConfig({
 
 ## 工作原理
 
-插件在构建时完成三件事：
+插件在构建时按下面的顺序工作：
 
-### 1. HTML 注入
+### 1. `configResolved`：比较规范化后的 Vite base 与 rule base
 
-通过 `transformIndexHtml` 钩子在 `<head>` 中注入：
+插件先在 `configResolved` 阶段读取 Vite 最终解析后的 `base`，再和每条 `rules[].base` 做同样的尾斜杠规范化比较。
 
-- `<link rel="preconnect">` 标签（为每个 fallback 域名预建连接）
-- `<script>` 内联运行时 IIFE + `install(config)` 调用
+- 如果规范化后的 Vite `base` 至少命中一条 rule `base`，后续才继续启用 URL 改写
+- 如果没有命中，`writeBundle` 会跳过动态 import 改写，避免把非 CDN 构建误写成外域地址
 
-### 2. 静态资源 URL 改写
+### 2. `generateBundle`：按需发出 Service Worker 资源
 
-利用 Vite 的 `experimental.renderBuiltUrl` 钩子，将 JS 资源的 URL 改写为运行时解析：
+如果开启了 `serviceWorker`，插件会在 `generateBundle` 阶段按需发出：
 
-```js
-// 原始输出
-import('/assets/chunk-abc.js');
+- `rf-sw.js`
+- `manifest.json`
 
-// 改写后（构建产物中）
-window.__RF__.url('assets/chunk-abc.js');
-// → 'https://cdn.example.com/assets/chunk-abc.js'（或熔断后跳过不可用 host）
-```
+### 3. `writeBundle`：解析字面量动态 import，并替换为 `window.__RF__.load(filename)`
 
-### 3. 动态 import 包装
+`writeBundle` 会先用 `es-module-lexer` 解析 chunk 里的动态 import，再只改写满足以下条件的字面量导入：
 
-利用 Rollup 的 `renderDynamicImport` 钩子，将动态 `import()` 包装为带回退循环的加载函数：
+1. 该 import 是字面量字符串
+2. 解析出的文件名对应 `chunk.dynamicImports` 里的条目
+3. 当前构建已经通过规范化 base 门禁
+
+匹配到的 `import()` 会被替换成 `window.__RF__.load(filename)`，例如：
 
 ```js
 // 原始代码
 const mod = await import('./Lazy.vue');
 
 // 构建后
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
+const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
-`__RF__.load` 内部执行完整的 retry → fallback 循环：
+### 4. `transformIndexHtml`：注入运行时与 preconnect 标签
 
-1. 通过 `resolveBuiltUrl` 确定首次请求 URL
-2. 尝试 `import(url)`
-3. 失败后按配置重试（指数退避 + 抖动）
-4. 重试预算耗尽后切换到下一个候选 URL
-5. ES Module 重试自动添加 `__rf=` 参数绕过浏览器模块缓存
-6. 每步都发出对应的 `rf:retry` / `rf:fallback` / `rf:error` 事件
-7. 所有候选耗尽后抛出原始错误
+`transformIndexHtml` 会在 `<head>` 注入：
+
+- `<link rel="preconnect">` 标签
+- 内联运行时 IIFE 和 `install(config)` 调用的 `<script>`
+
+### **RF**.url 行为
+
+`__RF__.url(filename)` 只会把文件名和第一条编译后的 rule base 拼接起来，它不会查看熔断状态，也不会在运行时跳过 host。
+
+### **RF**.load 回退循环
+
+`__RF__.load(filename)` 会先解析初始 URL，然后把 retry / fallback / deadline / cancellation 都交给共享的 Coordinator 处理。它还会使用规范化后的 URL key，这样同一 owner 的并发加载可以共享同一个 recovery Promise。
 
 ### vite:preloadError 处理
 
-运行时还监听 Vite 的 `vite:preloadError` 事件，当 modulepreload 失败时记录 host 失败到熔断器，让后续的 `resolveBuiltUrl` 自动跳过不可用的 host。
+运行时还监听 Vite 的 `vite:preloadError` 事件。当 modulepreload 失败时：
+
+- 读取 `event.payload`
+- 提取出的 URL 若匹配已配置的 rule，就调用 `event.preventDefault()`
+- 不会直接更新熔断器状态、发出恢复事件，也不会自己选择 fallback URL
+- CSS `<link>` 失败仍然由 Observer 负责
 
 ## 配置
 
@@ -133,13 +143,25 @@ export default defineConfig({
 
 ## Vite Dev 模式
 
-默认情况下插件在 `dev` 模式不激活（`enableDev: false`）。Vite dev server 使用原生 ESM，动态 import 失败无法拦截。如需调试回退逻辑，请使用：
+默认情况下插件在 `dev` 模式不激活（`enableDev: false`）。Vite dev server 使用原生 ESM，动态 import 失败无法拦截。
 
 ```bash
 vite build && vite preview
 ```
 
 设置 `enableDev: true` 会在 dev 模式下也注入运行时，但仅同步 `<script>` / `<link>` 的 error 事件有效。
+
+## 同步/异步覆盖
+
+| 场景                       | Vite (build/preview)                         | Vite (dev) |
+| -------------------------- | -------------------------------------------- | ---------- |
+| 同步 `<script>` / `<link>` | ✓ Observer                                   | ✓ Observer |
+| 异步 chunk（`import()`）   | ✓ `__RF__.load` + `writeBundle` 改写         | ✗          |
+| CSS 动态注入               | ✓ Observer                                   | ✓ Observer |
+| SystemJS（legacy bundle）  | ✓ `instantiate` hook                         | —          |
+| 图片 / 字体 / 媒体资源     | ✓ Hybrid SW（opt-in）                        | ✗          |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW（opt-in）                        | ✗          |
+| CSS `@import`              | ✓ Hybrid SW（需 CSS referrer 命中 manifest） | ✗          |
 
 ## 许可证
 

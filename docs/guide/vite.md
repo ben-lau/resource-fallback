@@ -45,91 +45,55 @@ Vite `base` 应当与 `rules[].base`（rule `base`）保持一致，确保构建
 
 ## 工作原理
 
-插件在构建时完成三件事：
+插件在构建时按下面的顺序工作：
 
-### 1. HTML 注入
+### 1. `configResolved`：比较规范化后的 Vite base 与规则 base
 
-通过 `transformIndexHtml` 钩子在 `<head>` 中注入：
+插件先在 `configResolved` 阶段读取 Vite 最终解析后的 `base`，再和每条 `rules[].base` 做同样的尾斜杠规范化比较。
 
-- `<link rel="preconnect">` 标签（为每个 fallback 域名预建连接）
-- `<script>` 内联运行时 IIFE + `install(config)` 调用
+- 若规范化后的 Vite `base` 与至少一条 rule `base` 相等，才会继续启用后续的 URL 改写
+- 若不匹配，则 `writeBundle` 中的动态 import 改写会直接跳过，避免把非 CDN 构建误写成外域地址
 
-### 2. renderBuiltUrl 机制
+### 2. `generateBundle`：按需生成 Service Worker 资源
 
-利用 Vite 的 `experimental.renderBuiltUrl` 钩子，将 JS 资源的 URL 改写为运行时解析：
+如果开启了 `serviceWorker`，插件会在 `generateBundle` 阶段按需生成并发出：
 
-```js
-// 原始输出
-import('/assets/chunk-abc.js');
+- `rf-sw.js`
+- `manifest.json`
 
-// 改写后（构建产物中）
-window.__RF__.url('assets/chunk-abc.js');
-// → 'https://cdn.example.com/assets/chunk-abc.js'（或熔断后跳过不可用 host）
-```
+### 3. `writeBundle`：解析字面量动态 import，并替换为 `window.__RF__.load(filename)`
 
-`__RF__.url()` 在运行时根据规则与熔断器状态解析最终 URL，跳过已熔断的 host。
+`writeBundle` 会先用 `es-module-lexer` 解析 chunk 里的动态 import，再只改写满足以下条件的字面量导入：
 
-### 3. 动态 import 改写
+1. 该 import 是字面量字符串
+2. 解析出的文件名对应 `chunk.dynamicImports` 里的条目
+3. 当前 chunk 所在构建已经通过规范化 base 比较门禁
 
-插件通过两种方式包装动态 `import()`：
-
-#### renderDynamicImport
-
-利用 Rollup 的 `renderDynamicImport` 钩子，将动态 `import()` 包装为带回退循环的加载函数：
+改写结果是把匹配到的 `import()` 替换成 `window.__RF__.load(filename)`，例如：
 
 ```js
 // 原始代码
 const mod = await import('./Lazy.vue');
 
 // 构建后
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
+const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
-#### writeBundle + es-module-lexer
+### 4. `transformIndexHtml`：注入运行时与 preconnect 标签
 
-`writeBundle` 钩子使用 `es-module-lexer` 解析 chunk 内的动态 import，将需改写的 URL 替换为 `__RF__.load()` 调用。这解决了异步模块中包含 CSS 时依赖关系丢失的问题。
+`transformIndexHtml` 会在 `<head>` 注入：
 
-```js
-// writeBundle 改写示例
-window.__RF__.load('assets/About-xxx.js');
-```
-
-### shouldRewriteUrls 闸门
-
-在 `configResolved` 阶段，插件会比较 Vite 最终解析后的 `base` 与 `rules[].base`（两侧都会做尾斜杠规范化，与 runtime 一致）：
-
-```ts
-shouldRewriteUrls = options.rules.some(
-  (r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base),
-);
-```
-
-- 若规范化后 Vite `base` 与至少一条 rule `base` 相等，则启用 URL 改写（`renderBuiltUrl`、`writeBundle`）
-- 否则跳过 URL 改写，避免 Vite `base` 未切到 CDN 时误把异步 chunk 拼到外域
-
-::: info 为何在 configResolved 判断
-Vite `base` 从 `configResolved` 获取，确保读取的是 Vite 最终解析后的值（考虑 plugin 间覆盖）。
-:::
-
-### **RF**.load 回退循环
-
-`__RF__.load` 内部执行完整的 retry → fallback 循环：
-
-1. 通过 `resolveBuiltUrl` 确定首次请求 URL
-2. 尝试 `import(url)`
-3. 失败后按配置重试（指数退避 + 抖动）
-4. 重试预算耗尽后切换到下一个候选 URL
-5. ES Module 重试自动添加 `__rf=` 参数绕过浏览器模块缓存
-6. 每步都发出对应的 `rf:retry` / `rf:fallback` / `rf:error` 事件
-7. 所有候选耗尽后抛出原始错误
+- `<link rel="preconnect">` 标签
+- `<script>` 内联运行时 IIFE 和 `install(config)` 调用
 
 ### vite:preloadError 处理
 
 运行时监听 Vite 的 `vite:preloadError` 事件。当 modulepreload 失败时：
 
-- 记录 host 失败到熔断器
-- 让后续的 `resolveBuiltUrl` 自动跳过不可用的 host
-- 对 CSS preload 失败，通过 `chunk.dynamicImports` 追踪关联的动态 chunk，确保 CSS 依赖不会在 fallback 路径中被遗漏
+- 读取 `event.payload`
+- 提取出的 URL 若匹配已配置的 rule，就调用 `event.preventDefault()`
+- 这里不会直接更新熔断器状态、发出恢复事件，也不会自己选下一个 fallback URL
+- CSS `<link>` 失败仍然由 Observer 负责处理；这里的职责只是阻止 Vite 在 managed failure 上继续抛错
 
 ## 配置示例
 
@@ -183,7 +147,7 @@ export default defineConfig({
 | 场景                       | Vite (build/preview)                         | Vite (dev) |
 | -------------------------- | -------------------------------------------- | ---------- |
 | 同步 `<script>` / `<link>` | ✓ Observer                                   | ✓ Observer |
-| 异步 chunk（`import()`）   | ✓ `__RF__.load` + `renderDynamicImport`      | ✗          |
+| 异步 chunk（`import()`）   | ✓ `__RF__.load` + `writeBundle` 改写         | ✗          |
 | CSS 动态注入               | ✓ Observer                                   | ✓ Observer |
 | SystemJS（legacy bundle）  | ✓ `instantiate` hook                         | —          |
 | 图片 / 字体 / 媒体资源     | ✓ Hybrid SW（opt-in）                        | ✗          |

@@ -39,53 +39,63 @@ export default defineConfig({
 
 ## How It Works
 
-The plugin does three things at build time:
+The plugin follows this build/runtime sequence:
 
-### 1. HTML Injection
+### 1. `configResolved`: compare normalized Vite base against rule bases
 
-Via the `transformIndexHtml` hook, injects into `<head>`:
+The plugin first reads Vite's final resolved `base` in `configResolved`, then compares it with every `rules[].base` using the same trailing-slash normalization.
 
-- `<link rel="preconnect">` tags (pre-build connections for each fallback domain)
-- `<script>` with inlined runtime IIFE + `install(config)` call
+- If the normalized Vite `base` matches at least one rule `base`, later URL rewriting stays enabled
+- If it does not match, `writeBundle` skips the dynamic import rewrite so a non-CDN build is not rewritten into external URLs
 
-### 2. Static Asset URL Rewriting
+### 2. `generateBundle`: optionally emit Service Worker assets
 
-Uses Vite's `experimental.renderBuiltUrl` hook to rewrite JS asset URLs for runtime resolution:
+If `serviceWorker` is enabled, `generateBundle` optionally emits:
 
-```js
-// Original output
-import('/assets/chunk-abc.js');
+- `rf-sw.js`
+- `manifest.json`
 
-// Rewritten (in build output)
-window.__RF__.url('assets/chunk-abc.js');
-// → 'https://cdn.example.com/assets/chunk-abc.js' (or skips unavailable host due to circuit breaker)
-```
+### 3. `writeBundle`: parse literal dynamic imports and replace them with `window.__RF__.load(filename)`
 
-### 3. Dynamic Import Wrapping
+`writeBundle` uses `es-module-lexer` to parse dynamic imports inside chunks, then rewrites only literal imports that satisfy all of the following:
 
-Uses Rollup's `renderDynamicImport` hook to wrap dynamic `import()` into a loading function with fallback loop:
+1. the import specifier is a literal string
+2. the resolved filename exists in `chunk.dynamicImports`
+3. the build has already passed the normalized base gate
+
+Matching imports are replaced with `window.__RF__.load(filename)`, for example:
 
 ```js
 // Original code
 const mod = await import('./Lazy.vue');
 
 // After build
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
+const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
-`__RF__.load` internally executes the full retry → fallback loop:
+### 4. `transformIndexHtml`: inject runtime and preconnect tags
 
-1. Determines initial request URL via `resolveBuiltUrl`
-2. Attempts `import(url)`
-3. On failure, retries per config (exponential backoff + jitter)
-4. After retry budget is exhausted, switches to next candidate URL
-5. ES Module retries automatically add `__rf=` parameter to bypass browser module cache
-6. Each step emits corresponding `rf:retry` / `rf:fallback` / `rf:error` events
-7. After all candidates are exhausted, throws the original error
+`transformIndexHtml` injects into `<head>`:
+
+- `<link rel="preconnect">` tags
+- a `<script>` that inlines the runtime IIFE and the `install(config)` call
+
+### `__RF__.url` behavior
+
+`__RF__.url(filename)` only joins the filename with the first compiled rule base. It does not inspect circuit state or skip hosts at runtime.
+
+### `__RF__.load` fallback loop
+
+`__RF__.load(filename)` resolves the initial URL first, then delegates retry / fallback / deadline / cancellation to the shared Coordinator. It also uses a normalized URL key so concurrent loads from the same owner can share one recovery Promise.
 
 ### vite:preloadError Handling
 
-The runtime also listens for Vite's `vite:preloadError` event. When modulepreload fails, it records the host failure to the circuit breaker so subsequent `resolveBuiltUrl` calls automatically skip unavailable hosts.
+The runtime also listens for Vite's `vite:preloadError` event. When modulepreload fails:
+
+- the adapter reads `event.payload`
+- if the extracted URL matches a configured rule, it calls `event.preventDefault()`
+- it does not update circuit state, emit a recovery event, or choose a fallback URL directly
+- CSS `<link>` failures remain Observer-owned
 
 ## Configuration
 
@@ -140,6 +150,18 @@ vite build && vite preview
 ```
 
 Setting `enableDev: true` also injects the runtime in dev mode, but only sync `<script>` / `<link>` error events will work.
+
+## Sync/async coverage
+
+| Scenario                   | Vite (build/preview)                           | Vite (dev) |
+| -------------------------- | ---------------------------------------------- | ---------- |
+| Sync `<script>` / `<link>` | ✓ Observer                                     | ✓ Observer |
+| Async chunk (`import()`)   | ✓ `__RF__.load` + `writeBundle` rewrite        | ✗          |
+| CSS dynamic injection      | ✓ Observer                                     | ✓ Observer |
+| SystemJS (legacy bundle)   | ✓ `instantiate` hook                           | —          |
+| Images / fonts / media     | ✓ Hybrid SW (opt-in)                           | ✗          |
+| CSS `url()` / `@font-face` | ✓ Hybrid SW (opt-in)                           | ✗          |
+| CSS `@import`              | ✓ Hybrid SW (CSS referrer must match manifest) | ✗          |
 
 ## License
 

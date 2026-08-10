@@ -45,102 +45,55 @@ Full options: [Configuration Reference](./configuration.md).
 
 ## How it works
 
-The plugin does three things at build time:
+The plugin follows this build/runtime sequence:
 
-### 1. HTML injection
+### 1. `configResolved`: compare normalized Vite base against rule bases
 
-Via `transformIndexHtml`, injects into `<head>`:
+The plugin first reads Vite's final resolved `base` in `configResolved`, then compares it with every `rules[].base` using the same trailing-slash normalization.
 
-- `<link rel="preconnect">` tags (pre-connect for each fallback domain)
-- `<script>` with inlined runtime IIFE + `install(config)` call
+- If the normalized Vite `base` matches at least one rule `base`, URL rewriting stays enabled for later build steps
+- If it does not match, `writeBundle` skips the dynamic import rewrite so a non-CDN build is not rewritten into external URLs
 
-### 2. renderBuiltUrl
+### 2. `generateBundle`: optionally emit Service Worker assets
 
-Uses Vite's `experimental.renderBuiltUrl` hook to rewrite JS asset URLs for runtime resolution:
+If `serviceWorker` is enabled, `generateBundle` optionally emits:
 
-```js
-// Original output
-import('/assets/chunk-abc.js');
+- `rf-sw.js`
+- `manifest.json`
 
-// Rewritten (in build output)
-window.__RF__.url('assets/chunk-abc.js');
-// → 'https://cdn.example.com/assets/chunk-abc.js' (or skips unavailable host due to circuit breaker)
-```
+### 3. `writeBundle`: parse literal dynamic imports and replace them with `window.__RF__.load(filename)`
 
-`__RF__.url()` resolves the final URL at runtime based on rules and circuit breaker state, skipping tripped hosts.
+`writeBundle` uses `es-module-lexer` to parse dynamic imports inside chunks, then rewrites only literal imports that satisfy all of the following:
 
-### 3. Dynamic import rewriting
+1. the import specifier is a literal string
+2. the resolved filename exists in `chunk.dynamicImports`
+3. the build has already passed the normalized base gate
 
-The plugin wraps dynamic `import()` in two ways:
-
-#### renderDynamicImport
-
-Uses Rollup's `renderDynamicImport` hook to wrap dynamic `import()` into a loading function with a fallback loop:
+Matching imports are replaced with `window.__RF__.load(filename)`, for example:
 
 ```js
 // Original code
 const mod = await import('./Lazy.vue');
 
 // After build
-const mod = await window.__RF__.load('assets/Lazy-abc.js', import('./Lazy.vue'));
+const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
-#### writeBundle + es-module-lexer
+### 4. `transformIndexHtml`: inject runtime and preconnect tags
 
-The `writeBundle` hook uses `es-module-lexer` to parse dynamic imports inside chunks and replace URLs that need rewriting with `__RF__.load()` calls. This preserves dependency relationships when async modules include CSS.
+`transformIndexHtml` injects into `<head>`:
 
-```js
-// writeBundle rewrite example
-window.__RF__.load('assets/About-xxx.js');
-```
-
-### shouldRewriteUrls gate
-
-In `configResolved`, the plugin compares Vite's final resolved `base` with `rules[].base` (both sides use the same trailing-slash normalization as the runtime):
-
-```ts
-shouldRewriteUrls = options.rules.some(
-  (r) => ensureTrailingSlash(viteBase) === ensureTrailingSlash(r.base),
-);
-```
-
-- If the normalized Vite `base` equals at least one rule `base`, URL rewriting is enabled (`renderBuiltUrl`, `writeBundle`)
-- Otherwise rewriting is skipped so async chunks are not rewritten to a CDN when Vite `base` is still `/`
-
-::: info Why configResolved
-Vite `base` is read from `configResolved` to get Vite's final resolved value (after other plugins may override it).
-:::
-
-### **RF**.load fallback loop
-
-`__RF__.load` runs the full retry → fallback loop:
-
-1. Determines initial URL via `resolveBuiltUrl`
-2. Attempts `import(url)`
-3. On failure, retries per config (exponential backoff + jitter)
-4. After retry budget is exhausted, switches to the next candidate URL
-5. ES Module retries automatically append `__rf=` to bypass browser module cache
-6. Emits `rf:retry` / `rf:fallback` / `rf:error` at each step
-7. Throws the original error when all candidates are exhausted
+- `<link rel="preconnect">` tags
+- a `<script>` that inlines the runtime IIFE and the `install(config)` call
 
 ### vite:preloadError handling
 
 The runtime listens for Vite's `vite:preloadError` event. When modulepreload fails:
 
-- **`preventDefault()` is required** — otherwise Vite throws and blocks subsequent `__RF__.load()` calls
-- Payload is read from **`event.payload`** (not `detail`)
-- Records host failure to the circuit breaker
-- Lets subsequent `resolveBuiltUrl` skip unavailable hosts
-- For CSS preload failures, CSS entity loading is delegated to Observer via `<link>` error events
-
-```ts
-// Simplified behavior in installViteAdapter
-window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault();
-  const url = extractUrlFromError(event.payload);
-  if (url) resolver.recordFailure(url);
-});
-```
+- the adapter reads `event.payload`
+- if the extracted URL matches a configured rule, it calls `event.preventDefault()`
+- it does not update circuit state, emit a recovery event, or choose a fallback URL directly
+- CSS `<link>` failures remain Observer-owned; this handler only stops Vite from throwing on a managed failure
 
 ## Configuration example
 
@@ -194,7 +147,7 @@ Use `vite build && vite preview` to verify fallback. Setting `enableDev: true` i
 | Scenario                   | Vite (build/preview)                           | Vite (dev) |
 | -------------------------- | ---------------------------------------------- | ---------- |
 | Sync `<script>` / `<link>` | ✓ Observer                                     | ✓ Observer |
-| Async chunk (`import()`)   | ✓ `__RF__.load` + `renderDynamicImport`        | ✗          |
+| Async chunk (`import()`)   | ✓ `__RF__.load` + `writeBundle` rewrite        | ✗          |
 | CSS dynamic injection      | ✓ Observer                                     | ✓ Observer |
 | SystemJS (legacy bundle)   | ✓ `instantiate` hook                           | —          |
 | Images / fonts / media     | ✓ Hybrid SW (opt-in)                           | ✗          |
