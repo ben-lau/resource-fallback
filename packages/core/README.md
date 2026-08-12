@@ -24,13 +24,13 @@ import {
 } from '@resource-fallback/core';
 ```
 
-| 函数                      | 说明                                                            |
-| ------------------------- | --------------------------------------------------------------- |
-| `defineConfig(opts)`      | 恒等辅助函数，提供类型安全的配置编写体验                        |
-| `getRuntimePath()`        | 返回 IIFE 运行时文件的绝对路径                                  |
-| `getRuntimeCode()`        | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）              |
-| `buildInjectedTags(opts)` | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组 |
-| `serialiseConfig(cfg)`    | 将运行时配置序列化为可嵌入页面的 JSON 字符串                    |
+| 函数                      | 说明                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `defineConfig(opts)`      | 恒等辅助函数，提供类型安全的配置编写体验                                                    |
+| `getRuntimePath()`        | 返回 IIFE 运行时文件的绝对路径                                                              |
+| `getRuntimeCode()`        | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）                                          |
+| `buildInjectedTags(opts)` | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组；会先序列化配置并丢弃函数值 |
+| `serialiseConfig(cfg)`    | 将运行时配置序列化为可嵌入页面的 JSON 字符串；函数字段不会保留                              |
 
 ### defineConfig
 
@@ -70,6 +70,8 @@ const tags = buildInjectedTags({
 // ]
 ```
 
+注意：`buildInjectedTags()` 和插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象。`hooks` 里的函数、以及其他函数类型字段，都会在这一阶段被丢弃。`externalRuntime` 只改变 runtime script 是内联还是外链，不会保留这些函数；自动注入场景推荐监听 DOM `rf:*` 事件。如需 JS hooks，请在页面里手动调用 `window.__RF__.install()`。
+
 ## 浏览器运行时
 
 运行时以 IIFE 格式注入页面（约 5KB gzip），通过 `window.__RF__` 暴露接口：
@@ -89,10 +91,10 @@ interface RfGlobal {
 
 | 模块                 | 职责                                                                                                             |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **entry**            | 初始化 `window.__RF__` 全局对象，创建共享 coordinator/ownership/lifecycle 并调度各适配器安装                     |
+| **entry**            | 初始化 `window.__RF__` 全局对象，创建共享 RecoveryCoordinator / ownership / lifecycle，并调度各适配器安装        |
 | **observer**         | 监听 `window` 上的 `error` 事件（捕获阶段），把 `<script>` 和 `<link rel="stylesheet">` 失败交给共享 coordinator |
-| **coordinator**      | 统一负责规则匹配、重试、回退、熔断、超时、取消和恢复事件；适配器只提供原生 transport                             |
-| **circuit**          | per-host 熔断器，通过 `localStorage` 实现跨标签页状态共享                                                        |
+| **coordinator**      | 页面侧恢复决策引擎；统一负责规则匹配、重试、回退、熔断、超时、取消和恢复事件；适配器只提供原生 transport         |
+| **circuit**          | per-host 熔断状态；页面侧当前只创建一个 registry，并通过 `localStorage` 实现跨标签页状态共享                     |
 | **retry**            | 指数退避延迟计算（`baseDelay × 2^(attempt-1)`），可选 ±25% 抖动                                                  |
 | **hooks**            | 事件总线，同时分发 DOM `CustomEvent` 和 JS 函数钩子                                                              |
 | **kill-switch**      | 三重紧急开关检测（全局变量 / 查询参数 / Cookie）                                                                 |
@@ -111,16 +113,25 @@ interface RfGlobal {
 - 经典脚本和 CSS 不添加 cache-bust 参数，避免降低 CDN 缓存命中率
 - 替换标签使用 `createElement` 而非 `cloneNode`，避免浏览器的 "already started" 标记
 
+### 共享恢复与规则限制
+
+- 页面侧 RecoveryCoordinator 会按 `owner + logical resource key` 共享一次进行中的恢复 Promise
+- 同一个 owner 命中同一个逻辑资源时会加入同一条 retry / fallback 链；不同 owner 或不同逻辑 key 不共享
+- ownership registry 会阻止 Observer 与 Vite / Webpack / SystemJS 适配器分别接管同一个逻辑资源
+- 规则编译时按 `base` 长度降序排序，匹配时优先更长前缀
+- `window.__RF__.url(filename)` 只使用第一条已编译规则的 `base` 构造首轮 URL，不感知熔断状态
+- 页面 runtime 当前只有一个 circuit registry，使用第一条已编译规则的 circuit 选项初始化；Service Worker 仍使用 resolver，但其熔断状态始终是独立内存
+
 ### 事件
 
 运行时在每个决策点分发 DOM `CustomEvent`：
 
-| 事件          | 触发时机               | `event.detail`                                   |
-| ------------- | ---------------------- | ------------------------------------------------ |
-| `rf:retry`    | 同一 URL 重试          | `{ url: string, attempt: number }`               |
-| `rf:fallback` | 切换到下一个候选 URL   | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success`  | 经过回退的资源加载成功 | `{ url: string, attempts: number }`              |
-| `rf:error`    | 所有候选耗尽（giveup） | `{ url: string, reason?: unknown }`              |
+| 事件          | 触发时机                            | `event.detail`                                   |
+| ------------- | ----------------------------------- | ------------------------------------------------ |
+| `rf:retry`    | 同一 URL 重试                       | `{ url: string, attempt: number }`               |
+| `rf:fallback` | 切换到下一个候选 URL                | `{ from: string, to: string, reason?: unknown }` |
+| `rf:success`  | 页面侧一次已恢复 session 成功       | `{ url: string, attempts: number }`              |
+| `rf:error`    | 页面侧 session 失败，或 SW 透传错误 | `{ url: string, reason?: unknown }`              |
 
 ## 导出
 

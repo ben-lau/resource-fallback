@@ -34,7 +34,7 @@ title: 简介
 ```mermaid
 graph TB
   subgraph build["构建时 (Node)"]
-    VP["Vite Plugin<br/><small>renderBuiltUrl<br/>renderDynamicImport</small>"]
+    VP["Vite Plugin<br/><small>transformIndexHtml<br/>动态 import 包装</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON 配置</small>"]
     VP --> CORE
@@ -55,11 +55,8 @@ graph TB
     end
 
     subgraph engine["决策引擎"]
-      RES["Resolver<br/><small>规则匹配 → retry / fallback / giveup</small>"]
-      RT["Retry<br/><small>指数退避 + 抖动</small>"]
-      CB["CircuitBreaker<br/><small>per-host 熔断<br/>localStorage 跨 Tab 共享</small>"]
-      RES --- RT
-      RES --- CB
+      RC["RecoveryCoordinator<br/><small>retry / fallback / deadlines / cancellation</small>"]
+      REG["In-flight Registry + Circuit Registry + EventBus"]
     end
 
     HB["HookBus<br/><small>rf:retry / rf:fallback<br/>rf:success / rf:error</small>"]
@@ -69,11 +66,12 @@ graph TB
     INSTALL --> WA
     INSTALL --> SA
     INSTALL --> SWA
-    OBS --> RES
-    VA --> RES
-    WA --> RES
-    SA --> RES
-    RES --> HB
+    OBS --> RC
+    VA --> RC
+    WA --> RC
+    SA --> RC
+    RC --> REG
+    REG --> HB
   end
 ```
 
@@ -98,21 +96,21 @@ flowchart TD
 
 ## 包结构
 
-| 包                                                                                                     | 说明                                 | 版本    |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------- |
-| [`@resource-fallback/core`](https://www.npmjs.com/package/@resource-fallback/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.1.5` |
-| [`@resource-fallback/vite-plugin`](https://www.npmjs.com/package/@resource-fallback/vite-plugin)       | Vite 4+ 插件                         | `0.1.5` |
-| [`@resource-fallback/webpack-plugin`](https://www.npmjs.com/package/@resource-fallback/webpack-plugin) | Webpack 5+ 插件                      | `0.1.5` |
+| 包                                                                                                     | 说明                                 | 版本信息                   |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------ | -------------------------- |
+| [`@resource-fallback/core`](https://www.npmjs.com/package/@resource-fallback/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | 见 npm 页面 / package.json |
+| [`@resource-fallback/vite-plugin`](https://www.npmjs.com/package/@resource-fallback/vite-plugin)       | Vite 4+ 插件                         | 见 npm 页面 / package.json |
+| [`@resource-fallback/webpack-plugin`](https://www.npmjs.com/package/@resource-fallback/webpack-plugin) | Webpack 5+ 插件                      | 见 npm 页面 / package.json |
 
 ### @resource-fallback/core
 
 核心运行时与构建工具：
 
-- **Resolver** — 规则匹配、retry / fallback 决策
+- **RecoveryCoordinator** — 页面侧恢复决策引擎，统一负责规则选择、retry / fallback、deadline、取消与事件
 - **Retry** — 指数退避 + 抖动
-- **CircuitBreaker** — per-host 熔断，支持 localStorage 跨 Tab 共享
+- **Circuit Registry** — per-host 熔断状态；页面侧当前只有一个 registry，支持 localStorage 跨 Tab 共享
 - **Observer** — 监听 `<script>` / `<link>` 的 error 事件
-- **Adapter** — Vite / Webpack / SystemJS / SW 适配器
+- **Adapter** — Vite / Webpack / SystemJS / SW 适配器，负责 transport 与 ownership 接入
 - **buildInjectedTags()** — 生成注入 HTML 的标签
 - **getRuntimeCode()** — 获取 IIFE 运行时源码
 
@@ -120,10 +118,15 @@ flowchart TD
 
 Vite 构建集成，详见 [Vite 集成](./vite.md)：
 
-- `renderBuiltUrl` 静态资源 URL 改写
-- `renderDynamicImport` + `writeBundle` 动态 import 包装
 - `transformIndexHtml` HTML 注入
+- 动态 `import()` 包装
 - 可选 Hybrid SW 资产生成
+
+当前页面 runtime 还有三个需要明确的限制：
+
+- `window.__RF__.url(filename)` 只会使用第一条已编译规则的 `base` 构造首轮 URL，不会跳过已熔断 host；
+- 规则会先按 `base` 长度降序编译；恢复开始后，RecoveryCoordinator 会根据初始 URL 选中一条规则，并沿该规则的有序候选继续恢复；
+- 页面侧目前只初始化一个 circuit registry，而不是每条规则各自一个。
 
 ### @resource-fallback/webpack-plugin
 

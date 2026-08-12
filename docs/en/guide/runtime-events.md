@@ -4,25 +4,25 @@ title: Runtime Events
 
 # Runtime Events
 
-resource-fallback exposes a DOM CustomEvent API and optional JS function hooks for monitoring, alerting, and degraded UI.
+resource-fallback exposes DOM CustomEvents and optional JS function hooks for monitoring, alerting, and degraded UI. In auto-injected setups, prefer DOM events because function values in build config are dropped during serialization.
 
 ## Event reference
 
-| Event         | When fired                                        | `detail` fields         |
-| ------------- | ------------------------------------------------- | ----------------------- |
-| `rf:retry`    | Same URL is retried                               | `{ url, attempt }`      |
-| `rf:fallback` | Switched to next candidate URL                    | `{ from, to, reason? }` |
-| `rf:success`  | Resource loaded after at least one retry/fallback | `{ url, attempts }`     |
-| `rf:error`    | All candidates exhausted, or no-match giveup      | `{ url, reason? }`      |
+| Event         | When fired                                           | `detail` fields         |
+| ------------- | ---------------------------------------------------- | ----------------------- |
+| `rf:retry`    | Same URL is retried                                  | `{ url, attempt }`      |
+| `rf:fallback` | Switched to next candidate URL                       | `{ from, to, reason? }` |
+| `rf:success`  | A recovered page-side session completes successfully | `{ url, attempts }`     |
+| `rf:error`    | A page-side session fails, or an SW error is bridged | `{ url, reason? }`      |
 
-`reason` on `rf:error` may be:
+::: info Event sources
+Page-side adapters (Observer, Vite, Webpack, SystemJS) hand failures to the RecoveryCoordinator, and the HookBus emits the DOM events. In Hybrid SW mode, the SW posts events back to the page, and the page runtime re-emits the same `rf:*` names.
 
-- `'rules-exhausted'` — matched rule but all URLs failed
-- `'no-match'` — URL did not match any rule (Observer still emits for debugging; **not** a full fallback chain)
-
-::: warning rf:error semantics
-`rf:error` with `reason: 'no-match'` means the runtime **did not take over** — e.g. third-party scripts. Do not treat all `rf:error` events as production incidents.
-:::
+- For page Coordinator events, `ErrorEvent.reason` is an opaque `unknown` failure value from the transport/coordinator.
+- For SW-bridged events, `reason` may include resolver giveup reasons such as `'rules-exhausted'` or `'no-match'`.
+- Page `rf:success` is published only after a recovery session succeeds; it is not emitted for an initial first-try success.
+- SW `rf:success` is emitted for any usable SW response, including an initial successful fetch.
+  :::
 
 ## DOM listener examples
 
@@ -81,7 +81,7 @@ function didFallbackRun(since: number) {
 
 ## JS function hooks
 
-When using `externalRuntime: true`, pass hooks in config (functions cannot be JSON-serialized for inline injection):
+If you need function hooks, call `window.__RF__.install()` manually in page code so you can pass live function objects directly:
 
 ```ts
 window.__RF__.install({
@@ -95,19 +95,9 @@ window.__RF__.install({
 });
 ```
 
-Or configure hooks at build time when `externalRuntime` is enabled:
-
-```ts
-resourceFallback({
-  externalRuntime: true,
-  rules: [...],
-  hooks: {
-    onError: (e) => {
-      if (e.reason !== 'no-match') sentry.captureMessage('rf.error', e);
-    },
-  },
-});
-```
+::: warning Hook serialization limits
+`buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize the config before it reaches the page, so function hooks from build config are dropped. `externalRuntime` only changes whether the runtime script is inline or external; it does not preserve those functions. For auto-injected setups, use DOM `rf:*` events instead.
+:::
 
 ## Monitoring integration
 
@@ -121,7 +111,6 @@ window.addEventListener('rf:fallback', (e) => {
   monitor.send('resource.fallback', e.detail);
 });
 window.addEventListener('rf:error', (e) => {
-  if (e.detail.reason === 'no-match') return;
   monitor.send('resource.error', e.detail);
 });
 ```
@@ -132,7 +121,7 @@ window.addEventListener('rf:error', (e) => {
 | --------------- | ------------------------------------------------------------ |
 | Retry rate      | `rf:retry` count by host                                     |
 | Fallback rate   | `rf:fallback` `from` → `to`                                  |
-| Exhaustion rate | `rf:error` where `reason === 'rules-exhausted'`              |
+| Exhaustion rate | SW-bridged `rf:error` where `reason === 'rules-exhausted'`   |
 | Circuit trips   | host skipped in fallback chain (via logging + circuit state) |
 
 ### Hybrid SW events

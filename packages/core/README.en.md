@@ -24,13 +24,13 @@ import {
 } from '@resource-fallback/core';
 ```
 
-| Function                  | Description                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------ |
-| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                       |
-| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                   |
-| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                  |
-| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML based on config |
-| `serialiseConfig(cfg)`    | Serializes runtime config to a JSON string suitable for embedding in the page        |
+| Function                  | Description                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                                                    |
+| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                                                |
+| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                                               |
+| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML; serializes config and drops function values |
+| `serialiseConfig(cfg)`    | Serializes runtime config to a page-safe JSON string; function fields are not preserved                           |
 
 ### defineConfig
 
@@ -70,6 +70,8 @@ const tags = buildInjectedTags({
 // ]
 ```
 
+Note: `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize config before it reaches the page. Functions inside `hooks` — and any other function-valued fields — are dropped at that step. `externalRuntime` only changes whether the runtime script is inline or external; it does not preserve those functions. For auto-injected setups, prefer DOM `rf:*` events. Use JS hooks only when you manually call `window.__RF__.install()` in page code.
+
 ## Browser Runtime
 
 The runtime is injected as an IIFE (~5KB gzip) and exposes its interface via `window.__RF__`:
@@ -89,10 +91,10 @@ interface RfGlobal {
 
 | Module               | Responsibility                                                                                                                               |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **entry**            | Initializes the `window.__RF__`, creates the shared coordinator/ownership/lifecycle services, and dispatches adapter installation            |
+| **entry**            | Initializes `window.__RF__`, creates the shared RecoveryCoordinator / ownership / lifecycle services, and dispatches adapter installation    |
 | **observer**         | Listens for `error` events on `window` (capture phase) and hands `<script>` and `<link rel="stylesheet">` failures to the shared coordinator |
-| **coordinator**      | Owns rule matching, retry, fallback, circuit breaking, deadlines, cancellation, and recovery events; adapters provide transports only        |
-| **circuit**          | Per-host circuit breaker with `localStorage` cross-tab state sharing                                                                         |
+| **coordinator**      | The page-side decision engine for rule matching, retry, fallback, circuit breaking, deadlines, cancellation, and recovery events             |
+| **circuit**          | Per-host circuit state; the page runtime currently creates a single registry with `localStorage` cross-tab sharing                           |
 | **retry**            | Exponential backoff delay calculation (`baseDelay × 2^(attempt-1)`), optional ±25% jitter                                                    |
 | **hooks**            | Event bus; dispatches both DOM `CustomEvent` and JS function hooks                                                                           |
 | **kill-switch**      | Triple kill-switch detection (global variable / query parameter / cookie)                                                                    |
@@ -111,16 +113,25 @@ interface RfGlobal {
 - Classic scripts and CSS do not add cache-bust parameters to avoid reducing CDN cache hit rates
 - Replacement tags use `createElement` instead of `cloneNode` to avoid the browser's "already started" flag
 
+### Shared recovery and current rule limits
+
+- The page-side RecoveryCoordinator shares one in-flight recovery Promise per `owner + logical resource key`
+- Calls from the same owner for the same logical resource join the same retry/fallback chain; different owners or logical keys stay independent
+- The ownership registry prevents Observer and Vite / Webpack / SystemJS adapters from independently taking over the same logical resource
+- Rules are compiled with longer `base` prefixes first
+- `window.__RF__.url(filename)` always constructs the initial URL from the first compiled rule's `base`; it is not circuit-aware
+- The page runtime currently initializes one circuit registry from the first compiled rule's circuit options; the Service Worker still uses the legacy resolver terminology, with isolated in-memory circuit state
+
 ### Events
 
 The runtime dispatches DOM `CustomEvent` at each decision point:
 
-| Event         | When Fired                        | `event.detail`                                   |
-| ------------- | --------------------------------- | ------------------------------------------------ |
-| `rf:retry`    | Same URL retried                  | `{ url: string, attempt: number }`               |
-| `rf:fallback` | Switched to next candidate URL    | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success`  | Resource loaded after fallback    | `{ url: string, attempts: number }`              |
-| `rf:error`    | All candidates exhausted (giveup) | `{ url: string, reason?: unknown }`              |
+| Event         | When Fired                                           | `event.detail`                                   |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| `rf:retry`    | Same URL retried                                     | `{ url: string, attempt: number }`               |
+| `rf:fallback` | Switched to next candidate URL                       | `{ from: string, to: string, reason?: unknown }` |
+| `rf:success`  | A recovered page-side session succeeds               | `{ url: string, attempts: number }`              |
+| `rf:error`    | A page-side session fails, or an SW error is bridged | `{ url: string, reason?: unknown }`              |
 
 ## Exports
 

@@ -12,18 +12,18 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 
 | 字段                  | 类型                              | 默认值               | 说明                                                                |
 | --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；多条规则时 `resolveBuiltUrl` 以最后一条命中为准       |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀      |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
 | `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
 | `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                  |
 | `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                            |
-| `externalRuntime`     | `boolean`                         | `false`              | 将运行时作为外链引入而非内联                                        |
+| `externalRuntime`     | `boolean`                         | `false`              | 仅改变 runtime script 的放置方式；不会保留构建配置里的函数钩子      |
 | `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                    |
 | `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                  |
 | `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                              |
 | `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                |
-| `hooks`               | `RuntimeHooks`                    | —                    | JS 函数钩子（仅 `externalRuntime` 模式可用）                        |
+| `hooks`               | `RuntimeHooks`                    | —                    | 序列化注入时函数会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件      |
 | `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                       |
 | `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                 |
 | `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                   |
@@ -42,6 +42,12 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vite `base` 与 rule `base`。Vite `base` / Webpack `publicPath` 应等于 `rules[].base`。`base` 与 `urls` 可以不同——`base` 管首轮加载前缀，`urls` 管失败后的回退链。不再支持 RegExp / 函数匹配。
 :::
 
+当前页面侧规则与熔断行为需要精确理解：
+
+- `window.__RF__.url(filename)` 使用第一条已编译规则的 `base` 构造首轮 URL，不感知熔断状态；
+- 一次恢复会先根据初始 URL 选中一条规则，再沿该规则的有序 `urls` 候选继续 retry / fallback；
+- 页面 runtime 当前只有一个 circuit registry，使用第一条已编译规则的 circuit 选项初始化；`FallbackRule.circuit` 仍是公开类型，但页面侧“每条规则独立熔断器”尚未实现。
+
 ## RetryOptions
 
 | 字段        | 类型      | 默认值 | 说明                     |
@@ -59,6 +65,17 @@ Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vit
 | `cooldown`        | `number`  | `30000`  | 熔断后冷却时长（ms），到期后重新尝试     |
 | `shareAcrossTabs` | `boolean` | `true`   | 通过 `localStorage` 跨标签页共享熔断状态 |
 | `storageTtl`      | `number`  | `120000` | localStorage 中熔断条目的存活时长（ms）  |
+
+页面侧 RecoveryCoordinator 还会按 `owner + logical resource key` 共享一次进行中的恢复 Promise。同一个 owner 命中同一个逻辑资源时会加入同一条恢复链；不同 owner 或不同 logical key 不共享。ownership registry 会阻止 Observer 与构建器适配器分别接管同一个逻辑资源。
+
+## hooks 与序列化限制
+
+`buildInjectedTags()` 与插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象，函数值会被丢弃。因此：
+
+- 构建配置里的 `hooks` 不会在自动注入场景下保留下来；
+- `externalRuntime` 只改变 runtime script 是否外链，不会改变上述序列化行为；
+- 推荐用 DOM `rf:*` 事件作为自动注入场景的监控接入方式；
+- 如需 JS hooks，请在页面代码里手动调用 `window.__RF__.install()`，直接传入函数对象。
 
 ## ServiceWorkerOptions
 

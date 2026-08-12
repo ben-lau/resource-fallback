@@ -30,7 +30,7 @@ Zero-mental-overhead frontend resource fallback solution. Provides runtime **ret
 ```mermaid
 graph TB
   subgraph build["Build Time (Node)"]
-    VP["Vite Plugin<br/><small>renderBuiltUrl<br/>renderDynamicImport</small>"]
+    VP["Vite Plugin<br/><small>transformIndexHtml<br/>dynamic import wrapping</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON config</small>"]
     VP --> CORE
@@ -50,11 +50,8 @@ graph TB
     end
 
     subgraph engine["Decision Engine"]
-      RES["Resolver<br/><small>rule match → retry / fallback / giveup</small>"]
-      RT["Retry<br/><small>exponential backoff + jitter</small>"]
-      CB["CircuitBreaker<br/><small>per-host circuit<br/>localStorage cross-tab sharing</small>"]
-      RES --- RT
-      RES --- CB
+      RC["RecoveryCoordinator<br/><small>retry / fallback / deadlines / cancellation</small>"]
+      REG["In-flight Registry + Circuit Registry + EventBus"]
     end
 
     HB["HookBus<br/><small>rf:retry / rf:fallback<br/>rf:success / rf:error</small>"]
@@ -63,11 +60,12 @@ graph TB
     INSTALL --> VA
     INSTALL --> WA
     INSTALL --> SA
-    OBS --> RES
-    VA --> RES
-    WA --> RES
-    SA --> RES
-    RES --> HB
+    OBS --> RC
+    VA --> RC
+    WA --> RC
+    SA --> RC
+    RC --> REG
+    REG --> HB
   end
 ```
 
@@ -92,11 +90,11 @@ flowchart TD
 
 ## Packages
 
-| Package                                                        | Description                                   | Version |
-| -------------------------------------------------------------- | --------------------------------------------- | ------- |
-| [`@resource-fallback/core`](packages/core)                     | Browser IIFE runtime + Node utility functions | `0.1.5` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ plugin                                | `0.1.5` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin                             | `0.1.5` |
+| Package                                                        | Description                                   | Version source               |
+| -------------------------------------------------------------- | --------------------------------------------- | ---------------------------- |
+| [`@resource-fallback/core`](packages/core)                     | Browser IIFE runtime + Node utility functions | See npm badge / package.json |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ plugin                                | See npm badge / package.json |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ plugin                             | See npm badge / package.json |
 
 ## Quick Start
 
@@ -183,23 +181,23 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### PluginOptions
 
-| Field                 | Type                              | Default              | Description                                                               |
-| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rule array; for `resolveBuiltUrl`, the last matching rule wins   |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`   |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback               |
-| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                           |
-| `nonce`               | `string`                          | —                    | CSP nonce appended to the injected `<script>` tag                         |
-| `externalRuntime`     | `boolean`                         | `false`              | Load runtime as external script instead of inline                         |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                      |
-| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                 |
-| `htmlInject`          | `'head-prepend' \| 'head-append`  | `'head-prepend'`     | Position in `<head>` for injection                                        |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import` |
-| `hooks`               | `RuntimeHooks`                    | —                    | JS function hooks (only available in `externalRuntime` mode)              |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                              |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                  |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                         |
+| Field                 | Type                              | Default              | Description                                                                                   |
+| --------------------- | --------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first  |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                    |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                       |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback                                   |
+| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                               |
+| `nonce`               | `string`                          | —                    | CSP nonce appended to the injected `<script>` tag                                             |
+| `externalRuntime`     | `boolean`                         | `false`              | Changes script placement only; it does not preserve function hooks from build config          |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                                          |
+| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                                     |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | Position in `<head>` for injection                                                            |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import`                     |
+| `hooks`               | `RuntimeHooks`                    | —                    | Functions in serialized config are dropped; for auto-injected setups prefer DOM `rf:*` events |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                                                  |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                                      |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                                             |
 
 ### FallbackRule
 
@@ -211,6 +209,12 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 | `circuit` | `CircuitOptions` | See below    | Override circuit breaker config for this rule                                                                                                                                                                                            |
 
 > Vite's config `base` and `FallbackRule.base` share a name: call them Vite `base` vs rule `base` in prose. Vite `base` / Webpack `publicPath` should equal `rules[].base`.
+
+Three current page-side limits are important:
+
+- `window.__RF__.url(filename)` always builds the initial URL from the first compiled rule's `base`; it is not circuit-aware;
+- a recovery session chooses one rule from the initial URL, then walks that rule's ordered candidates;
+- the page runtime currently creates one circuit registry, initialized from the first compiled rule's circuit options. `FallbackRule.circuit` remains public, but independent per-rule page circuits are not implemented yet.
 
 ### RetryOptions
 
@@ -260,16 +264,29 @@ The SW cache policy is intentionally conservative: only readable 2xx responses f
 
 The SW resolver always uses an isolated in-memory circuit breaker. Even if page-side `defaults.circuit.shareAcrossTabs` is `true`, the SW does not read or write `localStorage`. If the SW fetch chain ultimately rejects, it emits `rf:error` and returns `Response.error()`, keeping the browser-visible resource behavior close to a real network error.
 
+## Shared recovery and ownership
+
+The page-side RecoveryCoordinator shares one in-flight recovery Promise per `owner + logical resource key`. Calls from the same owner for the same logical resource join the same recovery chain; different owners or different logical keys do not share work. The ownership registry prevents Observer and Vite / Webpack / SystemJS adapters from independently taking over the same logical resource.
+
+## Hooks and serialization limits
+
+`buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls both serialize the config before it reaches the page. Function values, including `hooks.onRetry` / `onFallback` / `onSuccess` / `onError`, are dropped during that step. `externalRuntime` only moves the runtime IIFE into a separate `<script src>`; the generated install call still uses the same serialized config.
+
+So:
+
+- for automatic injection and build-config monitoring, prefer DOM `rf:retry`, `rf:fallback`, `rf:success`, and `rf:error` events;
+- use JS function hooks only when you manually call `window.__RF__.install()` in page code before installation and pass live function objects yourself.
+
 ## Runtime Behavior
 
 ### Events
 
-| Event         | When Fired                                                       | Detail                  |
-| ------------- | ---------------------------------------------------------------- | ----------------------- |
-| `rf:retry`    | Same URL retried                                                 | `{ url, attempt }`      |
-| `rf:fallback` | Switched to next candidate URL                                   | `{ from, to, reason? }` |
-| `rf:success`  | Resource loaded successfully (after at least one retry/fallback) | `{ url, attempts }`     |
-| `rf:error`    | All candidate URLs exhausted                                     | `{ url, reason? }`      |
+| Event         | When Fired                                           | Detail                  |
+| ------------- | ---------------------------------------------------- | ----------------------- |
+| `rf:retry`    | Same URL retried                                     | `{ url, attempt }`      |
+| `rf:fallback` | Switched to next candidate URL                       | `{ from, to, reason? }` |
+| `rf:success`  | A recovered page-side session completes successfully | `{ url, attempts }`     |
+| `rf:error`    | A page-side session fails, or an SW error is bridged | `{ url, reason? }`      |
 
 Application code can listen via `window.addEventListener('rf:fallback', (e) => { ... })`.
 
@@ -278,7 +295,7 @@ Application code can listen via `window.addEventListener('rf:fallback', (e) => {
 | Scenario                   | Webpack                                        | Vite (build/preview)                           | Vite (dev) |
 | -------------------------- | ---------------------------------------------- | ---------------------------------------------- | ---------- |
 | Sync `<script>` / `<link>` | ✓ Observer                                     | ✓ Observer                                     | ✓ Observer |
-| Async chunk (`import()`)   | ✓ `__webpack_require__.l` hook                 | ✓ `__RF__.load` + `renderDynamicImport`        | ✗          |
+| Async chunk (`import()`)   | ✓ `__webpack_require__.l` hook                 | ✓ `__RF__.load` + dynamic import wrapping      | ✗          |
 | CSS dynamic injection      | ✓ Observer                                     | ✓ Observer                                     | ✓ Observer |
 | SystemJS (legacy bundle)   | ✓ `instantiate` hook                           | ✓ `instantiate` hook                           | —          |
 | Images / fonts / media     | ✓ Hybrid SW (opt-in, controlled pages)         | ✓ Hybrid SW (opt-in, controlled pages)         | ✗          |

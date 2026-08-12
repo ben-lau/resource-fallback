@@ -34,7 +34,7 @@ Traditional approaches require manual failure handling in business code or compl
 ```mermaid
 graph TB
   subgraph build["Build Time (Node)"]
-    VP["Vite Plugin<br/><small>renderBuiltUrl<br/>renderDynamicImport</small>"]
+    VP["Vite Plugin<br/><small>transformIndexHtml<br/>dynamic import wrapping</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON config</small>"]
     VP --> CORE
@@ -55,11 +55,8 @@ graph TB
     end
 
     subgraph engine["Decision Engine"]
-      RES["Resolver<br/><small>rule match → retry / fallback / giveup</small>"]
-      RT["Retry<br/><small>exponential backoff + jitter</small>"]
-      CB["CircuitBreaker<br/><small>per-host circuit<br/>localStorage cross-tab sharing</small>"]
-      RES --- RT
-      RES --- CB
+      RC["RecoveryCoordinator<br/><small>retry / fallback / deadlines / cancellation</small>"]
+      REG["In-flight Registry + Circuit Registry + EventBus"]
     end
 
     HB["HookBus<br/><small>rf:retry / rf:fallback<br/>rf:success / rf:error</small>"]
@@ -69,11 +66,12 @@ graph TB
     INSTALL --> WA
     INSTALL --> SA
     INSTALL --> SWA
-    OBS --> RES
-    VA --> RES
-    WA --> RES
-    SA --> RES
-    RES --> HB
+    OBS --> RC
+    VA --> RC
+    WA --> RC
+    SA --> RC
+    RC --> REG
+    REG --> HB
   end
 ```
 
@@ -98,21 +96,21 @@ flowchart TD
 
 ## Package structure
 
-| Package                                                                                                | Description                                   | Version |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------- | ------- |
-| [`@resource-fallback/core`](https://www.npmjs.com/package/@resource-fallback/core)                     | Browser IIFE runtime + Node utility functions | `0.1.5` |
-| [`@resource-fallback/vite-plugin`](https://www.npmjs.com/package/@resource-fallback/vite-plugin)       | Vite 4+ plugin                                | `0.1.5` |
-| [`@resource-fallback/webpack-plugin`](https://www.npmjs.com/package/@resource-fallback/webpack-plugin) | Webpack 5+ plugin                             | `0.1.5` |
+| Package                                                                                                | Description                                   | Version source              |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------- |
+| [`@resource-fallback/core`](https://www.npmjs.com/package/@resource-fallback/core)                     | Browser IIFE runtime + Node utility functions | See npm page / package.json |
+| [`@resource-fallback/vite-plugin`](https://www.npmjs.com/package/@resource-fallback/vite-plugin)       | Vite 4+ plugin                                | See npm page / package.json |
+| [`@resource-fallback/webpack-plugin`](https://www.npmjs.com/package/@resource-fallback/webpack-plugin) | Webpack 5+ plugin                             | See npm page / package.json |
 
 ### @resource-fallback/core
 
 Core runtime and build utilities:
 
-- **Resolver** — rule matching, retry / fallback decisions
+- **RecoveryCoordinator** — the page-side decision engine for rule selection, retry/fallback, deadlines, cancellation, and events
 - **Retry** — exponential backoff + jitter
-- **CircuitBreaker** — per-host circuit with optional localStorage cross-tab sharing
+- **Circuit Registry** — per-host circuit state; the page runtime currently uses a single registry with optional localStorage cross-tab sharing
 - **Observer** — listens for `<script>` / `<link>` error events
-- **Adapters** — Vite / Webpack / SystemJS / SW adapters
+- **Adapters** — Vite / Webpack / SystemJS / SW adapters; they provide transport and ownership admission
 - **buildInjectedTags()** — generates HTML injection tags
 - **getRuntimeCode()** — returns IIFE runtime source
 
@@ -120,10 +118,15 @@ Core runtime and build utilities:
 
 Vite build integration — see [Vite Integration](./vite.md):
 
-- `renderBuiltUrl` static asset URL rewriting
-- `renderDynamicImport` + `writeBundle` dynamic import wrapping
 - `transformIndexHtml` HTML injection
+- dynamic `import()` wrapping
 - Optional Hybrid SW asset generation
+
+Three current page-runtime limits are worth calling out:
+
+- `window.__RF__.url(filename)` always builds the initial URL from the first compiled rule's `base`; it does not skip circuit-open hosts;
+- rules are compiled with longer `base` prefixes first, and once recovery starts the RecoveryCoordinator picks one rule from the initial URL and walks that rule's ordered candidates;
+- the page runtime currently initializes one circuit registry rather than one per rule.
 
 ### @resource-fallback/webpack-plugin
 

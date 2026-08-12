@@ -30,7 +30,7 @@
 ```mermaid
 graph TB
   subgraph build["构建时 (Node)"]
-    VP["Vite Plugin<br/><small>renderBuiltUrl<br/>renderDynamicImport</small>"]
+    VP["Vite Plugin<br/><small>transformIndexHtml<br/>动态 import 包装</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON 配置</small>"]
     VP --> CORE
@@ -51,11 +51,8 @@ graph TB
     end
 
     subgraph engine["决策引擎"]
-      RES["Resolver<br/><small>规则匹配 → retry / fallback / giveup</small>"]
-      RT["Retry<br/><small>指数退避 + 抖动</small>"]
-      CB["CircuitBreaker<br/><small>per-host 熔断<br/>localStorage 跨 Tab 共享</small>"]
-      RES --- RT
-      RES --- CB
+      RC["RecoveryCoordinator<br/><small>retry / fallback / deadlines / cancellation</small>"]
+      REG["In-flight Registry + Circuit Registry + EventBus"]
     end
 
     HB["HookBus<br/><small>rf:retry / rf:fallback<br/>rf:success / rf:error</small>"]
@@ -65,11 +62,12 @@ graph TB
     INSTALL --> WA
     INSTALL --> SA
     INSTALL --> SWA
-    OBS --> RES
-    VA --> RES
-    WA --> RES
-    SA --> RES
-    RES --> HB
+    OBS --> RC
+    VA --> RC
+    WA --> RC
+    SA --> RC
+    RC --> REG
+    REG --> HB
   end
 ```
 
@@ -94,11 +92,11 @@ flowchart TD
 
 ## 包结构
 
-| 包                                                             | 说明                                 | 版本    |
-| -------------------------------------------------------------- | ------------------------------------ | ------- |
-| [`@resource-fallback/core`](packages/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | `0.1.5` |
-| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ 插件                         | `0.1.5` |
-| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件                      | `0.1.5` |
+| 包                                                             | 说明                                 | 版本信息                    |
+| -------------------------------------------------------------- | ------------------------------------ | --------------------------- |
+| [`@resource-fallback/core`](packages/core)                     | 浏览器 IIFE 运行时 + Node 端工具函数 | 见 npm badge / package.json |
+| [`@resource-fallback/vite-plugin`](packages/vite-plugin)       | Vite 4+ 插件                         | 见 npm badge / package.json |
+| [`@resource-fallback/webpack-plugin`](packages/webpack-plugin) | Webpack 5+ 插件                      | 见 npm badge / package.json |
 
 ## 快速上手
 
@@ -185,23 +183,23 @@ module.exports = {
 
 ### PluginOptions
 
-| 字段                  | 类型                              | 默认值               | 说明                                                                |
-| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；多条规则时 `resolveBuiltUrl` 以最后一条命中为准       |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
-| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                  |
-| `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                            |
-| `externalRuntime`     | `boolean`                         | `false`              | 将运行时作为外链引入而非内联                                        |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                    |
-| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                  |
-| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                              |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                |
-| `hooks`               | `RuntimeHooks`                    | —                    | JS 函数钩子（仅 `externalRuntime` 模式可用）                        |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                       |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                 |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                   |
+| 字段                  | 类型                              | 默认值               | 说明                                                                           |
+| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------------ |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                 |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                    |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制            |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                       |
+| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                             |
+| `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                                       |
+| `externalRuntime`     | `boolean`                         | `false`              | 仅改变 runtime script 的放置方式；不会保留构建配置里的函数钩子                 |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                               |
+| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                             |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                                         |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                           |
+| `hooks`               | `RuntimeHooks`                    | —                    | 配置对象中的函数在序列化到页面时会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件 |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                                  |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                            |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                              |
 
 ### FallbackRule
 
@@ -213,6 +211,12 @@ module.exports = {
 | `circuit` | `CircuitOptions` | 见下表   | 覆盖该规则的熔断配置                                                                                                                                         |
 
 > Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vite `base` 与 rule `base`。Vite `base` / Webpack `publicPath` 应等于 `rules[].base`。
+
+当前页面侧有三个容易误解的限制：
+
+- `window.__RF__.url(filename)` 只使用第一条已编译规则的 `base` 构造首轮 URL，不感知熔断状态；
+- 一次恢复会先根据初始 URL 选中一条规则，再沿该规则的有序候选继续 retry / fallback；
+- 页面 runtime 当前只创建一个 circuit registry，并使用第一条已编译规则的 circuit 选项初始化；`FallbackRule.circuit` 类型仍保留，但“每条规则独立页面熔断器”尚未实现。
 
 ### RetryOptions
 
@@ -262,16 +266,29 @@ resourceFallback({
 
 SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 `defaults.circuit.shareAcrossTabs` 为 `true`，SW 也不会读写 `localStorage`。若 SW fetch 链路最终 reject，会发出 `rf:error` 并返回 `Response.error()`，保持浏览器侧资源表现接近真实 network error。
 
+## 共享恢复与 ownership
+
+页面侧 RecoveryCoordinator 会按 `owner + logical resource key` 共享一次进行中的恢复 Promise。同一个 owner 请求同一个逻辑资源时会加入同一条恢复链；不同 owner 或不同 logical key 不共享。ownership registry 会阻止 Observer 与 Vite / Webpack / SystemJS 适配器分别接管同一个逻辑资源。
+
+## hooks 与序列化限制
+
+`buildInjectedTags()` 与插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象；其中的函数值（包括 `hooks.onRetry` / `onFallback` / `onSuccess` / `onError`）会被丢弃。`externalRuntime` 只把 runtime IIFE 改成外链 `<script src>`，后续自动注入的 `install(...)` 仍然使用同一套序列化逻辑。
+
+因此：
+
+- 自动注入 / 构建配置里的监控接入，推荐使用 DOM `rf:retry`、`rf:fallback`、`rf:success`、`rf:error` 事件；
+- 只有在你手动控制 `window.__RF__.install()` 调用、并在页面里直接传入函数对象时，JS hooks 才会生效。
+
 ## 运行时行为
 
 ### 事件
 
-| 事件名        | 触发时机                              | detail                  |
-| ------------- | ------------------------------------- | ----------------------- |
-| `rf:retry`    | 同一 URL 重试                         | `{ url, attempt }`      |
-| `rf:fallback` | 切换到下一个候选 URL                  | `{ from, to, reason? }` |
-| `rf:success`  | 资源加载成功（经过至少一次重试/回退） | `{ url, attempts }`     |
-| `rf:error`    | 所有候选 URL 耗尽                     | `{ url, reason? }`      |
+| 事件名        | 触发时机                            | detail                  |
+| ------------- | ----------------------------------- | ----------------------- |
+| `rf:retry`    | 同一 URL 重试                       | `{ url, attempt }`      |
+| `rf:fallback` | 切换到下一个候选 URL                | `{ from, to, reason? }` |
+| `rf:success`  | 页面侧一次已恢复 session 成功结束   | `{ url, attempts }`     |
+| `rf:error`    | 页面侧 session 失败，或 SW 透传错误 | `{ url, reason? }`      |
 
 应用代码可通过 `window.addEventListener('rf:fallback', (e) => { ... })` 监听。
 
@@ -280,7 +297,7 @@ SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 
 | 场景                       | Webpack                                      | Vite (build/preview)                         | Vite (dev) |
 | -------------------------- | -------------------------------------------- | -------------------------------------------- | ---------- |
 | 同步 `<script>` / `<link>` | ✓ Observer                                   | ✓ Observer                                   | ✓ Observer |
-| 异步 chunk（`import()`）   | ✓ `__webpack_require__.l` hook               | ✓ `__RF__.load` + `renderDynamicImport`      | ✗          |
+| 异步 chunk（`import()`）   | ✓ `__webpack_require__.l` hook               | ✓ `__RF__.load` + 动态 import 包装           | ✗          |
 | CSS 动态注入               | ✓ Observer                                   | ✓ Observer                                   | ✓ Observer |
 | SystemJS（legacy bundle）  | ✓ `instantiate` hook                         | ✓ `instantiate` hook                         | —          |
 | 图片 / 字体 / 媒体资源     | ✓ Hybrid SW（opt-in，受控页面）              | ✓ Hybrid SW（opt-in，受控页面）              | ✗          |
@@ -431,7 +448,7 @@ pnpm release                # build + publish 所有包到 npm
 
 ### 功能增强
 
-- [ ] **（高优先级）单次加载超时 / `retry.timeout`** — 已从公开类型中移除未实现的 `RetryOptions.timeout`。后续需在各加载路径（Observer、`__RF__.load`、webpack chunk 等）落地「超过 N ms 视为失败并驱动 resolver」；可选配合 `fetch`+`AbortSignal` 或 HEAD 预检；经典 `<script>` 无原生超时 API，需单独权衡实现。
+- [ ] **（高优先级）单次加载超时 / `retry.timeout`** — 已从公开类型中移除未实现的 `RetryOptions.timeout`。后续需在各加载路径（Observer、`__RF__.load`、webpack chunk 等）落地「超过 N ms 视为失败并驱动恢复流程」；可选配合 `fetch`+`AbortSignal` 或 HEAD 预检；经典 `<script>` 无原生超时 API，需单独权衡实现。
 - [x] **Hybrid Service Worker 拦截模式（opt-in）** — SW 负责 `image`、`font`、`media`、CSS `url()` 和受控 CSS `@import`；现有 Observer/Vite/Webpack/SystemJS adapter 继续负责 script 与构建器语义
 - [x] **图片/字体资源支持（SW 模式）** — 已在 Hybrid SW 中覆盖 `<img>`、`@font-face`、CSS 背景图和媒体资源；仍需满足浏览器 CORS/MIME/SRI 等安全策略
 - [ ] **Vite dev 模式支持** — 当前 Vite dev 使用原生 ESM，动态 import 失败无法拦截
