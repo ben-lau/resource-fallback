@@ -369,7 +369,7 @@ window.addEventListener('rf:error', (e) => {
 });
 ```
 
-或通过 `hooks`（需要 `externalRuntime: true`，因为函数无法 JSON 序列化）：
+或在页面里手动调用 `window.__RF__.install(...)` 并直接传入 live hooks（不要求 `externalRuntime`；关键在于绕过构建期序列化）：
 
 ```ts
 window.__RF__.install({

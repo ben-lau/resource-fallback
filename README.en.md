@@ -367,7 +367,7 @@ window.addEventListener('rf:error', (e) => {
 });
 ```
 
-Or via `hooks` (requires `externalRuntime: true` since functions cannot be JSON-serialized):
+Or call `window.__RF__.install(...)` manually in page code and pass live hooks directly (`externalRuntime` is not required; the key is avoiding build-time serialization):
 
 ```ts
 window.__RF__.install({
