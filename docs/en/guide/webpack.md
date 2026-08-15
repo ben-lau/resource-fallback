@@ -69,13 +69,13 @@ If `html-webpack-plugin` is not detected, the plugin logs a warning and does not
 
 Injects a Webpack `RuntimeModule` (stage = `STAGE_TRIGGER`) that patches `__webpack_require__.l` inside webpack's bootstrap — after it is defined but before the first chunk load. This is more reliable than external monkey-patching.
 
-The injected code only connects Webpack's loader callbacks to core's private `window.__RF__.internal` bridge. Retry, fallback, circuit state, events, and shared recovery Promises remain owned by the core Coordinator.
+The injected code only connects Webpack's loader callbacks to core's private `window.__RF__.internal` bridge. It is not a public application API and should not be treated as a semver-stable integration surface. The page-side RecoveryCoordinator remains the recovery decision engine and owns retry, fallback, circuit state, events, cancellation, and sharing of in-flight recovery Promises.
 
 ### Runtime — dual-layer protection
 
 #### Layer 1: `__webpack_require__.l` wrapping
 
-All async chunks (including `React.lazy()`, dynamic `import()`) load `<script>` tags through `__webpack_require__.l`. Wrapped flow:
+All async chunks (including `React.lazy()`, dynamic `import()`) load `<script>` tags through `__webpack_require__.l`. The RuntimeModule is the primary path: it wraps webpack's native loader inside bootstrap, preserves first-load callback semantics, then hands recovery decisions to the Coordinator. Wrapped flow:
 
 ```
 Chunk load request
@@ -90,11 +90,11 @@ Chunk load request
   │   │       └── giveup → done(event) (let webpack handle the error)
 ```
 
-Each retry/fallback creates a brand new `<script>` element to bypass browser cache.
+Concurrent admissions for the same logical chunk (`logicalKey` derived from `key`/`chunkId`) join one Coordinator session and share one recovery Promise instead of launching parallel recoveries. Each retry/fallback creates a brand new `<script>` element and preserves webpack metadata such as `nonce`, `crossOrigin`, `referrerPolicy`, `charset`, and `trustedScriptUrl`; when a `key` is present, the new node also carries `data-webpack`.
 
 #### data-webpack ownership
 
-Retry/fallback `<script>` elements get a `data-webpack` attribute (chunk loading key). Observer skips `<script>` tags with `data-webpack` to avoid duplicate processing of the same failure.
+Retry/fallback `<script>` elements get a `data-webpack` attribute (chunk loading key). Observer only skips `<script>` tags with `data-webpack`, which prevents duplicate takeover of the same async JS chunk by both Observer and the webpack adapter; this rule does not transfer CSS ownership, so CSS `<link>` replacement still belongs to Observer.
 
 ::: info Ownership split
 
@@ -106,7 +106,7 @@ Retry/fallback `<script>` elements get a `data-webpack` attribute (chunk loading
 
 `mini-css-extract-plugin` and webpack `experiments.css` register non-`j` loaders on `__webpack_require__.f` (e.g. `miniCss`, `css`). When an async chunk includes a separate `.css` chunk, `__webpack_require__.e(chunkId)` runs `Promise.all` over JS and CSS loader promises.
 
-If CSS `<link>` load fails, webpack's generated `onerror` **rejects with `ChunkLoadError`** (`code: 'CSS_CHUNK_LOAD_FAILED'`). The injected wrapper below consumes that CSS rejection so `Promise.all` can continue while Observer replaces the `<link>`; otherwise lazy routes can fail even when JS fallback succeeds.
+If CSS `<link>` load fails, webpack's generated `onerror` **rejects with `ChunkLoadError`** (`code: 'CSS_CHUNK_LOAD_FAILED'`) or an error whose `request` points at a `.css` URL. The RuntimeModule does exactly one thing here: swallow that recognized CSS rejection so `Promise.all` does not fail early. The actual `<link>` replacement still belongs to Observer. In other words, the webpack hook prevents premature failure, while Observer creates and owns the replacement CSS node.
 
 The injected `RuntimeModule` wraps every non-`j` loader on `__webpack_require__.f`:
 
@@ -144,7 +144,9 @@ Observer acts as a safety net for scenarios `__webpack_require__.l` does not cov
 
 ### chunkLoadingGlobal hook
 
-The runtime also hooks `window[chunkLoadingGlobal]` (default `webpackChunk_`) `push`. Once webpack bootstrap installs `__webpack_require__`, the runtime wraps `__webpack_require__.l` — a fallback path if `RuntimeModule` fails to take effect.
+core's webpack adapter also hooks `window[chunkLoadingGlobal]` `push` as a fallback path: once chunk runtime code exposes `__webpack_require__`, it can wrap `__webpack_require__.l` from the page side. The global name comes from `output.chunkLoadingGlobal` when set, otherwise from webpack's `uniqueName`-derived default, so it is not always literally `webpackChunk_`.
+
+This chunk-array / `chunkLoadingGlobal` path is a backup, not a replacement for the RuntimeModule primary path. If the RuntimeModule misses due to version or injection timing, the page-side adapter can still take over; if the plugin RuntimeModule already wrapped `.l`, the chunk-array adapter detects the marker and yields.
 
 ## Configuration example
 
@@ -212,6 +214,10 @@ If the entry bundle exhausts all fallbacks, React/Vue never initializes. Add an 
   });
 </script>
 ```
+
+### dispose cleanup
+
+When `window.__RF__.dispose()` runs, or the current runtime installation is torn down, the webpack owner cancels in-flight recovery and removes the `__webpack_require__.l` wrapper, chunk-array `push` patches, scan timers, and listeners. Old sessions do not continue taking over page state after a fresh install; a new runtime installation creates its own Coordinator and adapters.
 
 ## Sync/async coverage
 
