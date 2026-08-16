@@ -14,7 +14,7 @@ title: 开发与落地经验
 
 ### [工程亮点](./highlights.md)
 
-与其它路线相比的差异：同源决策引擎、覆盖自有构建产物全链路、对齐浏览器怪异行为、职责划界、可观测性与运维开关。
+与其它路线相比的差异：页面侧 `RecoveryCoordinator` / SW legacy `Resolver` 的分层决策、覆盖自有构建产物全链路、对齐浏览器怪异行为、职责划界、可观测性与运维开关。
 
 ### [技术难点](./challenges.md)
 
@@ -26,7 +26,7 @@ title: 开发与落地经验
 
 ### [问题案例](./case-studies.md)
 
-本仓库内解决过的问题（背景 → 思考过程 → 解决方案），共 10 个案例：Webpack 双处理、Vite 动态 import、ESM 缓存、Vite base / rule base 闸门、cloneNode、URL 匹配、SystemJS、Resolver 语义、观测事件、Hybrid SW。
+本仓库内解决过的问题（背景 → 思考过程 → 解决方案），共 10 个案例：Webpack 双处理、Vite 动态 import、ESM 缓存、Vite base / rule base 闸门、cloneNode、URL 匹配、SystemJS、legacy Resolver / SW 语义、观测事件、Hybrid SW。
 
 ### [可复用原则](./principles.md)
 
@@ -45,7 +45,7 @@ title: 开发与落地经验
 
 以下多为「只读产物字符串」类方案的经验，与本仓库当前实现对照即可，不必逐条点名具体仓库：
 
-1. **`renderChunk` / `renderDynamicImport` 过早改写**：在未定型 **`__vite__mapDeps` / `__vitePreload`** 前替换 `import()`，易导致 **异步组件 CSS 整块丢失**；**`experimental.renderBuiltUrl` 对 `hostType === 'js'` 返回 runtime** 也可能阻断了 **mapDeps** 生成——症状同样是 **懒加载无样式**。
+1. **历史上试过、现已否决的 `renderChunk` / `renderDynamicImport` 过早改写**：在未定型 **`__vite__mapDeps` / `__vitePreload`** 前替换 `import()`，易导致 **异步组件 CSS 整块丢失**；**`experimental.renderBuiltUrl` 对 `hostType === 'js'` 返回 runtime** 也可能阻断了 **mapDeps** 生成——症状同样是 **懒加载无样式**。当前实现已改为 `writeBundle` 后改写，不再依赖这些钩子。
 2. **硬编码 `__vitePreload` 源码**：minify 后变量名变化、边界括号扫描 fragile；维护成本高。
 3. **仅用正则扫 `import(`**：注释/字符串里的假命中、嵌套括号易误伤；应用 **`es-module-lexer` + `MagicString`**（见 §4.2）定点替换整条语句更稳。
 4. **运行时 `cloneNode(true)` 换 `<script src>`**：见 §4.5。

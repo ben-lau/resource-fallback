@@ -4,17 +4,17 @@ title: Hybrid Service Worker
 
 # Hybrid Service Worker
 
-Hybrid Service Worker is an **opt-in** extension that covers subresources DOM Observer cannot see: `img`, `@font-face`, CSS `url()`, media resources, and controlled CSS `@import`. Scripts remain owned by existing page-side adapters (Observer, Vite, Webpack, SystemJS).
+Hybrid Service Worker is an **opt-in** extension that covers subresources DOM Observer cannot see: `img`, `@font-face`, CSS `url()`, media resources, and controlled CSS `@import`. Page-side script and builder recovery still runs through `RecoveryCoordinator` plus the existing Observer/Vite/Webpack/SystemJS adapters.
 
 ## Overview
 
-| Resource type                                                | Owner                 |
-| ------------------------------------------------------------ | --------------------- |
-| Scripts, dynamic import, Webpack async chunk, SystemJS       | Page runtime adapters |
-| Images, fonts, media, CSS subresources, controlled `@import` | Hybrid SW (opt-in)    |
-| Top-level `<link rel="stylesheet">`                          | Observer              |
+| Resource type                                                | Owner                                                                 | Notes                                          |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------- |
+| Scripts, dynamic import, Webpack async chunk, SystemJS       | Page runtime (`RecoveryCoordinator` + Observer/Vite/Webpack/SystemJS) | Keeps script and builder semantics on the page |
+| Images, fonts, media, CSS subresources, controlled `@import` | Hybrid SW resolver (opt-in)                                           | Fetch-layer fallback in the worker             |
+| Top-level `<link rel="stylesheet">`                          | Observer                                                              | Still a page-owned DOM boundary                |
 
-This split avoids duplicate retry, event ordering issues, and breaking builder Promise semantics.
+This split avoids duplicate retry, event ordering issues, and breaking builder Promise semantics. The page runtime and the SW do not share one recovery state machine: page adapters delegate to `RecoveryCoordinator`, while the SW keeps its own fetch-layer resolver.
 
 ## Manifest preloading
 
@@ -48,6 +48,8 @@ flowchart LR
 ```
 
 SW events are delivered to the triggering page first via `FetchEvent.clientId`, avoiding cross-tab event leakage.
+
+On the page side, duplicate takeover is prevented by the ownership registry: one owner claims a `logicalKey`, and concurrent work from the same owner joins the same in-flight recovery Promise through `RecoveryCoordinator`.
 
 ## Configuration
 

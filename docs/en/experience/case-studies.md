@@ -13,7 +13,7 @@ Webpack 5 async chunks load via runtime calling something like `__webpack_requir
 - Browser: **`window.addEventListener('error', …, true)`** for script/link target-phase errors
 - Webpack: retry/fallback injected into the **script load path**
 
-So **one script load failure** bubbles through both: runtime may retry from `script.onerror`, while capture-phase listener runs `resolver.resolve` → scheduleReplace — **two independent state machines**. Network shows roughly **double** the expected rounds for `retry.max` and `urls.length`; circuit breaker and logs look noisy.
+So **one script load failure** bubbles through both: runtime may retry from `script.onerror`, while the capture-phase listener may also claim the same resource and start its own recovery path. In older implementations that often looked like `resolver.resolve` → scheduleReplace; in the current page runtime it is ownership admission plus `RecoveryCoordinator.recover(...)`. Either way, the bug is the same: **two independent state machines**. Network shows roughly **double** the expected rounds for `retry.max` and `urls.length`; circuit breaker and logs look noisy.
 
 Webpack tags async chunk `<script>` with **`data-webpack="..."`**. Extracted styles often appear as **`<link data-webpack="...">`**; webpack's chunk JS loader **does not symmetrically handle `<link>` failure chains** — if Observer fully exits, CSS chunks go unmanaged.
 
@@ -29,13 +29,13 @@ Conclusion: **each failure owned by exactly one path**; **CSS** has no symmetric
 
 In `packages/core/src/runtime/observer.ts`:
 
-1. **`isWebpackChunkScript(el)`**: when `tagName === 'SCRIPT'` and **`data-webpack`** exists, **return** — async JS chunks handled only by **`@resource-fallback/webpack-plugin` RuntimeModule** wrapping `__webpack_require__.l`.
+1. **`isWebpackChunkScript(el)`**: when `tagName === 'SCRIPT'` and **`data-webpack`** exists, **return** — async JS chunks are handled only by the **`@resource-fallback/webpack-plugin` RuntimeModule** together with the page-side `RecoveryCoordinator`.
 
 2. **No same exemption for `<link>`** — even with `data-webpack`, **LINK still goes to Observer** (mini-css-extract output).
 
 3. **Entry bundles** usually lack `data-webpack` — Observer still covers them.
 
-Expected: **one failure → one retry/fallback sequence**; rf events align with webpack console.
+Expected: **one failure → one retry/fallback sequence**; rf events align with webpack console. In the current implementation, the ownership registry also ensures one logical chunk has one owner, while concurrent work from that owner shares one in-flight recovery Promise.
 
 ### Extension: async CSS chunk — Observer alone cannot stop **`Promise.all` reject**
 
@@ -47,7 +47,7 @@ Not limited to mini-css: any **non-`j`** loader on **`__webpack_require__.f`** w
 
 **Solution**: In injected **`RuntimeModule`** (same stage as **`__webpack_require__.l` wrap**, **STAGE_TRIGGER**): **iterate `Object.keys(__webpack_require__.f)`, skip `"j"`**, wrap each unmarked function loader — after **`origFn(chunkId, promises)`**, **`.catch`** on newly added promise entries:
 
-- If **`err.code === 'CSS_CHUNK_LOAD_FAILED'`** or **`err.request` matches `.css` suffix**: **`resolver.recordFailure(err.request)`**, **swallow reject** so **`Promise.all` does not fail**
+- If **`err.code === 'CSS_CHUNK_LOAD_FAILED'`** or **`err.request` matches `.css` suffix**: **swallow reject** so **`Promise.all` does not fail**, leaving room for Observer to replace the `<link>`
 - Other errors **rethrow** (don't break Module Federation remotes, etc.)
 
 CSS loading still via Observer **`<link>`** (unchanged ownership). See **`examples/webpack-react`** lazy-b with **`*.css` chunk** E2E.
@@ -91,7 +91,7 @@ Early attempts with `renderDynamicImport` alone fought **preload generation orde
 
    `window.__RF__.load(JSON.stringify(normalizedRelativePath))`
 
-5. **`__RF__.load`** in `packages/core/src/runtime/adapter-vite.ts`: native browser **`import(url)`** in the loop (IIFE targets es2020 — no `Function(...)` / `unsafe-eval`), with the same **`resolver`**, preserving **preload topology** while adding retry/fallback/cache bust.
+5. **`__RF__.load`** in `packages/core/src/runtime/adapter-vite.ts`: native browser **`import(url)`** in the loop (IIFE targets es2020 — no `Function(...)` / `unsafe-eval`), with recovery delegated to the page-side `RecoveryCoordinator`. That keeps **preload topology** intact while letting concurrent work for the same owner + `logicalKey` share one in-flight recovery Promise and add retry/fallback/cache bust.
 
 Gate: **§4.4 `shouldRewriteUrls`** — only rewrite when Vite `base` equals a rule `base` after `ensureTrailingSlash`.
 
@@ -101,7 +101,7 @@ Gate: **§4.4 `shouldRewriteUrls`** — only rewrite when Vite `base` equals a r
 
 Payload is on **`event.payload`**, not `detail`; without **`preventDefault()`**, behavior equals unhandled.
 
-**Solution**: In `installViteAdapter`, on **`vite:preloadError`**: **`preventDefault()`**, parse URL from **`payload`**, **`recordFailure`** / observability; **CSS entity load** still via Observer **`<link rel="stylesheet">`**.
+**Solution**: In `installViteAdapter`, on **`vite:preloadError`**: **`preventDefault()`**, parse URL from **`payload`**, and only use it for prepared-rule gating; **CSS entity load** still via Observer **`<link rel="stylesheet">`**. The current page runtime does not record that preload event as a resolver failure.
 
 ---
 
@@ -229,7 +229,7 @@ Observer: if **`readUrl(el)` in `systemjsManagedUrls`**, **return**. Legacy and 
 
 ---
 
-## 4.8 Resolver: try initial URL first, circuit vs `urls`, `findPrepared`/`isFallback`
+## 4.8 Legacy Resolver (mainly SW / historical discussion): try initial URL first, circuit vs `urls`, `findPrepared`/`isFallback`
 
 ### Background
 
@@ -239,6 +239,8 @@ Product requirements:
 2. **Skip dead fallback hosts**
 3. **Don't mis-route odd URLs** via accidental url-prefix match
 
+This section describes the legacy `Resolver` semantics still present in `packages/core/src/runtime/resolver.ts`, now mainly relevant to the SW fetch layer and historical comparisons. The page runtime has moved to `RecoveryCoordinator` + compiled config, so it no longer exposes this exact match order, reason enum, or circuit composition as page API.
+
 ### Thinking
 
 `packages/core/src/runtime/resolver.ts`:
@@ -246,23 +248,23 @@ Product requirements:
 - **`findPrepared(url, isFallback)`**: scan **end to start** (last rule wins); always **prefix-match rule `base`**; **only if `isFallback === true`** allow **`url.indexOf(r.raw.urls[j])===0`**
 - **`resolve`**: no match → **`giveup: 'no-match'`**; retry budget → retry; else **`recordFailure(host)`** → **`pickNextUrl`**
 - **Path strip / swap**: rule `base` may differ from `urls` list prefixes
-- **`resolveBuiltUrl`**: filename → first URL via rule `base`; **circuit does not skip first-load URL**; **last matching rule wins**; still **must pair with §4.4 gate**
+- **`resolveBuiltUrl`**: filename → first URL via rule `base`; **circuit does not skip first-load URL**; fallback still relies on **`resolve` + `__RF__.load`**. That belongs to the legacy resolver; the current page-side Vite path no longer depends on `renderBuiltUrl` / `renderDynamicImport`.
 
 Use **`joinAssetPrefix`** in **`swap`** to avoid **`prod` + `js/foo.js` → `prodjs/foo.js`**.
 
 ---
 
-## 4.9 Observability: `giveup`/no-match also fires `rf:error` — not "full fallback ran"
+## 4.9 Observability: don't treat page-side `rf:error` as a stable reason contract
 
 ### Background
 
-Debug listeners push all **`rf:*`** to **`window.__RF_EVENTS__`**. Unmatched script failure → **`giveup: 'no-match'`** → **`emitError`**. Counting any **`rf:error`** as "library intercepted" is **false positive**.
+Debug listeners push all **`rf:*`** to **`window.__RF_EVENTS__`**. In the older resolver-based flow, unmatched script failure could become **`giveup: 'no-match'`** → **`emitError`**. Counting any **`rf:error`** as "library intercepted" is therefore a **false positive**. In the current page runtime this is even more important, because `RecoveryCoordinator` now emits the terminal page event and its reason shape is not a public API contract.
 
 Monitoring treating all **`rf:error`** as incidents → **alert noise** (third-party scripts).
 
 ### Solution
 
-Demos: only **`retry` or `fallback`** in new event slice means **"entered fallback state machine"**; **`error` only** → UI shows **"not intercepted (expected)"**. Production: filter **`detail.reason`**.
+Demos: only **`retry` or `fallback`** in new event slice means **"entered fallback state machine"**; **`error` only** → UI shows **"not intercepted (expected)"**. Production: split dashboards by event type first, and treat `reason` as diagnostic detail rather than stable page API.
 
 ---
 
@@ -285,7 +287,7 @@ Typical SW pitfalls exposed:
 
 **Hybrid ownership**:
 
-- **script / dynamic import / webpack async / SystemJS** → page adapters (Promise, module map, CSS reject, SRI)
+- **script / dynamic import / webpack async / SystemJS** → page-side `RecoveryCoordinator` plus adapters (Promise, module map, CSS reject, SRI)
 - **image / font / media / CSS subresources** → SW
 - **Top-level stylesheet** → Observer (avoid duplicate `<link>` handling)
 - **CSS `@import`** only when `destination === 'style'` and referrer matches manifest CSS

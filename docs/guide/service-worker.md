@@ -4,13 +4,13 @@ title: Hybrid Service Worker
 
 # Hybrid Service Worker
 
-Hybrid Service Worker（SW）是 resource-fallback 的 **opt-in** 扩展能力。启用后，SW 在 fetch 层补齐 DOM Observer 无法感知的子资源回退，而脚本加载仍由现有页面 adapter 负责。
+Hybrid Service Worker（SW）是 resource-fallback 的 **opt-in** 扩展能力。启用后，SW 在 fetch 层补齐 DOM Observer 无法感知的子资源回退；页面侧脚本与构建器恢复仍由 `RecoveryCoordinator` 协调 Observer / Vite / Webpack / SystemJS adapter 负责。
 
 ## 概述
 
 Service Worker 能显著扩展资源回退的覆盖面，尤其适合 `img`、`video`、`@font-face` 字体文件、CSS `url()` 子资源和 CSS `@import` 这类 DOM Observer 不容易感知的请求。
 
-推荐采用 **Hybrid SW** 分层方案：保留现有脚本和构建器 adapter 的 ownership，引入 SW 补齐非脚本资源和 CSS 子资源。
+推荐采用 **Hybrid SW** 分层方案：保留现有页面 `RecoveryCoordinator` + ownership 划分，引入 SW 补齐非脚本资源和 CSS 子资源。SW 自身的 fetch 层回退仍使用独立 resolver，不与页面 adapter 混成同一状态机。
 
 ::: info 当前实现状态
 Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。
@@ -55,20 +55,22 @@ manifest 精简策略：仅保留 `owner === 'sw'` 和 `type === 'style'` 的 as
 
 ## ownership 划分
 
-| 资源类型                       | 负责方                                               | 说明                             |
-| ------------------------------ | ---------------------------------------------------- | -------------------------------- |
-| classic / module script        | 页面 adapter（Observer / Vite / Webpack / SystemJS） | SW 不接管 script                 |
-| Webpack async chunk            | Webpack adapter（`__webpack_require__.l`）           | 处理 Promise 语义与 module cache |
-| Vite dynamic import            | Vite adapter（`__RF__.load`）                        | 处理 module map 与 cache busting |
-| 顶层 `<link rel="stylesheet">` | Observer                                             | SW 不默认接管顶层 stylesheet     |
-| CSS `url()` / `@font-face`     | SW                                                   | fetch 层拦截                     |
-| CSS `@import`                  | SW（需 referrer 命中 CSS manifest）                  | 受 `includeStyleImports` 控制    |
-| `<img>` / 媒体资源             | SW                                                   | fetch 层拦截                     |
-| 字体文件                       | SW                                                   | 需满足 CORS/MIME 要求            |
+| 资源类型                       | 负责方                                                                       | 说明                                   |
+| ------------------------------ | ---------------------------------------------------------------------------- | -------------------------------------- |
+| classic / module script        | 页面 runtime（`RecoveryCoordinator` + Observer / Vite / Webpack / SystemJS） | SW 不接管 script                       |
+| Webpack async chunk            | Webpack runtime bridge + 页面 Coordinator                                    | 保留 loader Promise / metadata 语义    |
+| Vite dynamic import            | Vite adapter（`__RF__.load` + 页面 Coordinator）                             | 处理 module map、cache bust 与并发共享 |
+| 顶层 `<link rel="stylesheet">` | Observer                                                                     | SW 不默认接管顶层 stylesheet           |
+| CSS `url()` / `@font-face`     | SW resolver                                                                  | fetch 层拦截                           |
+| CSS `@import`                  | SW resolver（需 referrer 命中 CSS manifest）                                 | 受 `includeStyleImports` 控制          |
+| `<img>` / 媒体资源             | SW resolver                                                                  | fetch 层拦截                           |
+| 字体文件                       | SW resolver                                                                  | 需满足 CORS/MIME 要求                  |
 
 ::: warning 避免重复处理
 Observer 和 SW 不应同时处理同一个资源请求。带 `data-webpack` 的 `<script>` 由 Webpack adapter 负责；Observer 跳过这些标签。CSS chunk 的 `<link>` 虽带 `data-webpack`，但 webpack adapter 不处理 CSS，Observer 仍是 CSS chunk 的唯一安全网。
 :::
+
+页面侧的去重依赖 ownership registry：同一 `logicalKey` 先认领 owner，再由 `RecoveryCoordinator` 共享进行中的 recovery Promise；SW 则在 worker 内单独执行自己的 resolver 循环。
 
 ### 事件桥接
 

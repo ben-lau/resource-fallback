@@ -14,7 +14,7 @@ For **maintainers and integrators**: highlights, challenges, comparisons with ot
 
 ### [Engineering Highlights](./highlights.md)
 
-What sets this project apart: unified decision engine, full build-output coverage, browser quirk alignment, ownership boundaries, observability and ops switches.
+What sets this project apart: layered page-side `RecoveryCoordinator` plus SW legacy `Resolver`, full build-output coverage, browser quirk alignment, ownership boundaries, and observability / ops switches.
 
 ### [Technical Challenges](./challenges.md)
 
@@ -26,7 +26,7 @@ Compared with webpack-retry-chunk-load-plugin, vite-plugin-cdn-import, webpack-f
 
 ### [Case Studies](./case-studies.md)
 
-Ten solved problems (4.1–4.10): Webpack double-handling, Vite dynamic import, ESM cache, Vite base / rule base gate, cloneNode, URL matching, SystemJS, Resolver semantics, observability events, Hybrid SW.
+Ten solved problems (4.1–4.10): Webpack double-handling, Vite dynamic import, ESM cache, Vite base / rule base gate, cloneNode, URL matching, SystemJS, legacy Resolver / SW semantics, observability events, Hybrid SW.
 
 ### [Reusable Principles](./principles.md)
 
@@ -45,7 +45,7 @@ Ten solved problems (4.1–4.10): Webpack double-handling, Vite dynamic import, 
 
 Patterns seen in "string-replace build output" approaches — compare with this repo:
 
-1. **Rewriting too early in `renderChunk` / `renderDynamicImport`** — breaks `__vite__mapDeps` / `__vitePreload` before they stabilize; lazy-loaded components lose CSS. Returning runtime from `renderBuiltUrl` for `hostType === 'js'` can block mapDeps generation — same symptom.
+1. **Historical, rejected approach: rewriting too early in `renderChunk` / `renderDynamicImport`** — breaks `__vite__mapDeps` / `__vitePreload` before they stabilize; lazy-loaded components lose CSS. Returning runtime from `renderBuiltUrl` for `hostType === 'js'` can block mapDeps generation — same symptom. The current implementation moved to post-emit `writeBundle` rewriting instead of those hooks.
 2. **Hardcoding `__vitePreload` source** — fragile after minification.
 3. **Regex-only `import(` scanning** — false positives in comments/strings; use **`es-module-lexer` + `MagicString`** for statement-level replacement.
 4. **Runtime `cloneNode(true)` to swap `<script src>`** — see case study §4.5.

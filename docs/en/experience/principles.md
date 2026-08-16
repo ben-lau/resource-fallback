@@ -8,9 +8,9 @@ title: Reusable Principles
 
 2. **ESM failure is cacheable state**: break it with an **explicit URL change strategy**, not just a different DOM API.
 
-3. **Vite dynamic import: late is safer than early**: rewrite after **`writeBundle`** with **`es-module-lexer` + `MagicString`** to preserve **`__vitePreload` / `__vite__mapDeps` / async CSS** topology; avoid **`renderBuiltUrl`/`renderDynamicImport`** breaking analysis.
+3. **Vite dynamic import: late is safer than early**: the current implementation rewrites after **`writeBundle`** with **`es-module-lexer` + `MagicString`** to preserve **`__vitePreload` / `__vite__mapDeps` / async CSS** topology; treat **`renderBuiltUrl` / `renderDynamicImport`** as earlier, rejected approaches.
 
-4. **Vite: `vite:preloadError` must `preventDefault()`, read payload from `payload`** — otherwise CSS preload failure throws and blocks **`__RF__.load()`**.
+4. **Vite: `vite:preloadError` must `preventDefault()`, read payload from `payload`** — otherwise CSS preload failure throws and blocks **`__RF__.load()`**. The current page runtime only suppresses that throw; it does not turn the preload event itself into an old-Resolver failure record.
 
 5. **When Vite `base` and rule `base` diverge, don't open the build gate**: use **`shouldRewriteUrls` (compare after `ensureTrailingSlash` on both sides)** to prevent accidental CDN URL assembly.
 
@@ -24,9 +24,9 @@ title: Reusable Principles
 
 10. **SystemJS and Observer must register URLs for mutual exclusion**.
 
-11. **Resolver: `urls`-prefix match only when `isFallback === true`**; separate **circuit vs first-load rule `base` semantics**; **duplicate rule `base` / `resolveBuiltUrl` — last wins**.
+11. **Only the SW legacy Resolver keeps the `isFallback === true` → `urls`-prefix-match rule**. Page-side recovery is now coordinated by `RecoveryCoordinator`, so do not treat Resolver match order, duplicate rule `base` precedence, or per-rule circuits as current page API.
 
-12. **`rf:error` ≠ always ran fallback**: split **no-match** in UI and alerts.
+12. **Page-side `rf:error` is a terminal signal, not a stable reason-string contract**: if you need evidence that fallback actually started, prefer `rf:retry` / `rf:fallback`; keep `no-match` / `rules-exhausted` discussion in historical or SW-specific contexts.
 
 13. **SW default path must align with scope**: `scope: '/'` → `/rf-sw.js`; don't make **`Service-Worker-Allowed`** a default deploy burden.
 

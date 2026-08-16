@@ -25,24 +25,29 @@ README TODO lists Service Worker interception, image/font support, and sync scri
 Runtime installs from `packages/core/src/runtime/entry.ts`:
 
 ```ts
-installObserver({ resolver, bus, log, sri: config.sri || 'strip' });
+const ownership = createOwnershipRegistry();
+const circuit = createCircuitRegistry(...);
+const coordinator = createRecoveryCoordinator({ config: prepared, bus, circuit });
+
+installObserver({ coordinator, ownership, log, sri: prepared.sri });
 installWebpackAdapter({
-  resolver,
-  bus,
+  coordinator,
+  ownership,
   log,
   chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
 });
-installViteAdapter({ resolver, bus, log });
-installSystemJSAdapter({ resolver, bus, log });
+installViteAdapter({ config: prepared, coordinator, ownership, log, ... });
+installSystemJSAdapter({ config: prepared, coordinator, ownership, log });
+installSwAdapter({ config, bus, log });
 ```
 
-Adapters share `Resolver`, retry, circuit breaker, and hook bus but handle different failure semantics.
+Page-side adapters now share `RecoveryCoordinator`, the ownership registry, a shared page circuit, and the hook bus; they no longer each run the same `Resolver` directly. Concurrent recovery for the same owner + `logicalKey` reuses one in-flight recovery Promise, while duplicate takeover across owners is rejected during ownership admission. The Service Worker keeps its own fetch-layer resolver (`createSwResolver()`) and cooperates with the page through manifest preload and the event bridge.
 
 `packages/core/src/runtime/observer.ts` captures `<script>` and `<link rel="stylesheet">` `error`/`load` and replaces with retry or fallback URLs. It does **not** handle `<img>`, `video`, fonts, or CSS internal `url()`/`@import`. It documents sync classic script limits: after failure, `replaceChild` cannot reorder scripts that already continued executing.
 
-`packages/core/src/runtime/adapter-vite.ts` handles Vite dynamic `import()` Promise semantics, module map failure cache busting, and `vite:preloadError` `preventDefault()` — not expressible as fetch success/failure alone.
+`packages/core/src/runtime/adapter-vite.ts` handles Vite dynamic `import()` Promise semantics, module map failure cache busting, and `vite:preloadError` `preventDefault()` plus URL extraction for rule gating. The current runtime does not record page-side failure from the preload event back into the old resolver path; these behaviors are not expressible as fetch success/failure alone.
 
-`packages/core/src/runtime/adapter-webpack.ts` and `packages/webpack-plugin/src/index.ts` handle Webpack async chunks, `__webpack_require__.l`, `data-webpack` ownership, and CSS chunk promise rejections that would otherwise short-circuit `Promise.all`. Ownership must be split with Observer to avoid double state machines.
+`packages/core/src/runtime/adapter-webpack.ts`, `packages/webpack-plugin/src/index.ts`, and the injected runtime bridge handle Webpack async chunks, `__webpack_require__.l`, `data-webpack` ownership, and CSS chunk promise rejections that would otherwise short-circuit `Promise.all`. They preserve Webpack loader/callback semantics but delegate recovery decisions to the page Coordinator, so concurrent requests for one logical chunk can share one in-flight recovery Promise.
 
 ## Capability comparison
 
@@ -50,7 +55,7 @@ Adapters share `Resolver`, retry, circuit breaker, and hook bus but handle diffe
 
 Classic script, module script, Webpack async chunk, Vite dynamic import, and SystemJS are not the same resource type.
 
-Current approach: Observer for entry `<script>`, Webpack adapter for async chunks, `__RF__.load()` for Vite dynamic import, SystemJS instantiate hook. They switch URLs **and** handle module cache, builder Promises, loader markers, and events.
+Current approach: Observer for entry `<script>`, Webpack adapter/runtime bridge for async chunks, `__RF__.load()` for Vite dynamic import, SystemJS instantiate hook. They switch URLs **and** handle module cache, builder Promises, loader markers, and events; page-side ownership and in-flight sharing are centralized in `RecoveryCoordinator`.
 
 SW on a controlled page can deliver a successful script response for fetch-layer fallback — valuable when SW controls the request. But SW cannot guarantee early first-visit scripts are controlled, nor modify original `<script integrity="...">`. When SW cannot fix fetch, page adapters still handle failed Promises, cache bust, and events.
 
@@ -202,7 +207,7 @@ Four layers:
 2. **Opaque image**: no-cors cross-origin image — normal, 404, DNS fail — can SW distinguish and fallback?
 3. **Font**: `@font-face` cross-origin `.woff2` with/without CORS on fallback
 4. **SRI**: script/style with `integrity` — fallback to matching vs mismatched hash
-5. **Vite dynamic import**: SW success vs giveup — `import()` Promise, module map, `__RF__.load` cache bust still needed?
+5. **Vite dynamic import**: SW success vs giveup — `import()` Promise, module map, `__RF__.load` cache bust still needed? Also verify the current handoff still comes from `writeBundle` + `es-module-lexer` + `MagicString`, not the earlier `renderDynamicImport` / `renderBuiltUrl` experiments.
 6. **Webpack CSS chunk**: async component with separate CSS chunk — is page-side CSS promise patch still required with SW?
 7. **Event bridge**: SW retry/fallback/success/error → `postMessage` → `rf:*` — order, loss, multi-tab
 8. **Kill switch**: `__RF_DISABLE__`, query, cookie — does SW pass-through or stop?

@@ -25,24 +25,29 @@ README 的 TODO 将 Service Worker 拦截模式、图片/字体资源支持、�
 当前运行时由 `packages/core/src/runtime/entry.ts` 统一安装：
 
 ```ts
-installObserver({ resolver, bus, log, sri: config.sri || 'strip' });
+const ownership = createOwnershipRegistry();
+const circuit = createCircuitRegistry(...);
+const coordinator = createRecoveryCoordinator({ config: prepared, bus, circuit });
+
+installObserver({ coordinator, ownership, log, sri: prepared.sri });
 installWebpackAdapter({
-  resolver,
-  bus,
+  coordinator,
+  ownership,
   log,
   chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
 });
-installViteAdapter({ resolver, bus, log });
-installSystemJSAdapter({ resolver, bus, log });
+installViteAdapter({ config: prepared, coordinator, ownership, log, ... });
+installSystemJSAdapter({ config: prepared, coordinator, ownership, log });
+installSwAdapter({ config, bus, log });
 ```
 
-这些 adapter 共用 `Resolver`、retry、circuit breaker 和 hook bus，但处理的是不同层面的失败语义。
+页面侧 adapter 现在共用的是 `RecoveryCoordinator`、ownership registry、共享的 page circuit 与 hook bus；它们不再各自直接跑同一个 `Resolver`。同一 owner + `logicalKey` 的并发恢复会复用同一个进行中的 recovery Promise，而跨 owner 的重复接管会在 ownership admission 阶段被拒绝。Service Worker 则保留独立的 fetch 层 resolver（`createSwResolver()`），只通过 manifest 与事件桥和页面协作。
 
 `packages/core/src/runtime/observer.ts` 负责捕获 `<script>` 和 `<link rel="stylesheet">` 的 `error` / `load` 事件，并原地替换为 retry 或 fallback URL。它明确不处理 `<img>`、`video`、字体文件和 CSS 内部 `url()` / `@import`。它还记录了同步 classic script 的限制：失败后再 `replaceChild` 无法让已经继续执行的后续脚本重新排序。
 
-`packages/core/src/runtime/adapter-vite.ts` 负责 Vite 动态 `import()` 的 Promise 语义、module map 失败缓存的 cache busting，以及 `vite:preloadError` 的 `preventDefault()`。这些不是单纯 fetch 成功或失败能完整表达的行为。
+`packages/core/src/runtime/adapter-vite.ts` 负责 Vite 动态 `import()` 的 Promise 语义、module map 失败缓存的 cache busting，以及 `vite:preloadError` 的 `preventDefault()` / URL 提取门禁。当前实现不会在 preload 事件里直接把页面失败写回旧 resolver；这些不是单纯 fetch 成功或失败能完整表达的行为。
 
-`packages/core/src/runtime/adapter-webpack.ts` 和 `packages/webpack-plugin/src/index.ts` 负责 Webpack async chunk、`__webpack_require__.l`、`data-webpack` ownership，以及 CSS chunk promise 被 reject 后如何避免 `Promise.all` 提前短路。经验文档也强调了这些路径必须与 Observer 划分 ownership，避免同一次失败被两条状态机重复处理。
+`packages/core/src/runtime/adapter-webpack.ts`、`packages/webpack-plugin/src/index.ts` 与其 runtime bridge 负责 Webpack async chunk、`__webpack_require__.l`、`data-webpack` ownership，以及 CSS chunk promise 被 reject 后如何避免 `Promise.all` 提前短路。它们保留 Webpack loader/callback 语义，但把恢复决策交给页面 Coordinator；同一个逻辑 chunk 的并发请求会共享一个 in-flight recovery Promise。
 
 ## 能力覆盖对比
 
@@ -50,7 +55,7 @@ installSystemJSAdapter({ resolver, bus, log });
 
 classic script、module script、Webpack async chunk、Vite dynamic import 和 SystemJS 不能被简单视为同一种资源。
 
-当前方案对入口 `<script>` 依赖 Observer，对 Webpack async chunk 依赖 Webpack adapter，对 Vite dynamic import 依赖 `__RF__.load()`，对 SystemJS 依赖 instantiate hook。它们不仅切换 URL，也处理 module cache、构建器 Promise、runtime loader 标记和事件上报。
+当前方案对入口 `<script>` 依赖 Observer，对 Webpack async chunk 依赖 Webpack adapter / runtime bridge，对 Vite dynamic import 依赖 `__RF__.load()`，对 SystemJS 依赖 instantiate hook。它们不仅切换 URL，也处理 module cache、构建器 Promise、runtime loader 标记和事件上报；页面侧的 ownership/in-flight 共享由 `RecoveryCoordinator` 统一管理。
 
 SW 在已控制页面且 fetch 层能成功 fallback 时，可以让浏览器拿到成功脚本响应，然后按原本解析或 loader 语义继续执行。这对已受控页面是有价值的。但 SW 无法保证首次访问的早期脚本请求已经被控制，也无法修改原始 `<script integrity="...">` 上的 SRI 属性。一旦 SW 无法在 fetch 层修复，仍需要现有页面侧 adapter 处理失败 Promise、cache bust 和事件。
 
@@ -233,7 +238,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 2. Opaque image 验证：跨域图片使用 `no-cors` 请求，分别让 CDN 返回正常图片、404、DNS 失败，观察 SW 是否能区分并 fallback。
 3. 字体验证：用 `@font-face` 请求跨域 `.woff2`，分别配置有无 CORS header 的 fallback 源，确认可用条件。
 4. SRI 验证：给 script/style 添加 `integrity`，让 SW fallback 到内容一致和内容不一致的 URL，确认浏览器校验结果。
-5. Vite dynamic import 验证：在 SW 成功 fallback 和 SW giveup 两种情况下，观察 `import()` Promise、module map cache 和当前 `__RF__.load()` cache bust 的必要性。
+5. Vite dynamic import 验证：在 SW 成功 fallback 和 SW giveup 两种情况下，观察 `import()` Promise、module map cache 和当前 `__RF__.load()` cache bust 的必要性；同时确认页面侧仍由 `writeBundle` + `es-module-lexer` + `MagicString` 改写链路接管，而不是回退到历史上的 `renderDynamicImport` / `renderBuiltUrl` 路线。
 6. Webpack CSS chunk 验证：构建带独立 CSS chunk 的 async component，确认即使 SW 处理 fetch，页面侧 CSS chunk promise 兜底是否仍需要保留。
 7. 事件桥验证：SW 连续发生 retry、fallback、success、error 时，通过 `postMessage` 到页面再转发 `rf:*`，确认事件顺序、丢失情况和多个 tab 的行为。
 8. Kill switch 验证：`window.__RF_DISABLE__`、query、cookie 禁用页面 runtime 时，SW 是否也停止处理或切换到 pass-through。

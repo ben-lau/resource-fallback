@@ -13,7 +13,7 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 - 浏览器侧：**`window.addEventListener('error', …, true)`** 捕获 `script`/`link` 的目标阶段错误；
 - Webpack 侧：在 **脚本加载路径**里注入重试/fallback。
 
-于是 **同一次脚本加载失败** 会冒泡：runtime 可能已经根据 `script.onerror` 决定重试一次，捕获阶段 Listener 又一遍 `resolver.resolve` → scheduleReplace，等价于 **两条独立的状态机**。Network 上出现：主 CDN、备 CDN 各自被请求的轮数大约是「单链路 × 2」，与你在配置里填的 `retry.max`、`urls.length` **心算对不上**，熔断与日志也会「看起来特别吵」。
+于是 **同一次脚本加载失败** 会冒泡：runtime 可能已经根据 `script.onerror` 决定重试一次，捕获阶段 Listener 若再自行认领同一资源，也会进入自己的恢复链。旧实现里这常表现为 `resolver.resolve` → scheduleReplace；当前页面实现则是 ownership admission + `RecoveryCoordinator.recover(...)`。无论哪一代实现，本质问题都一样：**两条独立的状态机**。Network 上出现：主 CDN、备 CDN 各自被请求的轮数大约是「单链路 × 2」，与你在配置里填的 `retry.max`、`urls.length` **心算对不上**，熔断与日志也会「看起来特别吵」。
 
 另外，Webpack 会给 **异步 chunk** 的 `<script>` 打上 **`data-webpack="..."`**。但 **extract 出来的样式** 常以 **`<link data-webpack="...">`** 形式出现；Webpack 自带的 chunk JS 加载器 **并不等同地处理 `<link>` 的失败链**——若\_observer 整块退出，CSS chunk 又没人管。
 
@@ -28,13 +28,13 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 
 在 `packages/core/src/runtime/observer.ts` 内：
 
-1. **`isWebpackChunkScript(el)`**：当 `tagName === 'SCRIPT'` 且存在 **`data-webpack`** 属性时，**直接 `return`**，不进入 resolver。这样 **异步 JS chunk** 只由 **`@resource-fallback/webpack-plugin` 注入的 runtime 模块**包装 `__webpack_require__.l`（或等价）处理。
+1. **`isWebpackChunkScript(el)`**：当 `tagName === 'SCRIPT'` 且存在 **`data-webpack`** 属性时，**直接 `return`**，不再让 Observer 认领。这样 **异步 JS chunk** 只由 **`@resource-fallback/webpack-plugin` 注入的 runtime 模块**与页面侧 `RecoveryCoordinator` 处理。
 
 2. **不对 `<link>` 做同样豁免**：即使有 `data-webpack`，**LINK 元素仍落入 Observer**。注释中写清：**mini-css-extract-plugin 的产物**要靠 Observer 兜底。
 
 3. **入口 bundle**通常 **没有** `data-webpack`，仍可由 Observer 兜底（与异步 chunk 的 owning 区分开）。
 
-实施后预期：**单次失败只驱动一条 retry/fallback 序列**；Webpack 控制台与 rf 事件对齐后，可对「每个 chunk 的失败次数上限」心里有数。
+实施后预期：**单次失败只驱动一条 retry/fallback 序列**；Webpack 控制台与 rf 事件对齐后，可对「每个 chunk 的失败次数上限」心里有数。当前实现还额外通过 ownership registry + in-flight sharing 保证：同一个逻辑 chunk 只会有一个 owner 接管，而同 owner 的并发请求复用同一个 recovery Promise。
 
 #### 延伸：异步 CSS chunk — Observer 不够，还须拦住 **`Promise.all` 里的 reject**
 
@@ -46,7 +46,7 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 
 **解决**：在 **`@resource-fallback/webpack-plugin`** 注入的 **`RuntimeModule`**（与包装 **`__webpack_require__.l`** 同一段、**STAGE_TRIGGER** 保证晚于各 loader 注册）中：**遍历 `Object.keys(__webpack_require__.f)`，跳过 `"j"`**，对每个 **`typeof === 'function'`** 且未打 **`__rf_css`** 标记的 loader **包一层**：在 **`origFn(chunkId, promises)` 调用之后**，对 **`promises` 本次新增的条目**附加 **`.catch(err => { … })`**：
 
-- 若 **`err.code === 'CSS_CHUNK_LOAD_FAILED'`** 或 **`err.request` 匹配「路径以 `.css` 结尾（可跟 query/hash）」**：**`resolver.recordFailure(err.request)`**（尽力而为），然后 **吞掉 reject**（resolved continuation），使 **`Promise.all` 不因 CSS 首屏失败而失败**；
+- 若 **`err.code === 'CSS_CHUNK_LOAD_FAILED'`** 或 **`err.request` 匹配「路径以 `.css` 结尾（可跟 query/hash）」**：直接 **吞掉 reject**（resolved continuation），使 **`Promise.all` 不因 CSS 首屏失败而失败**，把真正的 `<link>` 替换窗口留给 Observer；
 - 其它错误 **原样 `throw`**，避免误伤 Module Federation **`remote`** 等非 CSS loader。
 
 **CSS 实体加载**：仍依赖 §4.1 中 **Observer 对 `<link>`** 的处理（与 **`<script data-webpack>` 豁免** 分工不变）。集成验证可参考 **`examples/webpack-react`** 中带 **`lazy-b.css`** 的 Lazy B：构建后出现独立 **`*.css` chunk**，在 **`publicPath` 指向不可达 CDN** 时，**若无上述 RuntimeModule 补丁**，E2E 会出现 **`lazy-b-loaded` 永不挂载**。
@@ -96,7 +96,7 @@ import('./views/About-xxxx.js');
    `window.__RF__.load(JSON.stringify(normalizedRelativePath))`  
    （实际代码为模板字符串，`JSON.stringify(resolved)` 保证转义正确。）
 
-5. 运行时 **`__RF__.load`** 实现在 `packages/core/src/runtime/adapter-vite.ts`：内部循环里直接调用浏览器 **原生 `import(url)`**（IIFE 目标 es2020，无需 `Function(...)` / `unsafe-eval`），与 **同一 `resolver`** 协同，从而在 **不改变「先由 Vite 生成 preload 拓扑」前提下**，把失败后的 **retry / fallback / cache bust**接进链路。
+5. 运行时 **`__RF__.load`** 实现在 `packages/core/src/runtime/adapter-vite.ts`：内部循环里直接调用浏览器 **原生 `import(url)`**（IIFE 目标 es2020，无需 `Function(...)` / `unsafe-eval`），并把恢复决策委托给页面侧 `RecoveryCoordinator`。这样既保留 **先由 Vite 生成 preload 拓扑** 的前提，也让同一 owner + `logicalKey` 的并发加载共享一个 in-flight recovery Promise，把失败后的 **retry / fallback / cache bust**接进链路。
 
 附加闸门见 **4.4**——只有 `shouldRewriteUrls` 为真时才执行上述磁盘改写，以免 Vite `base` 与 rule `base` **不一致**时还去动 chunk。
 
@@ -106,7 +106,7 @@ import('./views/About-xxxx.js');
 
 **易踩坑**：事件载荷在 **`event.payload`**（不是常见的 `detail`）；监听里若不 **`event.preventDefault()`**，行为与「未监听」等价——仍会 throw。
 
-**解决**：在 `installViteAdapter` 中对 **`vite:preloadError`**：**先 `preventDefault()`**，再从 **`payload`** 解析 URL（若有），按需 **`recordFailure`** / 打观测事件；**CSS 实体加载**仍交给 **`window` capture + Observer** 对 `<link rel="stylesheet">` 的替换链路与 §4.3 一致。
+**解决**：在 `installViteAdapter` 中对 **`vite:preloadError`**：**先 `preventDefault()`**，再从 **`payload`** 解析 URL 并确认它是否命中当前 prepared rules；**CSS 实体加载**仍交给 **`window` capture + Observer** 对 `<link rel="stylesheet">` 的替换链路与 §4.3 一致。当前页面实现不会在这个 preload 事件里额外调用 `recordFailure`。
 
 ---
 
@@ -285,7 +285,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 ---
 
-### 4.8 Resolver：初始链路先试、熔断与 `urls`、`findPrepared`/`isFallback`
+### 4.8 Legacy Resolver（主要用于 SW / 历史讨论）：初始链路先试、熔断与 `urls`、`findPrepared`/`isFallback`
 
 #### 背景
 
@@ -300,6 +300,8 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 若 **初始就用 `urls`前缀来匹配未知资源**，会违背 (3)。
 
 多条规则 **rule `base`** 重复时若没有 **deterministic precedence**，配置文件一半生效一半不生效。
+
+这一节描述的是 `packages/core/src/runtime/resolver.ts` 仍保留的 legacy `Resolver` 语义，当前主要服务于 SW fetch 层与历史对照。页面 runtime 已改由 `RecoveryCoordinator` + compileRuntimeConfig 管理恢复，不再直接把这套匹配顺序、reason 枚举和 circuit 组合暴露为页面契约。
 
 #### 思考过程（与实现对齐）
 
@@ -317,9 +319,9 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 - **剥路径 / swap**：rule `base` 与 `urls` 列表前缀可不一致——仍能从当前 URL **剥出路径段**拼到 **下一候选前缀**。
 
-- **`resolveBuiltUrl`**：用于 **文件名 → 首轮 URL**（用 rule `base` 拼装）。设计意图：**不因熔断跳过「初始主推的 rule `base` URL」**，fallback 时再靠 **`resolve` + `__RF__.load` 循环**。多条规则时 **最后一条命中为准**；构建期仍须与 Vite §4.4 闸门连用，以免 Vite `base` 未对齐时误拼 CDN。
+- **`resolveBuiltUrl`**：用于 **文件名 → 首轮 URL**（用 rule `base` 拼装）。设计意图：**不因熔断跳过「初始主推的 rule `base` URL」**，fallback 时再靠 **`resolve` + `__RF__.load` 循环**。这属于 legacy resolver 的内部语义；当前页面侧 Vite 路径已不再依赖 `renderBuiltUrl` / `renderDynamicImport` 钩子。
 
-配置上：重复 rule `base` 最终以 **遍历顺序的最后一次为准**。
+若需要讨论重复 rule `base` 的优先级，请明确限定在 legacy resolver / SW 语境；不要把它描述成当前页面 runtime 的公开行为。
 
 #### 解决方案小结
 
@@ -327,13 +329,13 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 ---
 
-### 4.9 观测与示例：`giveup`/no-match 也会 `rf:error`，不能当作「已走完整回退链」
+### 4.9 观测与示例：不要把页面 `rf:error` 当作稳定 reason 协议
 
 #### 背景
 
 为调试方便，项目在 HTML 早期注入 listener，把所有 **`rf:*`** push 进 **`window.__RF_EVENTS__`**。
 
-**不匹配规则的脚本**失败后，Observer仍会进入 **`resolver.resolve` → `{ kind:'giveup', reason:'no-match' }`** → **`bus.emitError`**。若以 **「数组 length 变大」**作为「库里做了 fallback」的依据，就会把 **正确答案（未匹配应忽略 fallback）** 显示成 **「却被拦截」**的假阳性。
+历史上的 resolver 时代，**不匹配规则的脚本**失败后，Observer 可能进入 **`resolver.resolve` → `{ kind:'giveup', reason:'no-match' }`** → **`bus.emitError`**。若以 **「数组 length 变大」**作为「库里做了 fallback」的依据，就会把 **正确答案（未匹配应忽略 fallback）** 显示成 **「却被拦截」**的假阳性。当前页面 runtime 已改由 `RecoveryCoordinator` 统一发终态事件，因此更不应把 `rf:error` 的 reason 结构当作稳定 API。
 
 产品上 **监控**若把 **`rf:error` 全盘当成事故**，也会产生 **告警风暴**——其中大量可能是 **预期的 no-match（第三方脚本、无关域）**.
 
@@ -341,14 +343,14 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 必须把 **语义细分**落实到 **示例与消费者指南**：
 
-- **`rf:retry` / `rf:fallback`**：说明 **resolver 已经决定**，且 **下一轮会换 URL / 再加参数**。
-- **`rf:error`**：可能是 **`rules-exhausted`**（真·穷举失败），也可能是 **`no-match`**（**策略上未接管**）。
+- **`rf:retry` / `rf:fallback`**：说明 **确实进入了回退状态机**，下一轮会换 URL / 再加参数。
+- **`rf:error`**：在页面侧应视为 **终态失败信号**，而不是稳定的 reason 枚举；`no-match` / `rules-exhausted` 之类的细分更适合放在历史或 SW resolver 讨论里。
 
 #### 解决方案（如何实现）
 
 示例应用（Vue/React demo）改为：在点击「加载不匹配规则脚本」后，只扫描 **`__RF_EVENTS__` 新增的 slice**，若 **`type` 字段为 `'retry'` 或 `'fallback'`** 才认定为 **「本库已进入回退状态机」**；若仅有 **`error` 且无 retry/fallback**，则 UI 文案为 **符合预期的「未被拦截」**。
 
-线上监控同理：按需 filter **`detail.reason`** 或拆分 dashboard。
+线上监控同理：优先按事件类型拆分 dashboard；若确需细看 `reason`，应把它当成诊断字段，而不是页面契约。
 
 ---
 
@@ -371,7 +373,7 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
 核心取舍是 **Hybrid ownership**：
 
-- **script / dynamic import / Webpack async script / SystemJS** 继续归页面侧 adapter。它们处理的不只是网络请求，还包括构建器 Promise、module map cache、CSS chunk reject、SRI/属性复制等语义。
+- **script / dynamic import / Webpack async script / SystemJS** 继续归页面侧 `RecoveryCoordinator` + adapter。它们处理的不只是网络请求，还包括构建器 Promise、module map cache、CSS chunk reject、SRI/属性复制等语义。
 - **image / font / media / CSS 子资源** 归 SW。它们没有脚本执行顺序和构建器 Promise 的复杂语义，更适合在 fetch 层统一 retry/fallback。
 - **顶层 stylesheet** 暂不交给 SW。Observer 仍负责 `<link rel="stylesheet">`，避免 SW 与 Observer 对同一 `<link>` 重复 retry、重复计数、事件顺序混乱。
 - **CSS `@import`** 仅在 `request.destination === 'style'` 且 `request.referrer` 命中 manifest 中的 CSS 资源时接管，避免误伤页面主动加载的顶层 stylesheet。
