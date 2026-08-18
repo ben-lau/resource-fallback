@@ -189,17 +189,19 @@ Four layers:
 | **SW-first**         | nearly everything             | Highest — script, dynamic import, CSS promise, SRI, first load, SW update | High — misleading "SW replaces all"                |
 | **Full layered**     | manifest + ScriptSequencer    | Largest; split into phases                                                | Scope risk — ship Hybrid MVP first                 |
 
-## Recommended roadmap
+## Historical roadmap (superseded by the shipped opt-in implementation)
 
-**Phase 1**: Design doc + spikes (font CORS, opaque, SRI, first load, builder semantics) before heavy implementation.
+The phase plan below is kept as **historical planning rationale** from before Hybrid SW shipped; it is **not** current work. The current state is the one described above in “Current implementation status”: Hybrid SW already ships as an **opt-in** feature with manifest preload, emitted SW assets, page registration/bridge wiring, and fetch-layer fallback for non-script resources / CSS subresources.
 
-**Phase 2**: Hybrid SW MVP — opt-in; `image`, `font`, `media`, CSS `url()`, CSS `@import`; scripts stay on existing adapters.
+Historically, the rollout plan looked like this:
 
-**Phase 3**: Manifest — Vite/Webpack emit type/URL map; SW decides from manifest; record page-owned resources to avoid duplicates.
+- **Phase 1**: design doc + spikes (font CORS, opaque, SRI, first load, builder semantics) before heavy implementation
+- **Phase 2**: Hybrid SW MVP — opt-in; `image`, `font`, `media`, CSS `url()`, CSS `@import`; scripts stay on existing adapters
+- **Phase 3**: Manifest — Vite/Webpack emit type/URL map; SW decides from manifest; record page-owned resources to avoid duplicates
+- **Phase 4**: Evaluate top-level `style` SW ownership only after proving no Observer duplicate retry / Webpack CSS promise regression
+- **Phase 5**: ScriptSequencer opt-in if sync classic script ordering is required — build-time queue blocking scripts, serial load with retry/fallback per script
 
-**Phase 4**: Evaluate top-level `style` SW ownership only after proving no Observer duplicate retry / Webpack CSS promise regression.
-
-**Phase 5**: ScriptSequencer opt-in if sync classic script ordering is required — build-time queue blocking scripts, serial load with retry/fallback per script.
+The core outcomes of phases 2–3 are already shipped in the current version. Phases 4–5 should be read as possible future evolution, not as present-day implementation status.
 
 ## Validation spike checklist
 
@@ -210,7 +212,7 @@ Four layers:
 5. **Vite dynamic import**: SW success vs giveup — `import()` Promise, module map, `__RF__.load` cache bust still needed? Also verify the current handoff still comes from `writeBundle` + `es-module-lexer` + `MagicString`, not the earlier `renderDynamicImport` / `renderBuiltUrl` experiments.
 6. **Webpack CSS chunk**: async component with separate CSS chunk — is page-side CSS promise patch still required with SW?
 7. **Event bridge**: SW retry/fallback/success/error → `postMessage` → `rf:*` — order, loss, multi-tab
-8. **Kill switch**: `__RF_DISABLE__`, query, cookie — does SW pass-through or stop?
+8. **Kill switch**: confirm that `__RF_DISABLE__`, query flags, and cookies only affect the current page runtime installation path; they do not automatically unregister or take control over an already registered SW. If SW behavior must change, that needs separate SW registration / update / configuration handling.
 
 ## Synchronous script execution order
 

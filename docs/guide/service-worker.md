@@ -119,7 +119,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 :::
 
 ::: info Kill Switch
-`window.__RF_DISABLE__`、query 参数、`cookie` 禁用页面 runtime 时，SW adapter 也会停止处理或切换到 pass-through。
+`window.__RF_DISABLE__`、query 参数、`cookie` 等页面 kill switch 只会阻止**当前页面这次 runtime 安装路径**继续接线。它们**不会**自动注销或重新配置一个**已经注册**的 Service Worker，也**不能保证**该 SW 立即切到 pass-through。若业务需要停用或收敛 SW 行为，应单独管理 SW 的注册、更新与配置。
 :::
 
 ## 同步/异步覆盖矩阵

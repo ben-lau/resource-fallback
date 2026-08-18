@@ -218,17 +218,19 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 风险主要是范围过大。建议拆成 Hybrid SW MVP、manifest 增强、ScriptSequencer 三个可独立验证的阶段。
 
-## 推荐路线
+## 历史规划（已被当前 shipped 实现取代）
 
-第一阶段先不要实现 SW 代码，而是用本文档和 spike 验证关键假设。只有确认字体 CORS、opaque response、SRI、首次加载和构建器语义边界后，再进入实现计划。
+下述 phase plan 保留为**历史规划 rationale**，描述的是 shipped 之前如何拆解验证与落地 Hybrid SW；**不是当前待做事项**。当前事实以本文前面的“当前实现状态”为准：Hybrid SW 已经作为 **opt-in** 能力 shipped，包含 manifest 预置、SW asset 输出、页面注册桥接，以及对非脚本资源 / CSS 子资源的 fetch 层回退。
 
-第二阶段实现 Hybrid SW MVP。默认 opt-in，目标只包含非脚本资源和明确 ownership 的 CSS 子资源：`image`、`font`、`media`、CSS `url()`、CSS `@import`。现有 script、Vite dynamic import、Webpack async chunk、SystemJS 继续由现有 adapter 负责。
+历史上，计划大致分为以下阶段：
 
-第三阶段补 manifest。让 Vite/Webpack 插件输出资源类型与 URL 映射，SW 根据 manifest 决策，而不是仅靠 `request.destination` 和文件后缀猜测。manifest 也可记录哪些资源由页面 adapter owning，避免重复处理。
+1. **先不实现 SW 代码，而是做 spike 验证关键假设**：先确认字体 CORS、opaque response、SRI、首次加载和构建器语义边界。
+2. **实现 Hybrid SW MVP**：默认 opt-in，目标只包含非脚本资源和明确 ownership 的 CSS 子资源：`image`、`font`、`media`、CSS `url()`、CSS `@import`。现有 script、Vite dynamic import、Webpack async chunk、SystemJS 继续由现有 adapter 负责。
+3. **补 manifest**：让 Vite/Webpack 插件输出资源类型与 URL 映射，SW 根据 manifest 决策，而不是仅靠 `request.destination` 和文件后缀猜测。manifest 也可记录哪些资源由页面 adapter owning，避免重复处理。
+4. **评估是否扩大 SW ownership 到顶层 `style`**：只有在测试证明不会与 Observer 重复 retry、不会破坏 Webpack CSS chunk promise 处理时再启用。
+5. **如业务确实需要同步 classic script 强顺序，再单独实现 ScriptSequencer**：它应是 opt-in：构建期将阻塞 `<script src>` 改写为 `data-rf-src` 队列，运行时按 DOM 顺序串行加载，当前脚本成功后才加载下一个。这个方案直接解决顺序问题，不依赖 SW 是否已经控制页面。
 
-第四阶段评估是否扩大 SW ownership 到顶层 `style`。只有在测试证明不会与 Observer 重复 retry、不会破坏 Webpack CSS chunk promise 处理时再启用。
-
-第五阶段如果业务确实需要同步 classic script 强顺序，单独实现 ScriptSequencer。它应是 opt-in：构建期将阻塞 `<script src>` 改写为 `data-rf-src` 队列，运行时按 DOM 顺序串行加载，当前脚本成功后才加载下一个。这个方案直接解决顺序问题，不依赖 SW 是否已经控制页面。
+其中第 2～3 阶段的核心结果已经在当前版本 shipped；第 4～5 阶段仍应理解为潜在后续演进方向，而不是当前默认能力。
 
 ## 验证 Spike 清单
 
@@ -241,7 +243,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 5. Vite dynamic import 验证：在 SW 成功 fallback 和 SW giveup 两种情况下，观察 `import()` Promise、module map cache 和当前 `__RF__.load()` cache bust 的必要性；同时确认页面侧仍由 `writeBundle` + `es-module-lexer` + `MagicString` 改写链路接管，而不是回退到历史上的 `renderDynamicImport` / `renderBuiltUrl` 路线。
 6. Webpack CSS chunk 验证：构建带独立 CSS chunk 的 async component，确认即使 SW 处理 fetch，页面侧 CSS chunk promise 兜底是否仍需要保留。
 7. 事件桥验证：SW 连续发生 retry、fallback、success、error 时，通过 `postMessage` 到页面再转发 `rf:*`，确认事件顺序、丢失情况和多个 tab 的行为。
-8. Kill switch 验证：`window.__RF_DISABLE__`、query、cookie 禁用页面 runtime 时，SW 是否也停止处理或切换到 pass-through。
+8. Kill switch 验证：确认 `window.__RF_DISABLE__`、query、cookie 等页面 kill switch 只影响当前页面 runtime 安装路径，不会自动注销或接管已注册 SW；若需要改变 SW 行为，应通过单独的 SW 注册 / 更新 / 配置策略实现。
 
 ## 同步脚本执行顺序
 

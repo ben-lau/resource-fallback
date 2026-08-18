@@ -129,7 +129,7 @@ navigator.serviceWorker.controller?.scriptURL;
 - **Background images**: computed style alone is not enough — check Network / SW events
 
 ::: warning Kill switch
-When runtime is disabled via kill switch, verify whether SW should pass-through or stop handling — see [CSP & SRI](./csp-sri.md#kill-switch).
+Page kill switches such as `window.__RF_DISABLE__`, query flags, or cookies only stop the **current page runtime installation path** from wiring itself up. They do **not** unregister, reconfigure, or take control over an already registered Service Worker, and they do **not** guarantee that the SW will immediately pass through requests. If you need SW behavior to stop or change, manage SW registration, updates, and configuration separately.
 :::
 
 ## Related docs
