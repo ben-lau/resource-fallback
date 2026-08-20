@@ -13,7 +13,7 @@ Service Worker 能显著扩展资源回退的覆盖面，尤其适合 `img`、`v
 推荐采用 **Hybrid SW** 分层方案：保留现有页面 `RecoveryCoordinator` + ownership 划分，引入 SW 补齐非脚本资源和 CSS 子资源。SW 自身的 fetch 层回退仍使用独立 resolver，不与页面 adapter 混成同一状态机。
 
 ::: info 当前实现状态
-Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。
+Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。页面 runtime 仍负责注册 SW、补发配置更新，并把 SW `postMessage` 事件桥接为页面侧 `rf:*` DOM 事件。
 :::
 
 ## 启用方式
@@ -77,6 +77,13 @@ Observer 和 SW 不应同时处理同一个资源请求。带 `data-webpack` 的
 SW 不能直接调用 `window.dispatchEvent()`。SW 事件通过 `client.postMessage()` 送回页面，再由页面 runtime 转发为 DOM CustomEvent（`rf:retry` / `rf:fallback` / `rf:success` / `rf:error`）。
 
 SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串台。
+
+## 注册流程
+
+1. 构建阶段输出 `rf-sw.js` 与 preload manifest
+2. 页面 runtime 注册 SW，并把 `postMessage` 事件桥接回 `rf:*`
+3. SW 拦截 manifest ownership 命中的 fetch 请求
+4. 若 SW 侧最终仍失败，则派发 `rf:error`，并返回 `Response.error()`
 
 ## 配置选项
 

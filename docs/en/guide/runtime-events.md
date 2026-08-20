@@ -52,14 +52,14 @@ Place early in `index.html` before the app bundle:
 
 ```html
 <script>
-  window.addEventListener('rf:error', function (e) {
-    if (e.detail.reason === 'rules-exhausted') {
-      document.body.innerHTML =
-        '<p style="padding:2rem;text-align:center">Resources failed to load. Please refresh.</p>';
-    }
+  window.addEventListener('rf:error', function () {
+    document.body.innerHTML =
+      '<p style="padding:2rem;text-align:center">Resources failed to load. Please refresh.</p>';
   });
 </script>
 ```
+
+Keep this entry fallback generic. Page-side `rf:error.detail.reason` is not a stable reason-string contract; if you need proof that fallback actually ran, watch `rf:retry` / `rf:fallback` separately.
 
 ### Detect whether fallback actually ran
 
@@ -75,7 +75,7 @@ const events: Array<{ type: string; detail: unknown }> = [];
 });
 
 function didFallbackRun(since: number) {
-  return events.slice(since).some((e) => e.type === 'retry' || e.type === 'fallback');
+  return events.slice(since).some((e) => e.type === 'rf:retry' || e.type === 'rf:fallback');
 }
 ```
 
@@ -121,12 +121,29 @@ window.addEventListener('rf:error', (e) => {
 | --------------- | ------------------------------------------------------------ |
 | Retry rate      | `rf:retry` count by host                                     |
 | Fallback rate   | `rf:fallback` `from` → `to`                                  |
+| Terminal errors | `rf:error` count                                             |
 | Exhaustion rate | SW-bridged `rf:error` where `reason === 'rules-exhausted'`   |
 | Circuit trips   | host skipped in fallback chain (via logging + circuit state) |
 
 ### Hybrid SW events
 
 SW events are bridged to the same `rf:*` events on the page that triggered the fetch (`clientId`). Rare requests without `clientId` fall back to window broadcast.
+
+Reason strings such as `rules-exhausted` / `no-match` should stay explicitly scoped to those SW-bridged resolver events, not to page-side `rf:error` as a general API contract.
+
+## HookBus and adapter relationship
+
+```mermaid
+flowchart LR
+  OBS["Observer"] --> RC["RecoveryCoordinator"]
+  VA["Vite Adapter"] --> RC
+  WA["Webpack Adapter"] --> RC
+  SA["SystemJS Adapter"] --> RC
+  SWA["SW Adapter<br/>(postMessage bridge)"] --> HB["HookBus<br/>rf:retry / rf:fallback<br/>rf:success / rf:error"]
+  RC --> HB
+  HB --> DOM["window.dispatchEvent"]
+  HB --> HOOKS["hooks.onRetry / onFallback / ..."]
+```
 
 ## Debug mode
 

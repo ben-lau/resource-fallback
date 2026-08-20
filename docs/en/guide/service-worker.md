@@ -8,6 +8,10 @@ Hybrid Service Worker is an **opt-in** extension that covers subresources DOM Ob
 
 ## Overview
 
+::: info Current implementation status
+Hybrid SW is already shipped as an opt-in feature. Vite/Webpack plugins generate a manifest, emit an SW asset, preload manifest into the worker bundle, and the page runtime still handles SW registration, follow-up config updates, and `postMessage` → `rf:*` DOM event bridging.
+:::
+
 | Resource type                                                | Owner                                                                 | Notes                                          |
 | ------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------- |
 | Scripts, dynamic import, Webpack async chunk, SystemJS       | Page runtime (`RecoveryCoordinator` + Observer/Vite/Webpack/SystemJS) | Keeps script and builder semantics on the page |
@@ -15,6 +19,25 @@ Hybrid Service Worker is an **opt-in** extension that covers subresources DOM Ob
 | Top-level `<link rel="stylesheet">`                          | Observer                                                              | Still a page-owned DOM boundary                |
 
 This split avoids duplicate retry, event ordering issues, and breaking builder Promise semantics. The page runtime and the SW do not share one recovery state machine: page adapters delegate to `RecoveryCoordinator`, while the SW keeps its own fetch-layer resolver.
+
+## Enable it
+
+```ts
+resourceFallback({
+  rules: [...],
+  serviceWorker: true,
+});
+
+resourceFallback({
+  rules: [...],
+  serviceWorker: {
+    scope: '/',
+    includeStyleImports: true,
+    fallbackOnOpaque: false,
+    cache: { enabled: true, cacheOpaque: false },
+  },
+});
+```
 
 ## Manifest preloading
 
@@ -51,6 +74,10 @@ SW events are delivered to the triggering page first via `FetchEvent.clientId`, 
 
 On the page side, duplicate takeover is prevented by the ownership registry: one owner claims a `logicalKey`, and concurrent work from the same owner joins the same in-flight recovery Promise through `RecoveryCoordinator`.
 
+## Event bridge
+
+SW cannot call `window.dispatchEvent()` directly. It posts events back to the page client, and the page runtime re-emits them as the same DOM CustomEvents: `rf:retry`, `rf:fallback`, `rf:success`, and `rf:error`.
+
 ## Configuration
 
 Enable with `serviceWorker: true` or an object:
@@ -84,6 +111,12 @@ Full reference: [Configuration Reference](./configuration.md#serviceworkeroption
 ::: info SW circuit breaker
 SW uses an isolated in-memory circuit breaker — it does not share page-side `localStorage` state.
 :::
+
+## Cache policy
+
+- Cache only readable 2xx responses from successful fallback
+- Read the current manifest-version cache only after network retry/fallback is exhausted
+- Clean old `resource-fallback-*` caches when a new manifest version activates
 
 ## Registration flow
 

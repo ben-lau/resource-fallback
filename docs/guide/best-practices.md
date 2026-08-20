@@ -38,7 +38,10 @@ Vite 项目的 rule `base` 必须对齐 Vite `base`；Webpack 项目的 rule `ba
 - rule `base` 和 `urls` 中的每一项都应为 **URL 前缀**（含末尾 `/`），例如 `https://cdn.example.com/`
 - rule `base` 与 `urls` 可以不同：`base` 是首轮前缀，`urls` 是回退链
 - 最后一个 `urls` 条目通常指向同源回源，避免主 CDN 故障时再次命中 CDN
-- 多条规则时 `resolveBuiltUrl` 以最后一条命中为准
+- 编译阶段会按 `base` 长度降序排序规则，较长前缀优先匹配
+- `window.__RF__.url(filename)` 只会使用**第一条已编译规则**的 `base` 构造首轮 URL，不感知熔断状态
+- 页面侧一次 recovery session 会先按首轮 URL 选中一条规则，再沿该规则自己的 `urls` 候选链继续 retry / fallback
+- 页面 runtime 当前只初始化一个 circuit registry，并使用第一条已编译规则的 circuit 选项；“每条规则独立页面熔断器”尚未实现
 
 ## 调试技巧
 
@@ -101,6 +104,9 @@ window.addEventListener('rf:error', (e) => {
 - **fallback 频率** — 按 host 统计 `rf:fallback` 事件，识别 CDN 故障
 - **error 率** — `rf:error` 表示所有候选 URL 耗尽，需要告警
 - **熔断状态** — 通过 debug 日志或自定义上报观察 per-host 熔断
+- **是否真的进入回退链** — 优先看 `rf:retry` / `rf:fallback`；不要把页面侧 `rf:error.detail.reason` 当成稳定公共协议
+
+若要分析 SW 透传事件，可在 **明确是 SW 语境** 时再讨论 `rules-exhausted` / `no-match` 这类 resolver reason；页面侧 `rf:error` 更适合作为终态失败信号使用。
 
 ## 同步脚本限制
 

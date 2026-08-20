@@ -12,7 +12,7 @@ Service Worker 能显著扩展资源回退的覆盖面，尤其适合 `img`、`v
 
 ## 当前实现状态
 
-Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。
+Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manifest、输出 SW asset，并把 manifest 预置到 SW 文件中，避免图片、背景图、字体等早期子资源在 SW 尚未收到页面 `postMessage` 配置时直接透传到主 CDN。页面 runtime 仍负责注册 SW、补发配置更新，并把 SW `postMessage` 事件桥接为 `rf:*` DOM 事件。
 
 默认 SW path 跟随 scope 派生，避免把 `Service-Worker-Allowed` 响应头变成默认心智负担：`scope: '/'` 时输出 `/rf-sw.js`，`scope: '/app/'` 时输出 `/app/rf-sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed`。
 
@@ -253,7 +253,7 @@ SW 对同步 classic script 有帮助，但不是完整答案。
 
 但以下情况 SW 不能保证顺序：
 
-- ƒ首次访问时该 script 请求没有进入 SW。
+- 首次访问时该 script 请求没有进入 SW。
 - 所有候选 URL 都失败，浏览器继续触发 script error，HTML 解析仍可能继续。
 - SRI、MIME、CORS、CSP 等校验在 fetch 成功后仍失败。
 - 页面侧后续脚本已经因其他原因执行，SW 无法回滚副作用。
@@ -267,3 +267,9 @@ SW 对同步 classic script 有帮助，但不是完整答案。
 原因不是为了降低工作量，而是因为 SW-first 无法跨越首次控制、SRI 标签属性、opaque response、浏览器安全策略和构建器运行时语义这些平台边界。保留现有 adapter 能保护已经解决过的脚本和构建器问题，让 SW 专注于它最擅长的资源请求层。
 
 中期建议演进为完整分层方案：manifest 提供精确资源信息，SW 扩展资源覆盖，页面 runtime 保留脚本语义与事件桥，ScriptSequencer 解决同步 classic script 顺序。这样比单纯按 TODO 逐项实现更完整，也更符合这个库“零心智负担但语义明确”的目标。
+
+## 相关文档
+
+- [Hybrid Service Worker](../guide/service-worker.md)
+- [配置参考](../guide/configuration.md)
+- [案例复盘](../experience/case-studies.md)

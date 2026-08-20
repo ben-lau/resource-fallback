@@ -57,8 +57,22 @@ script-src https://app.example.com/static/__rf/runtime.js https://cdn1.example.c
 ```
 
 ::: tip hooks with externalRuntime
-`hooks` (JS function callbacks) only work with `externalRuntime: true` because functions cannot be JSON-serialized into inline config.
+`externalRuntime` only changes where the runtime script is placed for CSP. It does **not** make build-config callbacks serializable. `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls still serialize config first, so function-valued `hooks` are dropped in auto-injected setups.
 :::
+
+If you manually call `window.__RF__.install()` in page code and pass live function objects yourself, hooks work without requiring `externalRuntime: true`. The key is avoiding build-time serialization:
+
+```ts
+window.__RF__.install({
+  rules: [...],
+  hooks: {
+    onError: (e) => monitor.send('resource.error', e),
+    onFallback: (e) => monitor.send('resource.fallback', e),
+  },
+});
+```
+
+For auto-injected setups, prefer DOM `rf:*` events. Choose `nonce` or `externalRuntime` separately for CSP compliance.
 
 ## SRI strategies
 

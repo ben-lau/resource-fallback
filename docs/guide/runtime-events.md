@@ -62,6 +62,8 @@ window.addEventListener('rf:error', (e) => {
 </script>
 ```
 
+这个入口兜底建议保持**通用终态 UI**：页面侧 `rf:error.detail.reason` 不应被当成稳定 reason 枚举；如果你只想判断“是否真的进入过回退链”，请改看 `rf:retry` / `rf:fallback`。
+
 ## 与监控系统对接
 
 推荐通过 DOM 事件对接监控系统：
@@ -79,6 +81,34 @@ window.addEventListener('rf:error', (e) => {
   monitor.send('resource.error', e.detail);
 });
 ```
+
+### 判断是否真的进入回退链
+
+测试或监控时，若要区分“终态失败”与“确实发生过 retry / fallback”，推荐单独记录 `rf:retry` / `rf:fallback`：
+
+```ts
+const events: Array<{ type: string; detail: unknown }> = [];
+
+['rf:retry', 'rf:fallback', 'rf:success', 'rf:error'].forEach((type) => {
+  window.addEventListener(type, (e) => {
+    events.push({ type, detail: (e as CustomEvent).detail });
+  });
+});
+
+function didFallbackRun(since: number) {
+  return events.slice(since).some((e) => e.type === 'rf:retry' || e.type === 'rf:fallback');
+}
+```
+
+### 监控指标建议
+
+| 指标       | 推荐来源                                                  |
+| ---------- | --------------------------------------------------------- |
+| 重试率     | `rf:retry` 按 host 计数                                   |
+| 回退率     | `rf:fallback` 的 `from` → `to`                            |
+| 终态失败率 | `rf:error` 总量                                           |
+| SW 耗尽率  | **仅在 SW 透传语境下**统计 `reason === 'rules-exhausted'` |
+| 熔断命中   | 结合 debug 日志或 circuit state 观测被跳过的 host         |
 
 ### JS 函数钩子
 
@@ -113,6 +143,10 @@ flowchart LR
   HB --> DOM["window.dispatchEvent"]
   HB --> HOOKS["hooks.onRetry / onFallback / ..."]
 ```
+
+## Hybrid SW 事件桥
+
+SW 事件会优先投递给触发该 fetch 的页面客户端（`FetchEvent.clientId`）；只有极少数没有 `clientId` 的场景才会回退为窗口广播。讨论 `rules-exhausted` / `no-match` 这类 reason 时，也应明确它们属于 **SW resolver 透传语境**，而不是页面侧稳定 API。
 
 ## 调试
 

@@ -12,7 +12,7 @@ The recommended path is not SW-first, but **layered**: keep existing script and 
 
 ## Current implementation status
 
-Hybrid SW is implemented as opt-in. Vite/Webpack plugins generate a resource manifest, emit a SW asset, and preload manifest into the SW file so early subresources (images, background images, fonts) don't pass through to the primary CDN before the page `postMessage`s config.
+Hybrid SW is implemented as opt-in. Vite/Webpack plugins generate a resource manifest, emit a SW asset, and preload manifest into the SW file so early subresources (images, background images, fonts) don't pass through to the primary CDN before the page `postMessage`s config. The page runtime still registers the SW, sends follow-up config updates, and bridges SW `postMessage` events into `rf:*` DOM events.
 
 Default SW path follows scope: `scope: '/'` → `/rf-sw.js`, `scope: '/app/'` → `/app/rf-sw.js`. Only when `path` is explicitly outside the scope directory do you need `Service-Worker-Allowed`.
 

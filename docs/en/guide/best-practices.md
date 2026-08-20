@@ -42,9 +42,9 @@ The last entry is usually `'/'` (relative origin) to avoid hitting a broken CDN 
 
 Prefix URLs should end with `/` (e.g. `https://cdn.example.com/`). The runtime uses `joinAssetPrefix` to avoid malformed paths like `...prod` + `js/foo.js` → `...prodjs/foo.js`.
 
-### Per-rule retry and circuit
+### Retry overrides and current circuit boundary
 
-Override per rule when different asset classes need different policies:
+Retry settings can still be overridden per rule when different asset classes need different retry budgets:
 
 ```ts
 rules: [
@@ -52,7 +52,6 @@ rules: [
     base: 'https://cdn.example.com/',
     urls: ['https://cdn-backup.example.com/', '/'],
     retry: { max: 2, baseDelay: 300 },
-    circuit: { threshold: 3, cooldown: 30000 },
   },
 ],
 defaults: {
@@ -62,6 +61,13 @@ defaults: {
 ```
 
 Keep `retry.max` between 1–3. Excessive retries increase user wait time.
+
+Current page-side rule/circuit behavior is narrower than the public type suggests:
+
+- compilation sorts rules by descending `base` length, so longer prefixes match first;
+- `window.__RF__.url(filename)` always builds the initial URL from the first compiled rule's `base`; it is not circuit-aware;
+- a page recovery session first chooses one rule from that initial URL, then walks that rule's ordered `urls` candidates;
+- the page runtime currently creates one circuit registry, initialized from the first compiled rule's circuit options. `FallbackRule.circuit` remains public, but independent per-rule page circuits are not implemented yet.
 
 ## CDN prefix notes
 
@@ -103,12 +109,11 @@ Or set `debug: true` in config (always logs — use sparingly in production).
 
 ## Monitoring
 
-Filter `rf:error` by reason:
+Treat page `rf:error` as a terminal signal, and use `rf:retry` / `rf:fallback` to prove that fallback actually ran:
 
 ```ts
 window.addEventListener('rf:error', (e) => {
-  if (e.detail.reason === 'no-match') return; // expected for third-party scripts
-  analytics.track('resource_fallback_exhausted', e.detail);
+  analytics.track('resource_fallback_terminal', e.detail);
 });
 ```
 
@@ -124,6 +129,8 @@ window.addEventListener('rf:fallback', (e) => {
 ```
 
 See [Runtime Events](./runtime-events.md) for full API.
+
+If you need reason-string analysis, keep it explicitly scoped to SW-bridged events. Page-side `rf:error.detail.reason` is an opaque failure value, not a stable public contract.
 
 ## Entry and lazy-route fallback UI
 

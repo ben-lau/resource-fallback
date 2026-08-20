@@ -49,7 +49,9 @@ resourceFallback({
 
 ### externalRuntime 与 hooks
 
-`externalRuntime` 模式下可以使用 JS 函数钩子（`hooks`），因为函数无法 JSON 序列化到内联 script 中：
+`externalRuntime` 只解决 CSP 下 runtime script 的放置方式；它**不会**让构建配置里的函数变得可序列化。`buildInjectedTags()` 与插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象，因此自动注入场景下 `hooks` 里的函数始终会被丢弃。
+
+若你在页面代码里**手动**调用 `window.__RF__.install()`，并直接传入 live 函数对象，hooks 可以生效；这**不要求** `externalRuntime: true`，关键在于绕过构建期序列化：
 
 ```ts
 window.__RF__.install({
@@ -60,6 +62,8 @@ window.__RF__.install({
   },
 });
 ```
+
+自动注入场景推荐优先使用 DOM `rf:*` 事件；若只是为了满足 CSP，再单独选择 `nonce` 或 `externalRuntime`。
 
 ## SRI 策略
 
