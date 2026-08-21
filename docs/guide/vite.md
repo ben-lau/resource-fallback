@@ -79,6 +79,14 @@ const mod = await import('./Lazy.vue');
 const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
+### `window.__RF__.url(filename)` 的当前语义
+
+`window.__RF__.url(filename)` 只会把文件名和**第一条已编译规则**的 `base` 拼接成首轮 URL。它不会查看当前熔断状态，也不会在页面运行时先跳过某个 host。
+
+### `window.__RF__.load(filename)` 的恢复语义
+
+`window.__RF__.load(filename)` 会先解析出初始 URL，再把 retry / fallback / deadline / cancellation 交给共享的 `RecoveryCoordinator`。它还会使用规范化后的 sharing key，让同一 owner 对同一逻辑资源的并发加载共享同一个 recovery Promise。
+
 ### 4. `transformIndexHtml`：注入运行时与 preconnect 标签
 
 `transformIndexHtml` 会在 `<head>` 注入：

@@ -17,7 +17,7 @@
 - **Hybrid Service Worker（opt-in）** — 通过 SW 补齐 `img`、`@font-face`、CSS `url()`、媒体资源和受控 CSS `@import` 的资源回退；脚本仍由现有 adapter 负责
 - **智能重试** — 指数退避 + 随机抖动，避免失败风暴；可配置每个 URL 的最大重试次数
 - **per-host 熔断器** — 连续失败达阈值后自动跳过该 host，冷却后恢复；通过 `localStorage` + `storage` 事件实现跨标签页状态共享
-- **三重 Kill Switch** — `window.__RF_DISABLE__` 全局变量 / `?__rf=off` 查询参数 / `__rf_disable=1` Cookie，线上紧急关停无需发版
+- **三重页面运行时 Kill Switch** — `window.__RF_DISABLE__` 全局变量 / `?__rf=off` 查询参数 / `__rf_disable=1` Cookie，线上紧急关停页面 runtime 无需发版
 - **CSP 友好** — 支持 `nonce` 属性与 `externalRuntime` 外链模式
 - **SRI 兼容** — 可选 strip / keep / strict 三种策略
 - **自动 Preconnect** — 为每个 fallback 域名注入 `<link rel="preconnect">`，减少 DNS + TLS 耗时
@@ -339,13 +339,15 @@ resourceFallback({
 
 ## Kill Switch
 
-三种方式可在不发版的情况下紧急禁用运行时：
+三种方式可在不发版的情况下紧急禁用页面运行时：
 
 | 方式     | 示例                           | 适用场景                         |
 | -------- | ------------------------------ | -------------------------------- |
 | 全局变量 | `window.__RF_DISABLE__ = true` | 在运行时 `<script>` 之前内联设置 |
 | 查询参数 | 访问 `?__rf=off`               | 临时排查问题                     |
 | Cookie   | `__rf_disable=1`               | 网关按会话/用户维度禁用          |
+
+这些开关只会停止**页面 runtime** 的安装 / 恢复路径；它们**不会**自动注销、改配或强制穿透一个已经注册好的 Service Worker。若要改变 SW 行为，需要单独处理 SW 的注册 / 更新 / 配置策略。
 
 ## 同步脚本限制
 

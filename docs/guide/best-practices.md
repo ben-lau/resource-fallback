@@ -102,11 +102,11 @@ window.addEventListener('rf:error', (e) => {
 建议监控的关键指标：
 
 - **fallback 频率** — 按 host 统计 `rf:fallback` 事件，识别 CDN 故障
-- **error 率** — `rf:error` 表示所有候选 URL 耗尽，需要告警
+- **error 率** — `rf:error` 表示页面侧恢复 session 的终态失败，或 SW 透传的失败；页面侧既可能是候选耗尽，也可能是 Coordinator deadline / terminal error
 - **熔断状态** — 通过 debug 日志或自定义上报观察 per-host 熔断
 - **是否真的进入回退链** — 优先看 `rf:retry` / `rf:fallback`；不要把页面侧 `rf:error.detail.reason` 当成稳定公共协议
 
-若要分析 SW 透传事件，可在 **明确是 SW 语境** 时再讨论 `rules-exhausted` / `no-match` 这类 resolver reason；页面侧 `rf:error` 更适合作为终态失败信号使用。
+若要分析 SW 透传事件，可在 **明确是 SW 语境** 时再讨论 `rules-exhausted` / `no-match` 这类 resolver reason；页面侧 `rf:error` 更适合作为终态失败信号使用，不应被等同成“所有候选 URL 耗尽”的唯一原因。
 
 ## 同步脚本限制
 

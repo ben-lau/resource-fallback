@@ -59,7 +59,7 @@ classic script、module script、Webpack async chunk、Vite dynamic import 和 S
 
 SW 在已控制页面且 fetch 层能成功 fallback 时，可以让浏览器拿到成功脚本响应，然后按原本解析或 loader 语义继续执行。这对已受控页面是有价值的。但 SW 无法保证首次访问的早期脚本请求已经被控制，也无法修改原始 `<script integrity="...">` 上的 SRI 属性。一旦 SW 无法在 fetch 层修复，仍需要现有页面侧 adapter 处理失败 Promise、cache bust 和事件。
 
-结论：SW 可以增强 script 成功率，但不应在第一阶段替代现有 script adapter。
+结论：SW 可以增强 script 成功率；按最初的设计拆解，它也不应在首个 shipped 阶段替代现有 script adapter。
 
 ### Style 和 CSS 子资源
 
@@ -67,7 +67,7 @@ SW 在已控制页面且 fetch 层能成功 fallback 时，可以让浏览器拿
 
 SW 天然适合补这个缺口。只要页面已被 SW 控制，这些 CSS 内部请求都会经过 fetch 事件，理论上可以按同一套规则做 retry 和 fallback。
 
-顶层 stylesheet 是否交给 SW，需要谨慎。若 Observer 和 SW 同时处理同一个 `<link>` 请求，可能出现重复 retry、事件顺序混乱和熔断计数放大。第一阶段更稳妥的做法是让 SW own CSS 子资源和可选的 `style` destination，并明确 Observer 对顶层 stylesheet 的边界。
+顶层 stylesheet 是否交给 SW，需要谨慎。若 Observer 和 SW 同时处理同一个 `<link>` 请求，可能出现重复 retry、事件顺序混乱和熔断计数放大。按最初的 shipped 拆解，更稳妥的做法是先让 SW own CSS 子资源和可选的 `style` destination，并明确 Observer 对顶层 stylesheet 的边界。
 
 结论：CSS `url()`、`@font-face`、`@import` 是 SW 的高价值目标；顶层 stylesheet 需要 ownership 设计。
 
@@ -157,7 +157,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 ### 方案 B：Hybrid SW
 
-做法是新增 SW fetch 层，但保留现有 adapter ownership。第一阶段建议让 SW 负责 `image`、`font`、`media`、CSS 子资源和可选 `style`；现有 Observer、Webpack adapter、Vite adapter、SystemJS adapter 继续负责脚本、构建器运行时和顶层 DOM error。
+做法是新增 SW fetch 层，但保留现有 adapter ownership。在最初的 rollout 设计里，首个 shipped 阶段建议让 SW 负责 `image`、`font`、`media`、CSS 子资源和可选 `style`；现有 Observer、Webpack adapter、Vite adapter、SystemJS adapter 继续负责脚本、构建器运行时和顶层 DOM error。
 
 优点是能补齐当前最明显的资源缺口，同时不打散已有处理过的脚本语义。它能覆盖 `img`、`@font-face`、CSS `url()`、CSS `@import` 等高价值目标，也能避免 SW 和页面 runtime 对同一个 Webpack/Vite 脚本失败重复 retry。
 
@@ -186,7 +186,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 这个方案比单独 Hybrid SW 更完整。它承认 SW 的价值，也承认页面侧语义不可完全移除。manifest 能减少 SW 里靠 URL 后缀猜资源类型的脆弱性，也能为后续 per-resource 策略、调试面板和性能指标打基础。
 
-缺点是实现周期最长，需要设计新的构建产物和兼容策略。它适合作为 Hybrid SW MVP 后的演进方向，而不是第一阶段一次性完成。
+缺点是实现周期最长，需要设计新的构建产物和兼容策略。它适合作为 Hybrid SW MVP 后的演进方向，而不是首个 shipped 阶段一次性完成。
 
 ## 成本与风险评估
 
@@ -232,9 +232,9 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 其中第 2～3 阶段的核心结果已经在当前版本 shipped；第 4～5 阶段仍应理解为潜在后续演进方向，而不是当前默认能力。
 
-## 验证 Spike 清单
+## 回归 / 验证清单（含历史 Spike 背景）
 
-在进入实现前，应先做以下最小验证：
+这份清单最初用于 shipped 前的最小验证；当前保留它是为了说明当时的风险拆解，并继续作为 **回归 / 验证 guidance**。它不是在说 Hybrid SW 仍“等待实现”。
 
 1. 首次访问控制验证：构建一个最小页面，注册 SW，并记录首屏 `<script>`、`<link>`、`img`、font 请求是否进入 `fetch` 事件。分别测试首次访问、刷新、关闭重开、`clients.claim()` 和 `skipWaiting()`。
 2. Opaque image 验证：跨域图片使用 `no-cors` 请求，分别让 CDN 返回正常图片、404、DNS 失败，观察 SW 是否能区分并 fallback。

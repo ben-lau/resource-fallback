@@ -79,6 +79,14 @@ const mod = await import('./Lazy.vue');
 const mod = await window.__RF__.load('assets/Lazy-abc.js');
 ```
 
+### Current `window.__RF__.url(filename)` semantics
+
+`window.__RF__.url(filename)` only joins the filename with the **first compiled rule** `base` to build the initial URL. It does not inspect circuit state or skip hosts at page runtime.
+
+### Current `window.__RF__.load(filename)` recovery semantics
+
+`window.__RF__.load(filename)` resolves the initial URL first, then delegates retry / fallback / deadline / cancellation to the shared `RecoveryCoordinator`. It also uses a normalized sharing key so concurrent loads from the same owner for the same logical resource can share one recovery Promise.
+
 ### 4. `transformIndexHtml`: inject runtime and preconnect tags
 
 `transformIndexHtml` injects into `<head>`:

@@ -230,7 +230,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 配置里习惯写 **「相对站点根」**的前缀，例如 `base: '/'` 或 `base: 'https://app.example.com/'` 与 **部署时 publicPath** 对齐。但 DOM 里 **`<script src="/assets/index.js">`** 读出 **`.src` 属性**时，浏览器 **规范化为完整的 `https://origin/assets/…`**。
 
-若 `resolver.matches` 对 string 使用的是 **`url.indexOf(pattern) === 0`**，则 **`/` 作为前缀**会与 **`https://…`**形态的字符串 **对不上**：表现为 **「首页明明挂了 CDN，Observer 永远不介入」**，或误以为库坏了。
+若沿用旧的 **resolver / observer string 前缀匹配**语义（例如 **`url.indexOf(pattern) === 0`**），则 **`/` 作为前缀**会与 **`https://…`**形态的字符串 **对不上**：表现为 **「首页明明挂了 CDN，Observer 永远不介入」**，或误以为库坏了。
 
 #### 思考过程
 
@@ -253,13 +253,13 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 `@vitejs/plugin-legacy` 等流水线会在不支持 `import` 的环境走 **SystemJS**。资源 URL、`fetch`/`instantiate` 路径与现代 **原生 `import`** 分叉。若在 **不知情**前提下仍只靠 **全局 `error` Observer**：
 
 - **可能**看见 SystemJS 插入的脚本失败，再走一遍 Observer；
-- **可能**SystemJS adapter 已经与 **resolver** 做了一轮；
+- **可能**SystemJS adapter 已经开始了一轮 **ownership admission + `RecoveryCoordinator.recover(...)`**；
 
 两条链 **互不感知**，易出现 **双倍请求**，或一端 **改写 DOM** 另一端 **仍以旧 URL 重试**，状态机错乱。
 
 #### 思考过程
 
-与 **§4.1**同理：**ownership**先于算法。区别在于 **Webpack 可以用 `data-webpack` 判别**；SystemJS路径需要 **运行时登记「此 URL 由 SystemJS 适配器认领」**，Observer **看到同一个 URL（或等价键）就不再 resolve**。
+与 **§4.1**同理：**ownership**先于算法。区别在于 **Webpack 可以用 `data-webpack` 判别**；SystemJS 路径需要 **运行时登记「此 URL 由 SystemJS 适配器认领」**，Observer **看到同一个 URL（或等价键）就不再接管**。
 
 曾评估过两种方案：
 
@@ -277,11 +277,11 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 #### 解决方案（如何实现）
 
-采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入 **`resolver`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
+采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入页面侧 **`RecoveryCoordinator.recover(...)`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
 
 Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedUrls`**，直接 **return**，把 **全权**留给 SystemJS adapter。
 
-实施后：**legacy 与现代**共用 **熔断与 urls 语义**，且不 double-count 重试次数。
+实施后：**legacy 与现代**共用 **熔断与 `urls` 候选语义**，且不 double-count 重试次数；页面侧当前 owner、事件与进行中 Promise 共享都由 `RecoveryCoordinator` 统一管理。
 
 ---
 

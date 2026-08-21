@@ -17,7 +17,7 @@ Zero-mental-overhead frontend resource fallback solution. Provides runtime **ret
 - **Hybrid Service Worker (opt-in)** — uses a SW to cover `img`, `@font-face`, CSS `url()`, media resources, and controlled CSS `@import`; scripts remain owned by the existing adapters
 - **Smart retry** — exponential backoff + random jitter to avoid thundering herd; configurable max retries per URL
 - **Per-host circuit breaker** — automatically skips hosts after consecutive failures reach a threshold, recovers after cooldown; cross-tab state sharing via `localStorage` + `storage` events
-- **Triple kill switch** — `window.__RF_DISABLE__` global variable / `?__rf=off` query param / `__rf_disable=1` cookie; emergency shutoff without a new release
+- **Triple page-runtime kill switch** — `window.__RF_DISABLE__` global variable / `?__rf=off` query param / `__rf_disable=1` cookie; emergency shutoff for the page runtime without a new release
 - **CSP friendly** — supports `nonce` attribute and `externalRuntime` external script mode
 - **SRI compatible** — three strategies: strip / keep / strict
 - **Automatic preconnect** — injects `<link rel="preconnect">` for each fallback domain, reducing DNS + TLS latency
@@ -47,6 +47,7 @@ graph TB
       VA["Vite Adapter<br/><small>__RF__.load / __RF__.url</small>"]
       WA["Webpack Adapter<br/><small>__webpack_require__.l wrapping</small>"]
       SA["SystemJS Adapter<br/><small>instantiate hook</small>"]
+      SWA["SW Adapter<br/><small>register / postMessage bridge</small>"]
     end
 
     subgraph engine["Decision Engine"]
@@ -60,6 +61,7 @@ graph TB
     INSTALL --> VA
     INSTALL --> WA
     INSTALL --> SA
+    INSTALL --> SWA
     OBS --> RC
     VA --> RC
     WA --> RC
@@ -337,13 +339,15 @@ For external mode, deploy `runtime.js` yourself — use `getRuntimeCode()` to ge
 
 ## Kill Switch
 
-Three ways to disable the runtime without a new release:
+Three ways to disable the page runtime without a new release:
 
 | Method          | Example                        | Use Case                               |
 | --------------- | ------------------------------ | -------------------------------------- |
 | Global variable | `window.__RF_DISABLE__ = true` | Inline before the runtime `<script>`   |
 | Query parameter | Visit `?__rf=off`              | Temporary debugging                    |
 | Cookie          | `__rf_disable=1`               | Gateway-level disable per session/user |
+
+These switches only stop the page-runtime install/recovery path. They do **not** automatically unregister, reconfigure, or force pass-through for an already registered Service Worker. If SW behavior must change, handle that through separate SW registration / update / configuration logic.
 
 ## Sync Script Limitations
 

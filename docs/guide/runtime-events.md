@@ -52,13 +52,27 @@ window.addEventListener('rf:error', (e) => {
 
 ### 入口失败降级 UI
 
-入口 bundle 如果所有 fallback 都失败，React/Vue 不会初始化。建议在 `index.html` 中添加内联监听：
+`rf:error` 不只可能来自入口 bundle；它也可能发生在页面已启动后的其他资源，或来自 SW 透传。因此不要对每个 `rf:error` 都直接替换整个页面。若你只想处理入口失败，请按**已知入口资源 URL**过滤，并在应用成功启动后移除这个监听：
 
 ```html
+<p id="rf-entry-fallback" hidden>资源加载失败，请刷新页面</p>
 <script>
-  window.addEventListener('rf:error', function () {
-    document.body.innerHTML = '<p>资源加载失败，请刷新页面</p>';
-  });
+  (function () {
+    var expectedEntry = 'https://cdn.example.com/assets/main.js';
+
+    function onRfError(event) {
+      var detail = event.detail || {};
+      if (detail.url !== expectedEntry) return;
+
+      var fallback = document.getElementById('rf-entry-fallback');
+      if (fallback) fallback.hidden = false;
+    }
+
+    window.addEventListener('rf:error', onRfError);
+
+    // 应用成功启动后请在入口代码里执行：
+    // window.removeEventListener('rf:error', onRfError);
+  })();
 </script>
 ```
 

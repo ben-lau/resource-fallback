@@ -48,14 +48,27 @@ window.addEventListener('rf:error', (e) => {
 
 ### Degraded UI for entry failures
 
-Place early in `index.html` before the app bundle:
+`rf:error` is not entry-only; it can also fire for later page resources or for SW-bridged failures. So do not replace the whole page for every `rf:error`. If you only want entry failure UI, filter by the **known entry resource URL** and remove the listener after the app boots:
 
 ```html
+<p id="rf-entry-fallback" hidden>Resources failed to load. Please refresh.</p>
 <script>
-  window.addEventListener('rf:error', function () {
-    document.body.innerHTML =
-      '<p style="padding:2rem;text-align:center">Resources failed to load. Please refresh.</p>';
-  });
+  (function () {
+    var expectedEntry = 'https://cdn.example.com/assets/main.js';
+
+    function onRfError(event) {
+      var detail = event.detail || {};
+      if (detail.url !== expectedEntry) return;
+
+      var fallback = document.getElementById('rf-entry-fallback');
+      if (fallback) fallback.hidden = false;
+    }
+
+    window.addEventListener('rf:error', onRfError);
+
+    // Remove this from your app entry after successful boot:
+    // window.removeEventListener('rf:error', onRfError);
+  })();
 </script>
 ```
 

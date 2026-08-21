@@ -162,13 +162,27 @@ class ChunkErrorBoundary extends React.Component<
 
 ### Entry Script Fallback
 
-If all fallbacks fail for the entry script, React/Vue won't initialize and the page shows a white screen. It's recommended to add an inline `rf:error` listener in `index.html`:
+If all fallbacks fail for the entry script, React/Vue won't initialize and the page shows a white screen. But `rf:error` can also fire later for non-entry resources or for SW-bridged failures, so do not replace the whole page for every `rf:error`. Add an inline `index.html` listener that filters to the **known entry resource**, then remove it after the app boots:
 
 ```html
+<p id="rf-entry-fallback" hidden>Resource loading failed, please refresh the page</p>
 <script>
-  window.addEventListener('rf:error', function () {
-    document.body.innerHTML = '<p>Resource loading failed, please refresh the page</p>';
-  });
+  (function () {
+    var expectedEntry = 'https://cdn.example.com/assets/main.js';
+
+    function onRfError(event) {
+      var detail = event.detail || {};
+      if (detail.url !== expectedEntry) return;
+
+      var fallback = document.getElementById('rf-entry-fallback');
+      if (fallback) fallback.hidden = false;
+    }
+
+    window.addEventListener('rf:error', onRfError);
+
+    // Remove this from your app entry after successful boot:
+    // window.removeEventListener('rf:error', onRfError);
+  })();
 </script>
 ```
 

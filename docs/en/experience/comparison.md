@@ -29,10 +29,10 @@ Similar needs in the community are often split into **"Webpack only"**, **"swap 
 
 ### 3.4 vs Service Worker (e.g. custom Workbox routing)
 
-|          | SW fetch interception                                                                             | resource-fallback (this repo)                                                                                                                               |
-| -------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Pros** | Broader resource types (fonts, images, subresource fetch); huge control plane.                    | **No SW registration/update/compatibility burden** by default; aligns with **Webpack/Vite plugins** — familiar SPA deploy path. Hybrid SW available opt-in. |
-| **Cons** | Lifecycle, HTTPS, same-origin, modeling `fetch` vs **`<script>` failure**; heavier ops/debugging. | Without SW: coverage limited to **script/style loading and builder-reachable paths**.                                                                       |
+|          | SW fetch interception                                                                             | resource-fallback (this repo)                                                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pros** | Broader resource types (fonts, images, subresource fetch); huge control plane.                    | **No SW registration/update/compatibility burden** by default; aligns with **Webpack/Vite plugins** — familiar SPA deploy path. Hybrid SW available opt-in.                     |
+| **Cons** | Lifecycle, HTTPS, same-origin, modeling `fetch` vs **`<script>` failure**; heavier ops/debugging. | The default path is **not** universal fetch interception; broader coverage such as images, fonts, and CSS subresources requires explicitly opting into and operating Hybrid SW. |
 
 ### 3.5 vs pure ops (publicPath switch, DNS, multi-cloud routing)
 
@@ -41,7 +41,7 @@ Similar needs in the community are often split into **"Webpack only"**, **"swap 
 | **Pros** | Site-wide consistency; "no patch" user experience.                                | **Within a single page lifecycle**, already-issued HTML/asset URLs can still **retry and swap sources** without immediate release. |
 | **Cons** | **Cached entry pages** may still point at bad domains; regional jitter is coarse. | **Extra client logic**; team must accept runtime script and semantic boundaries.                                                   |
 
-**Summary**: Strengths are **multi-builder adaptation + unified runtime state machine + alignment with browser/webpack/vite edge cases**; weaknesses include **no universal fetch interception without SW**, and **intentionally uncovered** areas like **Vite dev dynamic import**.
+**Summary**: Strengths are **multi-builder adaptation + unified runtime state machine + alignment with browser/webpack/vite edge cases**; weaknesses include **no universal fetch interception on the default path**. But images, fonts, and CSS subresource fallback are already available through the shipped **opt-in Hybrid SW**, while **Vite dev dynamic import** remains intentionally uncovered.
 
 ---
 

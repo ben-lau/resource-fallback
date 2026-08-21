@@ -59,7 +59,7 @@ Current approach: Observer for entry `<script>`, Webpack adapter/runtime bridge 
 
 SW on a controlled page can deliver a successful script response for fetch-layer fallback — valuable when SW controls the request. But SW cannot guarantee early first-visit scripts are controlled, nor modify original `<script integrity="...">`. When SW cannot fix fetch, page adapters still handle failed Promises, cache bust, and events.
 
-**Conclusion**: SW can improve script success rate; it should not replace existing script adapters in phase one.
+**Conclusion**: SW can improve script success rate; in the original rollout split it should not replace existing script adapters in the first shipped phase.
 
 ### Style and CSS subresources
 
@@ -67,7 +67,7 @@ Observer covers top-level `<link rel="stylesheet">` and some runtime-injected CS
 
 SW naturally fills this gap when the page is controlled — internal CSS requests go through `fetch`.
 
-Top-level stylesheets need care: Observer + SW on the same `<link>` → duplicate retry, event chaos, inflated circuit counts. Phase one: SW owns CSS subresources and optional `style` destination; Observer keeps top-level stylesheet boundary.
+Top-level stylesheets need care: Observer + SW on the same `<link>` → duplicate retry, event chaos, inflated circuit counts. In the original shipped rollout split, the safer move was: SW owns CSS subresources and optional `style` destination; Observer keeps the top-level stylesheet boundary.
 
 **Conclusion**: CSS `url()`, `@font-face`, `@import` are high-value SW targets; top-level stylesheets need ownership design.
 
@@ -147,7 +147,7 @@ Extend DOM Observer — listen for `<img>`, `video`, `source` `error`, swap `src
 
 ### Option B: Hybrid SW
 
-New SW fetch layer; keep adapter ownership. Phase one: SW for `image`, `font`, `media`, CSS subresources, optional `style`; Observer/Webpack/Vite/SystemJS keep scripts and top-level DOM errors.
+New SW fetch layer; keep adapter ownership. In the original rollout plan, the first shipped phase was: SW for `image`, `font`, `media`, CSS subresources, optional `style`; Observer/Webpack/Vite/SystemJS keep scripts and top-level DOM errors.
 
 **Pros**: Fills biggest gaps without breaking script semantics; avoids double retry on same Webpack/Vite failure.
 
@@ -178,7 +178,7 @@ Four layers:
 
 **Cons**: Longest timeline; new build artifacts.
 
-**Fit**: Post–Hybrid SW MVP evolution.
+**Fit**: Post–Hybrid SW MVP evolution rather than the first shipped phase.
 
 ## Cost and risk
 
@@ -203,7 +203,9 @@ Historically, the rollout plan looked like this:
 
 The core outcomes of phases 2–3 are already shipped in the current version. Phases 4–5 should be read as possible future evolution, not as present-day implementation status.
 
-## Validation spike checklist
+## Regression / validation checklist (with historical spike context)
+
+This checklist started as the pre-ship minimum spike plan. It is kept here both as historical rationale and as **current regression / validation guidance**. It does **not** mean Hybrid SW is still waiting to be implemented.
 
 1. **First-visit control**: log whether first-screen script/link/img/font enter `fetch` — first visit, refresh, reopen, `clients.claim()`, `skipWaiting`
 2. **Opaque image**: no-cors cross-origin image — normal, 404, DNS fail — can SW distinguish and fallback?

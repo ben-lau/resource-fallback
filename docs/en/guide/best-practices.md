@@ -130,6 +130,8 @@ window.addEventListener('rf:fallback', (e) => {
 
 See [Runtime Events](./runtime-events.md) for full API.
 
+Page-side `rf:error` means a terminal page recovery failure; that can be candidate exhaustion, a Coordinator deadline, or another terminal recovery error. SW-bridged `rf:error` may also carry resolver giveup states such as `rules-exhausted` or `no-match`.
+
 If you need reason-string analysis, keep it explicitly scoped to SW-bridged events. Page-side `rf:error.detail.reason` is an opaque failure value, not a stable public contract.
 
 ## Entry and lazy-route fallback UI
