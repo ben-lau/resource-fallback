@@ -188,6 +188,16 @@ export interface PluginOptions extends RuntimeConfig {
   htmlInject?: 'head-prepend' | 'head-append';
 }
 
+/**
+ * Options accepted by `buildInjectedTags()`. The Webpack plugin may add
+ * `webpackChunkLoadingGlobals`; application code normally only provides
+ * {@link PluginOptions} fields.
+ */
+export interface BuildInjectedTagsOptions extends PluginOptions {
+  /** Forwarded by the Webpack plugin to the page runtime. */
+  webpackChunkLoadingGlobals?: string[];
+}
+
 export type ResolveResult =
   | { kind: 'retry'; url: string; delay: number; attempt: number }
   | { kind: 'fallback'; url: string; delay: number; from: string; attempt: number }

@@ -2,11 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { HtmlTag, PluginOptions, RuntimeConfig } from './types';
+import type { BuildInjectedTagsOptions, HtmlTag, PluginOptions, RuntimeConfig } from './types';
 import { normalizeFallbackRules } from './runtime/utils';
 
 export type {
   CircuitOptions,
+  BuildInjectedTagsOptions,
   ErrorEvent,
   FallbackEvent,
   FallbackRule,
@@ -122,18 +123,13 @@ export function getServiceWorkerCode(): string {
   return cachedSwCode;
 }
 
-interface ExtendedPluginOptions extends PluginOptions {
-  /** 供 webpack 插件内部使用，将 chunkLoadingGlobal 信息转发给运行时。 */
-  webpackChunkLoadingGlobals?: string[];
-}
-
 /**
  * 构建所有需要注入到 HTML 中的 `<script>` / `<link>` 标签描述。
  * webpack 和 vite 插件都调用此函数以确保输出一致的标记。
  *
  * 运行时配置会被序列化并内联；`rules` 在序列化前会规范化 `base`/`urls` 尾斜杠。
  */
-export function buildInjectedTags(opts: ExtendedPluginOptions): HtmlTag[] {
+export function buildInjectedTags(opts: BuildInjectedTagsOptions): HtmlTag[] {
   const tags: HtmlTag[] = [];
   const runtimeConfig = stripPluginOnlyFields(opts);
 
@@ -212,7 +208,7 @@ export function joinAssetPrefix(prefix: string, filename: string): string {
 
 /** 剥离仅供插件使用的字段后再序列化。 */
 function stripPluginOnlyFields(
-  opts: ExtendedPluginOptions,
+  opts: BuildInjectedTagsOptions,
 ): RuntimeConfig & { webpackChunkLoadingGlobals?: string[] } {
   const {
     enableDev: _enableDev,
