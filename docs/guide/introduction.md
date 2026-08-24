@@ -34,7 +34,7 @@ title: 简介
 ```mermaid
 graph TB
   subgraph build["构建时 (Node)"]
-    VP["Vite Plugin<br/><small>transformIndexHtml<br/>动态 import 包装</small>"]
+    VP["Vite Plugin<br/><small>writeBundle 动态 import 改写<br/>transformIndexHtml HTML 注入</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON 配置</small>"]
     VP --> CORE

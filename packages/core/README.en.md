@@ -12,7 +12,7 @@ End users typically don't need to depend on this package directly — install [`
 pnpm add @resource-fallback/core
 ```
 
-## Node API
+## Common Node APIs
 
 ```ts
 import {
@@ -20,17 +20,25 @@ import {
   buildInjectedTags,
   getRuntimeCode,
   getRuntimePath,
+  getServiceWorkerCode,
+  getServiceWorkerPath,
+  buildResourceFallbackManifest,
+  buildServiceWorkerAssets,
   serialiseConfig,
 } from '@resource-fallback/core';
 ```
 
-| Function                  | Description                                                                                                       |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `defineConfig(opts)`      | Identity helper for type-safe config authoring                                                                    |
-| `getRuntimePath()`        | Returns the absolute path to the IIFE runtime file                                                                |
-| `getRuntimeCode()`        | Returns the IIFE runtime file as a string (cached after first call)                                               |
-| `buildInjectedTags(opts)` | Builds the `<script>` / `<link>` tag descriptors to inject into HTML; serializes config and drops function values |
-| `serialiseConfig(cfg)`    | Serializes runtime config to a page-safe JSON string; function fields are not preserved                           |
+| Function                                   | Description                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `defineConfig(opts)`                       | Identity helper for type-safe config authoring                                                                    |
+| `getRuntimePath()`                         | Returns the absolute path to the IIFE runtime file                                                                |
+| `getRuntimeCode()`                         | Returns the IIFE runtime file as a string (cached after first call)                                               |
+| `getServiceWorkerPath()`                   | Returns the absolute path to the Service Worker runtime file                                                      |
+| `getServiceWorkerCode()`                   | Returns the Service Worker runtime file as a string (cached after first call)                                     |
+| `buildResourceFallbackManifest(input)`     | Builds a stable-version resource manifest from a version seed, rules, and asset list                              |
+| `buildServiceWorkerAssets(options, input)` | Builds a Service Worker artifact with preloaded manifest/config; returns `null` when SW is disabled               |
+| `buildInjectedTags(opts)`                  | Builds the `<script>` / `<link>` tag descriptors to inject into HTML; serializes config and drops function values |
+| `serialiseConfig(cfg)`                     | Serializes runtime config to a page-safe JSON string; function fields are not preserved                           |
 
 ### defineConfig
 
@@ -74,7 +82,7 @@ Note: `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` ca
 
 ## Browser Runtime
 
-The runtime is injected as an IIFE (~5KB gzip) and exposes its interface via `window.__RF__`:
+The runtime is injected as an IIFE (currently ~10KB gzip; use the built artifact as the source of truth) and exposes its interface via `window.__RF__`:
 
 ```ts
 interface RfGlobal {
@@ -148,17 +156,24 @@ The runtime dispatches DOM `CustomEvent` at each decision point:
 ```ts
 export type {
   CircuitOptions,
+  BuildInjectedTagsOptions,
   ErrorEvent,
   FallbackEvent,
   FallbackRule,
   HtmlTag,
   HtmlTagAttributes,
+  NormalizedServiceWorkerOptions,
   PluginOptions,
   ResolveResult,
+  ResourceFallbackAssetOwner,
+  ResourceFallbackAssetType,
+  ResourceFallbackManifest,
+  ResourceFallbackManifestAsset,
   RetryEvent,
   RetryOptions,
   RuntimeConfig,
   RuntimeHooks,
+  ServiceWorkerOptions,
   SriPolicy,
   SuccessEvent,
 } from '@resource-fallback/core';

@@ -16,11 +16,11 @@ Hybrid SW is implemented as opt-in. Vite/Webpack plugins generate a resource man
 
 Default SW path follows scope: `scope: '/'` → `/rf-sw.js`, `scope: '/app/'` → `/app/rf-sw.js`. Only when `path` is explicitly outside the scope directory do you need `Service-Worker-Allowed`.
 
-Images and CSS backgrounds often use `no-cors`; SW may only see opaque responses without readable status. By default opaque responses are not failures; demo projects enable `serviceWorker.fallbackOnOpaque` to show visual fallback after fake CDN failure.
+Images and CSS backgrounds often use `no-cors`; SW may only see opaque responses without readable status. By default opaque responses are not failures. With `serviceWorker.fallbackOnOpaque`, the SW first probes with CORS: readable non-2xx responses enter fallback, while a CORS failure downgrades to `no-cors` and accepts the opaque response. The demo projects' `.invalid` domains exercise DNS/network failure, not opaque HTTP status handling.
 
 ## Current baseline
 
-README TODO lists Service Worker interception, image/font support, and sync script ordering as related but independent upgrades. SW extends coverage; it is not a predefined full replacement.
+The README TODO now keeps only capabilities such as strict synchronous classic-script ordering that are not implemented yet; Hybrid SW and image/font support already ship as opt-in capabilities. SW extends coverage, but it is not a full replacement for page-side script and builder semantics.
 
 Runtime installs from `packages/core/src/runtime/entry.ts`:
 
@@ -153,7 +153,7 @@ New SW fetch layer; keep adapter ownership. In the original rollout plan, the fi
 
 **Cons**: Requires ownership + event bridge; SW artifact, registration, scope, kill switch, E2E.
 
-**Fit**: Most realistic next step for this library.
+**Fit**: The library's currently available opt-in path for expanding resource coverage while keeping existing Webpack/Vite behavior stable.
 
 ### Option C: SW-first
 
@@ -181,6 +181,8 @@ Four layers:
 **Fit**: Post–Hybrid SW MVP evolution rather than the first shipped phase.
 
 ## Cost and risk
+
+> This section preserves the cost/risk comparison from before Hybrid SW shipped. Use “Current implementation status” above for present-day behavior; the remaining risks mainly concern expanding SW ownership and future ScriptSequencer work.
 
 | Approach             | Scope                         | Tests                                                                     | Release risk                                       |
 | -------------------- | ----------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
@@ -231,7 +233,7 @@ Sync script strict ordering is **not** SW MVP. **ScriptSequencer** is the reliab
 
 ## Decision
 
-**Short term: Hybrid SW, not SW-first.**
+**Current architecture: Hybrid SW opt-in, not SW-first.**
 
 Not for less work — SW-first cannot cross first-control, SRI attrs, opaque responses, security policy, and builder runtime semantics. Keeping adapters protects solved script/builder problems; SW focuses on fetch-layer resources it handles best.
 

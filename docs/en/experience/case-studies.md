@@ -221,11 +221,11 @@ Same as §4.1: **ownership first**. SystemJS needs **runtime URL registration** 
 
 **Option A (rejected)**: fully replace `instantiate`, create own `<script>` — duplicates SystemJS internals.
 
-**Option B (adopted)**: thin wrap **`instantiate`**, delegate to **`origInstantiate`**, retry/fallback in **`.catch()`**, register URL in **`systemjsManagedUrls` Set**.
+**Option B (adopted)**: thin wrap **`instantiate`**, delegate to **`origInstantiate`**, retry/fallback in **`.catch()`**, and claim the logical resource through the shared ownership registry so Observer admission is denied for the same key.
 
 ### Solution
 
-Observer: if **`readUrl(el)` in `systemjsManagedUrls`**, **return**. Legacy and modern share **circuit + urls semantics** without double-counting retries.
+Observer: if **`ownership.admit('observer', logicalKey)` is denied**, **return**. Legacy and modern share the page ownership boundary without double-counting retries.
 
 ---
 
@@ -296,8 +296,8 @@ Typical SW pitfalls exposed:
 
 1. **Default path follows scope**: `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js`
 2. **Manifest preloaded in SW file** via **`self.__RF_SW_PRELOAD__`** — rules use string rule `base` only (JSON-serializable; no RegExp / function match)
-3. **`fallbackOnOpaque` opt-in** for cross-origin opaque as failure
-4. **Conservative Cache API** — fallback 2xx only; versioned namespace; cleanup on activate
+3. **`fallbackOnOpaque` opt-in** for a CORS probe; readable non-2xx responses trigger fallback, while CORS-unavailable opaque responses remain accepted
+4. **Conservative Cache API** — readable fallback 2xx by default; `cacheOpaque: true` additionally permits opaque responses; versioned namespace; cleanup on activate
 5. **Vite/Webpack emit SW + manifest**; webpack from `getAssets()` + HtmlWebpackPlugin tags
 6. **Events via `clientId`**; ultimate reject → **`rf:error` + `Response.error()`**; SW **isolated circuit** (no page `localStorage`)
 

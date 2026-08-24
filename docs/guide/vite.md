@@ -4,7 +4,7 @@ title: Vite 集成
 
 # Vite 集成
 
-`@resource-fallback/vite-plugin` 是 Vite 4+ 插件，为 Vite 构建产物（同步 JS/CSS、异步 chunk、modulepreload）提供运行时重试与多 CDN 回退能力。
+`@resource-fallback/vite-plugin` 是 Vite 4+ 插件，为 Vite 构建产物（同步 JS/CSS、异步 chunk）提供运行时重试与多 CDN 回退；对 `modulepreload` 失败则提供受控的错误阻止与规则闸门，不直接替换 preload URL。
 
 ## 安装
 

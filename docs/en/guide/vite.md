@@ -4,7 +4,7 @@ title: Vite Integration
 
 # Vite Integration
 
-`@resource-fallback/vite-plugin` is a Vite 4+ plugin that provides runtime retry and multi-CDN fallback for Vite build outputs (sync JS/CSS, async chunks, modulepreload).
+`@resource-fallback/vite-plugin` is a Vite 4+ plugin that provides runtime retry and multi-CDN fallback for Vite build outputs (sync JS/CSS and async chunks); for `modulepreload` failures it provides managed error suppression and rule gating, but does not replace the preload URL directly.
 
 ## Installation
 

@@ -12,7 +12,7 @@
 pnpm add @resource-fallback/core
 ```
 
-## Node 端 API
+## 常用 Node 端 API
 
 ```ts
 import {
@@ -20,17 +20,25 @@ import {
   buildInjectedTags,
   getRuntimeCode,
   getRuntimePath,
+  getServiceWorkerCode,
+  getServiceWorkerPath,
+  buildResourceFallbackManifest,
+  buildServiceWorkerAssets,
   serialiseConfig,
 } from '@resource-fallback/core';
 ```
 
-| 函数                      | 说明                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------- |
-| `defineConfig(opts)`      | 恒等辅助函数，提供类型安全的配置编写体验                                                    |
-| `getRuntimePath()`        | 返回 IIFE 运行时文件的绝对路径                                                              |
-| `getRuntimeCode()`        | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）                                          |
-| `buildInjectedTags(opts)` | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组；会先序列化配置并丢弃函数值 |
-| `serialiseConfig(cfg)`    | 将运行时配置序列化为可嵌入页面的 JSON 字符串；函数字段不会保留                              |
+| 函数                                       | 说明                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `defineConfig(opts)`                       | 恒等辅助函数，提供类型安全的配置编写体验                                                    |
+| `getRuntimePath()`                         | 返回 IIFE 运行时文件的绝对路径                                                              |
+| `getRuntimeCode()`                         | 返回 IIFE 运行时文件的字符串内容（首次调用后缓存）                                          |
+| `getServiceWorkerPath()`                   | 返回 Service Worker 运行时文件的绝对路径                                                    |
+| `getServiceWorkerCode()`                   | 返回 Service Worker 运行时文件的字符串内容（首次调用后缓存）                                |
+| `buildResourceFallbackManifest(input)`     | 根据版本种子、规则和资源列表构建稳定版本的资源 manifest                                     |
+| `buildServiceWorkerAssets(options, input)` | 按配置生成预置 manifest/config 的 Service Worker 产物；未启用 SW 时返回 `null`              |
+| `buildInjectedTags(opts)`                  | 根据配置构建需要注入 HTML 的 `<script>` / `<link>` 标签描述数组；会先序列化配置并丢弃函数值 |
+| `serialiseConfig(cfg)`                     | 将运行时配置序列化为可嵌入页面的 JSON 字符串；函数字段不会保留                              |
 
 ### defineConfig
 
@@ -74,7 +82,7 @@ const tags = buildInjectedTags({
 
 ## 浏览器运行时
 
-运行时以 IIFE 格式注入页面（约 5KB gzip），通过 `window.__RF__` 暴露接口：
+运行时以 IIFE 格式注入页面（当前构建约 10KB gzip，具体以构建产物为准），通过 `window.__RF__` 暴露接口：
 
 ```ts
 interface RfGlobal {
@@ -148,17 +156,24 @@ interface RfGlobal {
 ```ts
 export type {
   CircuitOptions,
+  BuildInjectedTagsOptions,
   ErrorEvent,
   FallbackEvent,
   FallbackRule,
   HtmlTag,
   HtmlTagAttributes,
+  NormalizedServiceWorkerOptions,
   PluginOptions,
   ResolveResult,
+  ResourceFallbackAssetOwner,
+  ResourceFallbackAssetType,
+  ResourceFallbackManifest,
+  ResourceFallbackManifestAsset,
   RetryEvent,
   RetryOptions,
   RuntimeConfig,
   RuntimeHooks,
+  ServiceWorkerOptions,
   SriPolicy,
   SuccessEvent,
 } from '@resource-fallback/core';

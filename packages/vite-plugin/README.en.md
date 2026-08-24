@@ -2,7 +2,7 @@
 
 > **[中文](README.md)** | English
 
-Vite 4+ plugin that provides runtime retry and multi-CDN fallback for Vite build outputs (sync JS/CSS, async chunks, modulepreload).
+Vite 4+ plugin that provides runtime retry and multi-CDN fallback for Vite build outputs (sync JS/CSS and async chunks); for `modulepreload` failures it provides managed error suppression and rule gating, but does not replace the preload URL directly.
 
 ## Installation
 

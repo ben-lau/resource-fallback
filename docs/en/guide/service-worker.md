@@ -99,12 +99,12 @@ resourceFallback({
 });
 ```
 
-| Field                 | Default                                | Notes                                                       |
-| --------------------- | -------------------------------------- | ----------------------------------------------------------- |
-| `path`                | Derived from scope (`/` → `/rf-sw.js`) | Stays inside scope to avoid `Service-Worker-Allowed` header |
-| `includeStyleImports` | `true`                                 | CSS `@import` when referrer matches manifest CSS asset      |
-| `fallbackOnOpaque`    | `false`                                | Opt-in: treat opaque cross-origin responses as failure      |
-| `cache.enabled`       | `true`                                 | Cache successful fallback 2xx responses only                |
+| Field                 | Default                                | Notes                                                                                |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `path`                | Derived from scope (`/` → `/rf-sw.js`) | Stays inside scope to avoid `Service-Worker-Allowed` header                          |
+| `includeStyleImports` | `true`                                 | CSS `@import` when referrer matches manifest CSS asset                               |
+| `fallbackOnOpaque`    | `false`                                | CORS-probe cross-origin `no-cors` requests; CORS-unavailable responses remain opaque |
+| `cache.enabled`       | `true`                                 | Cache successful fallback responses; opaque needs `cacheOpaque`                      |
 
 Full reference: [Configuration Reference](./configuration.md#serviceworkeroptions).
 
@@ -114,7 +114,7 @@ SW uses an isolated in-memory circuit breaker — it does not share page-side `l
 
 ## Cache policy
 
-- Cache only readable 2xx responses from successful fallback
+- Cache only readable 2xx responses from successful fallback by default; `cacheOpaque: true` also permits opaque responses
 - Read the current manifest-version cache only after network retry/fallback is exhausted
 - Clean old `resource-fallback-*` caches when a new manifest version activates
 
@@ -137,7 +137,7 @@ SW registration is async. Early requests during initial HTML parsing may complet
 
 ### Opaque responses
 
-Cross-origin images often use `no-cors`. SW may only see opaque responses without readable status. By default opaque responses are **not** treated as failure. Enable `fallbackOnOpaque` when CDN errors appear as opaque (may skip usable opaque CDN images).
+Cross-origin images often use `no-cors`. SW may only see opaque responses without readable status. By default opaque responses are **not** treated as failure. With `fallbackOnOpaque`, the SW first probes with CORS: readable non-2xx responses trigger retry/fallback, while a CORS failure downgrades to `no-cors` and accepts the opaque response. Therefore this option does not guarantee fallback for every opaque HTTP error.
 
 ### SW persistence during development
 

@@ -34,7 +34,7 @@ Traditional approaches require manual failure handling in business code or compl
 ```mermaid
 graph TB
   subgraph build["Build Time (Node)"]
-    VP["Vite Plugin<br/><small>transformIndexHtml<br/>dynamic import wrapping</small>"]
+    VP["Vite Plugin<br/><small>writeBundle dynamic import rewrite<br/>transformIndexHtml HTML injection</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON config</small>"]
     VP --> CORE

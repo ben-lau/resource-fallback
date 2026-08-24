@@ -32,7 +32,7 @@ title: Reusable Principles
 
 14. **SW config can't rely on page `postMessage` alone**: preload manifest at build time for early img/font/CSS subresources.
 
-15. **Opaque response is a policy choice**: default conservative; use explicit **`fallbackOnOpaque`** when cross-origin opaque errors must trigger origin fallback.
+15. **Opaque response is a policy choice**: default conservative; use **`fallbackOnOpaque`** to probe CORS and handle readable cross-origin HTTP errors, while remembering that opaque responses remain accepted when CORS is unavailable.
 
 16. **SW local debug: check origin** — localhost, 127.0.0.1, LAN IP differ; LAN HTTP is not secure context.
 

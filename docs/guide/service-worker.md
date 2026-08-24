@@ -87,25 +87,25 @@ SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串
 
 ## 配置选项
 
-| 字段                  | 类型      | 默认值               | 说明                                         |
-| --------------------- | --------- | -------------------- | -------------------------------------------- |
-| `enabled`             | `boolean` | `true`（对象配置时） | 设为 `false` 可在对象配置中关闭              |
-| `path`                | `string`  | 跟随 scope           | SW 文件路径                                  |
-| `scope`               | `string`  | `'/'`                | SW 控制范围                                  |
-| `includeStyleImports` | `boolean` | `true`               | 允许 SW 接管受控 CSS `@import`               |
-| `fallbackOnOpaque`    | `boolean` | `false`              | 将跨源 opaque response 视为失败继续 fallback |
-| `cache.enabled`       | `boolean` | `true`               | fallback 成功后写入 Cache API                |
-| `cache.cacheOpaque`   | `boolean` | `false`              | 是否缓存 opaque response                     |
+| 字段                  | 类型      | 默认值               | 说明                                                                                        |
+| --------------------- | --------- | -------------------- | ------------------------------------------------------------------------------------------- |
+| `enabled`             | `boolean` | `true`（对象配置时） | 设为 `false` 可在对象配置中关闭                                                             |
+| `path`                | `string`  | 跟随 scope           | SW 文件路径                                                                                 |
+| `scope`               | `string`  | `'/'`                | SW 控制范围                                                                                 |
+| `includeStyleImports` | `boolean` | `true`               | 允许 SW 接管受控 CSS `@import`                                                              |
+| `fallbackOnOpaque`    | `boolean` | `false`              | 为 `no-cors` 跨源请求启用 CORS 探测；可读到非 2xx 时继续 fallback，CORS 不可用则接受 opaque |
+| `cache.enabled`       | `boolean` | `true`               | fallback 成功后写入 Cache API                                                               |
+| `cache.cacheOpaque`   | `boolean` | `false`              | 是否缓存 opaque response                                                                    |
 
 ### fallbackOnOpaque
 
 图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败，以避免跳过本来可用的跨源图片。
 
-开启 `fallbackOnOpaque` 后，SW 对 no-cors 请求先尝试 cors 模式探测真实状态码；CORS 不可用时自动降级回 no-cors。
+开启 `fallbackOnOpaque` 后，SW 对 no-cors 请求先尝试 cors 模式探测真实状态码；如果 CORS 可用且响应为非 2xx，就进入 retry/fallback。CORS 不可用时自动降级回 no-cors，并接受 opaque，此时只有网络级失败能触发 fallback。
 
 ### 缓存策略
 
-- 只缓存 fallback 成功后的可读 2xx 响应
+- 默认只缓存 fallback 成功后的可读 2xx 响应；设置 `cacheOpaque: true` 时也允许缓存 opaque 响应
 - 网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底
 - 新 manifest version 激活后会清理旧的 `resource-fallback-*` cache
 

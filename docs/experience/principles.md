@@ -18,7 +18,7 @@ title: 可复用原则
 12. **页面侧 `rf:error` 是终态信号，不是稳定 reason 字符串协议**：要判断是否真正进入回退链，优先看 `rf:retry` / `rf:fallback`；旧 `Resolver` 的 `no-match` / `rules-exhausted` 讨论应限制在历史或 SW 语境。
 13. **SW 默认路径必须与 scope 对齐**：默认 `scope: '/'` 就输出 `/rf-sw.js`，不要把 `Service-Worker-Allowed` 变成默认部署负担。
 14. **SW 配置不要只靠页面 `postMessage`**：早期图片/字体/CSS 子资源可能先于消息发生，构建期应把 manifest 预置进 SW 文件。
-15. **opaque response 是策略问题，不是实现细节**：默认保守不当失败；若要演示或业务确认“跨源 opaque 错误也继续回源”，用显式 `fallbackOnOpaque`。
+15. **opaque response 是策略问题，不是实现细节**：默认保守不当失败；若要通过 CORS 探测处理可读的跨源 HTTP 错误，显式启用 `fallbackOnOpaque`，但 CORS 不可用时 opaque 仍会被接受。
 16. **SW 本地调试必须看 origin**：`localhost`、`127.0.0.1`、局域网 IP 是不同 origin；局域网 IP 的 HTTP 不是 secure context，SW 不会注册。
 17. **验证视觉资源要验真实加载**：图片看 `naturalWidth`，字体看 `document.fonts.check()`，背景图结合 Network/SW 事件；`toBeVisible()` 只能证明 DOM 存在。
 18. **规则只用 string rule `base`**：不再依赖 RegExp / 函数 match；SW preload 预置的是可 JSON 序列化的配置。

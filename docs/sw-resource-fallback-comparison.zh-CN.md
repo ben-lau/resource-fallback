@@ -1,5 +1,7 @@
 # Service Worker 资源回退对比设计
 
+> **文档状态：历史设计稿。** 本文保留 Hybrid SW shipped 前的方案取舍与 rollout 记录；文中的“第一阶段”“下一步”“先不要实现”等均是当时语境，不代表当前待办。当前实现请以[现行设计页](./design/sw-comparison.md)和[Hybrid Service Worker 指南](./guide/service-worker.md)为准。
+
 ## 结论摘要
 
 Service Worker 能显著扩展资源回退的覆盖面，尤其适合 `img`、`video`、`@font-face` 字体文件、CSS `url()` 子资源和 CSS `@import` 这类 DOM Observer 不容易感知的请求。但 SW 不是当前 DOM Observer、Webpack adapter、Vite adapter 的严格超集。它解决的是 fetch 层请求兜底，不能完整替代页面侧对脚本执行语义、构建器运行时 Promise、SRI 标签属性和首次加载时机的处理。
@@ -12,27 +14,27 @@ Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manife
 
 默认 SW path 跟随 scope 派生，避免把 `Service-Worker-Allowed` 响应头变成默认心智负担：`scope: '/'` 时输出 `/rf-sw.js`，`scope: '/app/'` 时输出 `/app/rf-sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed`。
 
-图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败，以避免跳过本来可用的跨源图片；示例项目为了演示假 CDN 失败后的视觉 fallback，显式启用了 `serviceWorker.fallbackOnOpaque`。
+图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败；启用 `serviceWorker.fallbackOnOpaque` 后会先做 CORS 探测，只有能读取到非 2xx 状态时才会继续 fallback，CORS 不可用时仍降级为 `no-cors` 并接受 opaque。示例项目中的 `.invalid` 域名验证的是 DNS/网络失败，不是 opaque HTTP 错误。
 
 ## 当前事实基线
 
-README 的 TODO 将 Service Worker 拦截模式、图片/字体资源支持、同步脚本执行顺序保证列为相关但独立的升级点。也就是说，SW 是扩展覆盖面的方向，但不是已经定义好的完整替代方案。
+README 的 TODO 目前只保留同步 classic script 顺序等尚未实现的能力；Hybrid SW 与图片/字体资源支持已经作为 opt-in 能力 shipped。SW 用来扩展覆盖面，但不是页面侧脚本和构建器语义的完整替代方案。
 
 当前运行时由 `packages/core/src/runtime/entry.ts` 统一安装：
 
 ```ts
-installObserver({ resolver, bus, log, sri: config.sri || 'strip' });
-installWebpackAdapter({
-  resolver,
-  bus,
-  log,
-  chunkLoadingGlobals: config.webpackChunkLoadingGlobals,
-});
-installViteAdapter({ resolver, bus, log });
-installSystemJSAdapter({ resolver, bus, log });
+const ownership = createOwnershipRegistry();
+const circuit = createCircuitRegistry(firstCompiledRuleCircuit);
+const coordinator = createRecoveryCoordinator({ config: prepared, bus, circuit });
+
+installObserver({ coordinator, ownership, log, sri: prepared.sri });
+installWebpackAdapter({ coordinator, ownership, log });
+installViteAdapter({ config: prepared, coordinator, ownership, log });
+installSystemJSAdapter({ config: prepared, coordinator, ownership, log });
+installSwAdapter({ config, bus, log });
 ```
 
-这些 adapter 共用 `Resolver`、retry、circuit breaker 和 hook bus，但处理的是不同层面的失败语义。
+页面侧 adapter 共用 `RecoveryCoordinator`、ownership registry、页面 circuit 与 hook bus；同一 owner + `logicalKey` 的并发恢复共享一个 recovery Promise。Service Worker 则保留独立的 fetch 层 `Resolver`，不与页面 adapter 共用状态机。
 
 `packages/core/src/runtime/observer.ts` 负责捕获 `<script>` 和 `<link rel="stylesheet">` 的 `error` / `load` 事件，并原地替换为 retry 或 fallback URL。它明确不处理 `<img>`、`video`、字体文件和 CSS 内部 `url()` / `@import`。它还记录了同步 classic script 的限制：失败后再 `replaceChild` 无法让已经继续执行的后续脚本重新排序。
 
@@ -148,13 +150,13 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 ### 方案 B：Hybrid SW
 
-做法是新增 SW fetch 层，但保留现有 adapter ownership。第一阶段建议让 SW 负责 `image`、`font`、`media`、CSS 子资源和可选 `style`；现有 Observer、Webpack adapter、Vite adapter、SystemJS adapter 继续负责脚本、构建器运行时和顶层 DOM error。
+做法是新增 SW fetch 层，但保留现有 adapter ownership。历史 rollout 的第一阶段建议让 SW 负责 `image`、`font`、`media`、CSS 子资源和可选 `style`；当前已 shipped 的 Hybrid SW 正是这一 opt-in 分层，现有 Observer、Webpack adapter、Vite adapter、SystemJS adapter 继续负责脚本、构建器运行时和顶层 DOM error。
 
 优点是能补齐当前最明显的资源缺口，同时不打散已有处理过的脚本语义。它能覆盖 `img`、`@font-face`、CSS `url()`、CSS `@import` 等高价值目标，也能避免 SW 和页面 runtime 对同一个 Webpack/Vite 脚本失败重复 retry。
 
 缺点是需要明确 ownership 和事件桥。它不是“一个 SW 解决全部问题”，而是分层协作。实现中还要处理 SW 文件产物、注册时机、scope、kill switch、旧 SW 更新和 Playwright E2E。
 
-适用场景是本库当前最现实的下一步：扩大资源覆盖，同时保持已有 Webpack/Vite 能力稳定。
+适用场景是本库当前已经提供的 opt-in 路径：扩大资源覆盖，同时保持已有 Webpack/Vite 能力稳定。
 
 ### 方案 C：SW-first
 
@@ -209,9 +211,9 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 风险主要是范围过大。建议拆成 Hybrid SW MVP、manifest 增强、ScriptSequencer 三个可独立验证的阶段。
 
-## 推荐路线
+## 历史 rollout 与当前架构选择
 
-第一阶段先不要实现 SW 代码，而是用本文档和 spike 验证关键假设。只有确认字体 CORS、opaque response、SRI、首次加载和构建器语义边界后，再进入实现计划。
+历史上第一阶段先不要实现 SW 代码，而是用本文档和 spike 验证关键假设。这个阶段已经完成；当前 Hybrid SW 已作为 opt-in 能力 shipped。
 
 第二阶段实现 Hybrid SW MVP。默认 opt-in，目标只包含非脚本资源和明确 ownership 的 CSS 子资源：`image`、`font`、`media`、CSS `url()`、CSS `@import`。现有 script、Vite dynamic import、Webpack async chunk、SystemJS 继续由现有 adapter 负责。
 
@@ -242,7 +244,7 @@ SW 对同步 classic script 有帮助，但不是完整答案。
 
 但以下情况 SW 不能保证顺序：
 
-- ƒ首次访问时该 script 请求没有进入 SW。
+- 首次访问时该 script 请求没有进入 SW。
 - 所有候选 URL 都失败，浏览器继续触发 script error，HTML 解析仍可能继续。
 - SRI、MIME、CORS、CSP 等校验在 fetch 成功后仍失败。
 - 页面侧后续脚本已经因其他原因执行，SW 无法回滚副作用。
@@ -251,7 +253,7 @@ SW 对同步 classic script 有帮助，但不是完整答案。
 
 ## 决策建议
 
-短期建议采用 Hybrid SW，而不是 SW-first。
+当前架构采用 Hybrid SW opt-in，而不是 SW-first。
 
 原因不是为了降低工作量，而是因为 SW-first 无法跨越首次控制、SRI 标签属性、opaque response、浏览器安全策略和构建器运行时语义这些平台边界。保留现有 adapter 能保护已经解决过的脚本和构建器问题，让 SW 专注于它最擅长的资源请求层。
 

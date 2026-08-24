@@ -271,15 +271,15 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
   - 自建脚本可能遗漏 SystemJS 内部附加的属性（`crossOrigin`、`fetchPriority` 等）
   - 如果 SystemJS 更新了 `instantiate` 的内部逻辑（如 integrity 校验、import map 支持），自建脚本不会自动获得这些改进
 
-**方案 B（委托式，采纳）**：覆写 `instantiate`，但内部仍**委托给原始 `origInstantiate`**，保留 SystemJS 全部的脚本创建逻辑，仅在 `.catch()` 中加入 retry/fallback 循环。通过 `systemjsManagedUrls` 共享 Set 通知 Observer 跳过正在被管理的 URL。
+**方案 B（委托式，采纳）**：覆写 `instantiate`，但内部仍**委托给原始 `origInstantiate`**，保留 SystemJS 全部的脚本创建逻辑，仅在 `.catch()` 中加入 retry/fallback 循环。通过共享 ownership registry 记录正在管理的 logical key；Observer 对同一 key 的 ownership admission 会被拒绝。
 
 方案 B 的核心优势：**不复制 SystemJS 内部实现**，当 SystemJS 升级或内部行为变化时自动兼容，维护成本显著低于方案 A。
 
 #### 解决方案（如何实现）
 
-采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入页面侧 **`RecoveryCoordinator.recover(...)`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 写入 **`systemjsManagedUrls`**（`Set`，见 `adapter-systemjs.ts` 与 Observer 头部的 import）。
+采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入页面侧 **`RecoveryCoordinator.recover(...)`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 通过 ownership registry 认领，Observer 对同一 logical key 的 admission 会被拒绝。
 
-Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedUrls`**，直接 **return**，把 **全权**留给 SystemJS adapter。
+Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalKey)` 被拒绝**，直接 **return**，把 **全权**留给已认领该资源的 SystemJS adapter。
 
 实施后：**legacy 与现代**共用 **熔断与 `urls` 候选语义**，且不 double-count 重试次数；页面侧当前 owner、事件与进行中 Promise 共享都由 `RecoveryCoordinator` 统一管理。
 
@@ -404,11 +404,11 @@ Observer 在处理 error 目标时：**若 `readUrl(el)`落在 `systemjsManagedU
 
    默认仍保守：opaque response 不当失败，避免跳过本来可用的跨源图片。
 
-   但示例为了演示“假 CDN 返回 opaque 错误也要继续回源”，新增 `serviceWorker.fallbackOnOpaque`，在 SW core 中对 **跨源 opaque response** 视作失败继续进入 resolver。这个选项是 opt-in，因为它可能牺牲正常 CDN opaque 图片的首选命中率。
+   `serviceWorker.fallbackOnOpaque` 实际启用的是 CORS 探测：只有 CDN 允许读取状态且返回非 2xx 时，SW 才会把响应判定为失败并进入 resolver；CORS 不可用时会降级回 `no-cors` 并接受 opaque。示例中的 `.invalid` 域名只验证 DNS/网络失败，不验证 opaque HTTP 错误。
 
 4. **Cache API 保守落地**
 
-   只缓存 **fallback 成功后的非 opaque 2xx response**；网络 retry/fallback 全部耗尽后，才读当前 manifest version 的 cache。manifest version 纳入资源、fallback rules 和关键 SW cache 策略，`activate` 时清理旧 `resource-fallback-*` cache，避免 rules/cache 策略变化后旧 manifest 的资源长期污染。
+   默认只缓存 **fallback 成功后的非 opaque 2xx response**；显式设置 `cacheOpaque: true` 时也允许缓存 opaque response。网络 retry/fallback 全部耗尽后，才读当前 manifest version 的 cache。manifest version 纳入资源、fallback rules 和关键 SW cache 策略，`activate` 时清理旧 `resource-fallback-*` cache，避免 rules/cache 策略变化后旧 manifest 的资源长期污染。
 
 5. **Webpack/Vite 插件都 emit SW asset + manifest**
    - Vite：`generateBundle` 收集 bundle 输出，`transformIndexHtml` 使用 `post` 阶段，确保有最终 bundle 可生成非空 manifest。

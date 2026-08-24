@@ -30,7 +30,7 @@ Zero-mental-overhead frontend resource fallback solution. Provides runtime **ret
 ```mermaid
 graph TB
   subgraph build["Build Time (Node)"]
-    VP["Vite Plugin<br/><small>transformIndexHtml<br/>dynamic import wrapping</small>"]
+    VP["Vite Plugin<br/><small>writeBundle dynamic import rewrite<br/>transformIndexHtml HTML injection</small>"]
     WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
     CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON config</small>"]
     VP --> CORE
@@ -252,17 +252,17 @@ resourceFallback({
 });
 ```
 
-| Field                 | Type      | Default                                                                 | Description                                                                                                                                                                                 |
-| --------------------- | --------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`             | `boolean` | `true` for object config                                                | Set to `false` to disable from an object config                                                                                                                                             |
-| `path`                | `string`  | Derived from `scope`, e.g. `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header                                                                              |
-| `scope`               | `string`  | `'/'`                                                                   | SW control scope                                                                                                                                                                            |
-| `includeStyleImports` | `boolean` | `true`                                                                  | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset                                                                        |
-| `fallbackOnOpaque`    | `boolean` | `false`                                                                 | Treat cross-origin opaque responses as failures and continue fallback. Useful when CDN errors are hidden by the browser as opaque responses; may skip otherwise usable opaque CDN responses |
-| `cache.enabled`       | `boolean` | `true`                                                                  | Write to Cache API after a fallback network response succeeds                                                                                                                               |
-| `cache.cacheOpaque`   | `boolean` | `false`                                                                 | Whether to cache opaque responses. Disabled by default                                                                                                                                      |
+| Field                 | Type      | Default                                                                 | Description                                                                                                                                                                   |
+| --------------------- | --------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`             | `boolean` | `true` for object config                                                | Set to `false` to disable from an object config                                                                                                                               |
+| `path`                | `string`  | Derived from `scope`, e.g. `/` → `/rf-sw.js`, `/app/` → `/app/rf-sw.js` | SW file path. The default stays inside the scope to avoid requiring a `Service-Worker-Allowed` response header                                                                |
+| `scope`               | `string`  | `'/'`                                                                   | SW control scope                                                                                                                                                              |
+| `includeStyleImports` | `boolean` | `true`                                                                  | Let the SW handle CSS `@import` when `request.destination === 'style'` and the referrer matches a CSS manifest asset                                                          |
+| `fallbackOnOpaque`    | `boolean` | `false`                                                                 | Enable a CORS probe for cross-origin `no-cors` requests; readable non-2xx responses enter fallback, while CORS-unavailable responses downgrade to `no-cors` and remain opaque |
+| `cache.enabled`       | `boolean` | `true`                                                                  | Write to Cache API after a fallback network response succeeds                                                                                                                 |
+| `cache.cacheOpaque`   | `boolean` | `false`                                                                 | Whether to cache opaque responses. Disabled by default                                                                                                                        |
 
-The SW cache policy is intentionally conservative: only readable 2xx responses from a successful fallback are cached; the current manifest-version cache is read only after all network retry/fallback attempts are exhausted; old `resource-fallback-*` caches are cleaned when a new manifest version activates. The manifest version includes resources, fallback rules, and key SW cache policy so rule/cache changes do not keep using stale caches.
+The SW cache policy is conservative by default: only readable 2xx responses from a successful fallback are cached; setting `cacheOpaque: true` also permits caching opaque responses. The current manifest-version cache is read only after all network retry/fallback attempts are exhausted; old `resource-fallback-*` caches are cleaned when a new manifest version activates. The manifest version includes resources, fallback rules, and key SW cache policy so rule/cache changes do not keep using stale caches.
 
 The SW resolver always uses an isolated in-memory circuit breaker. Even if page-side `defaults.circuit.shareAcrossTabs` is `true`, the SW does not read or write `localStorage`. If the SW fetch chain ultimately rejects, it emits `rf:error` and returns `Response.error()`, keeping the browser-visible resource behavior close to a real network error.
 
@@ -474,7 +474,7 @@ Upcoming improvements, optimizations, and known limitations, sorted by priority:
 
 ### Documentation
 
-- [ ] **Standalone API Reference site** — generate with TypeDoc or VitePress
+- [x] **Standalone API Reference site** — generated by TypeDoc and mounted under the VitePress `/api/` pages
 - [ ] **Migration guide** — steps for migrating from no fallback solution
 - [ ] **FAQ** — collect typical questions from community feedback
 

@@ -16,11 +16,11 @@ Hybrid SW 已实现为 opt-in 能力。Vite/Webpack 插件会生成资源 manife
 
 默认 SW path 跟随 scope 派生，避免把 `Service-Worker-Allowed` 响应头变成默认心智负担：`scope: '/'` 时输出 `/rf-sw.js`，`scope: '/app/'` 时输出 `/app/rf-sw.js`。只有用户显式把 `path` 配到 scope 目录之外时，才需要自行配置 `Service-Worker-Allowed`。
 
-图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败，以避免跳过本来可用的跨源图片；示例项目为了演示假 CDN 失败后的视觉 fallback，显式启用了 `serviceWorker.fallbackOnOpaque`。
+图片和 CSS 背景图常以 `no-cors` 发起，SW 可能只能看到 opaque response，无法读取真实 status。默认不会把 opaque response 当失败；启用 `serviceWorker.fallbackOnOpaque` 后会先做 CORS 探测，只有能读取到非 2xx 状态时才会继续 fallback，CORS 不可用时仍降级为 `no-cors` 并接受 opaque。示例项目中的 `.invalid` 域名验证的是 DNS/网络失败，不是 opaque HTTP 错误。
 
 ## 当前事实基线
 
-README 的 TODO 将 Service Worker 拦截模式、图片/字体资源支持、同步脚本执行顺序保证列为相关但独立的升级点。也就是说，SW 是扩展覆盖面的方向，但不是已经定义好的完整替代方案。
+README 的 TODO 目前只保留同步 classic script 顺序等尚未实现的能力；Hybrid SW 与图片/字体资源支持已经作为 opt-in 能力 shipped。SW 用来扩展覆盖面，但不是页面侧脚本和构建器语义的完整替代方案。
 
 当前运行时由 `packages/core/src/runtime/entry.ts` 统一安装：
 
@@ -163,7 +163,7 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 
 缺点是需要明确 ownership 和事件桥。它不是“一个 SW 解决全部问题”，而是分层协作。实现中还要处理 SW 文件产物、注册时机、scope、kill switch、旧 SW 更新和 Playwright E2E。
 
-适用场景是本库当前最现实的下一步：扩大资源覆盖，同时保持已有 Webpack/Vite 能力稳定。
+适用场景是本库当前已经提供的 opt-in 路径：扩大资源覆盖，同时保持已有 Webpack/Vite 能力稳定。
 
 ### 方案 C：SW-first
 
@@ -189,6 +189,8 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 缺点是实现周期最长，需要设计新的构建产物和兼容策略。它适合作为 Hybrid SW MVP 后的演进方向，而不是首个 shipped 阶段一次性完成。
 
 ## 成本与风险评估
+
+> 本节保留 Hybrid SW shipped 前的方案成本与风险评估；当前实现状态以上方“当前实现状态”为准，后续风险主要针对 SW ownership 扩展和 ScriptSequencer 等未来能力。
 
 ### 现状增强
 
@@ -262,7 +264,7 @@ SW 对同步 classic script 有帮助，但不是完整答案。
 
 ## 决策建议
 
-短期建议采用 Hybrid SW，而不是 SW-first。
+当前架构采用 Hybrid SW opt-in，而不是 SW-first。
 
 原因不是为了降低工作量，而是因为 SW-first 无法跨越首次控制、SRI 标签属性、opaque response、浏览器安全策略和构建器运行时语义这些平台边界。保留现有 adapter 能保护已经解决过的脚本和构建器问题，让 SW 专注于它最擅长的资源请求层。
 
