@@ -7,6 +7,7 @@
 - Vue Router 懒加载路由（`() => import('./views/About.vue')`）
 - `defineAsyncComponent` 异步组件
 - `@vitejs/plugin-legacy` 生成的 SystemJS legacy bundle
+- Hybrid Service Worker 对图片、字体、CSS `url()` 和受控 `@import` 的回退
 - 运行时事件面板，实时展示 `rf:retry` / `rf:fallback` / `rf:success` / `rf:error` 事件
 
 ## 回退链路
@@ -21,7 +22,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
 /                             （回源，同源请求，成功）
 ```
 
-使用 `.invalid` 域名（RFC 2606 保留），DNS 必然失败，无需任何 mock 服务器即可观察完整的回退链路。
+使用 `.invalid` 域名（RFC 2606 保留），DNS 必然失败，无需任何 mock 服务器即可观察完整的回退链路。该链路验证的是 DNS/网络失败，不模拟 opaque HTTP 404/502。
 
 ## 配置说明
 
@@ -42,6 +43,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
         circuit: { threshold: 2, cooldown: 15_000, storageTtl: 60_000 },
       }],
       debug: true,
+      serviceWorker: { fallbackOnOpaque: true },
     }),
   ],
 }
@@ -87,5 +89,6 @@ pnpm --filter @resource-fallback-example/vite-vue test:e2e
 
 - 入口脚本的完整重试→回退→回源链路
 - 路由切换时异步 chunk 的回退
+- Hybrid Service Worker 激活后的图片、CSS 子资源和字体回退
 - 事件顺序验证（retry → fallback → success）
 - 无控制台错误

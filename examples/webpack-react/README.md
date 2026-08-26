@@ -7,6 +7,7 @@
 - `React.lazy()` + `<Suspense>` 异步组件加载
 - `ErrorBoundary` 兜底 chunk 加载失败
 - 入口脚本的 `rf:error` 白屏兜底
+- Hybrid Service Worker 对图片、字体、CSS `url()` 和受控 `@import` 的回退
 - 运行时事件面板，实时展示 `rf:retry` / `rf:fallback` / `rf:success` / `rf:error` 事件
 
 ## 回退链路
@@ -21,7 +22,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
 /                             （回源，同源请求，成功）
 ```
 
-使用 `.invalid` 域名（RFC 2606 保留），DNS 必然失败，无需任何 mock 服务器即可观察完整的回退链路。
+使用 `.invalid` 域名（RFC 2606 保留），DNS 必然失败，无需任何 mock 服务器即可观察完整的回退链路。该链路验证的是 DNS/网络失败，不模拟 opaque HTTP 404/502。
 
 ## 配置说明
 
@@ -44,6 +45,7 @@ cdn-backup.example.invalid    （DNS 必然失败）
         circuit: { threshold: 2, cooldown: 15_000, storageTtl: 60_000 },
       }],
       debug: true,
+      serviceWorker: { fallbackOnOpaque: true },
     }),
   ],
 }
@@ -100,6 +102,7 @@ pnpm --filter @resource-fallback-example/webpack-react test:e2e
 
 - 入口脚本的完整重试→回退→回源链路
 - 多个 `React.lazy()` 组件的顺序加载与回退
+- Hybrid Service Worker 激活后的图片、CSS 子资源和字体回退
 - 事件顺序验证
 - 熔断器状态在多次加载间的持久性
 - 无未捕获异常

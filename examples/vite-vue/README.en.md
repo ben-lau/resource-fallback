@@ -7,6 +7,7 @@ Demonstrates full integration of `@resource-fallback/vite-plugin` in a Vue 3 app
 - Vue Router lazy-loaded routes (`() => import('./views/About.vue')`)
 - `defineAsyncComponent` async components
 - `@vitejs/plugin-legacy` generated SystemJS legacy bundles
+- Hybrid Service Worker fallback for images, fonts, CSS `url()`, and controlled `@import`
 - Runtime event panel, showing `rf:retry` / `rf:fallback` / `rf:success` / `rf:error` events in real time
 
 ## Fallback Chain
@@ -21,7 +22,7 @@ cdn-backup.example.invalid    (DNS always fails)
 /                             (origin fallback, same-origin request, succeeds)
 ```
 
-Uses `.invalid` domains (RFC 2606 reserved) — DNS always fails, no mock server needed to observe the full fallback chain.
+Uses `.invalid` domains (RFC 2606 reserved) — DNS always fails, no mock server needed to observe the full fallback chain. This exercises DNS/network failure, not opaque HTTP 404/502 handling.
 
 ## Configuration
 
@@ -42,6 +43,7 @@ Uses `.invalid` domains (RFC 2606 reserved) — DNS always fails, no mock server
         circuit: { threshold: 2, cooldown: 15_000, storageTtl: 60_000 },
       }],
       debug: true,
+      serviceWorker: { fallbackOnOpaque: true },
     }),
   ],
 }
@@ -87,5 +89,6 @@ Test coverage:
 
 - Full retry → fallback → origin chain for entry scripts
 - Async chunk fallback on route switches
+- Hybrid Service Worker image, CSS subresource, and font fallback after activation
 - Event order verification (retry → fallback → success)
 - No console errors
