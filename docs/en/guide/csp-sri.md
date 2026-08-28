@@ -4,15 +4,15 @@ title: CSP & SRI
 
 # CSP & SRI
 
-resource-fallback injects a runtime `<script>` into `<head>` by default. This page covers CSP compliance, SRI strategies, and kill switches.
+resource-fallback injects a runtime `<script>` into `<head>` by default. In the default mode, one inline script runs the runtime IIFE and calls `install(...)`; with `externalRuntime`, only the runtime IIFE becomes external and the automatic `install(...)` call remains inline. This page covers CSP compliance, SRI strategies, and kill switches.
 
 ## CSP: no `unsafe-eval` required
 
-The runtime IIFE targets es2020 and uses native `import()` for dynamic loads — **not** `Function('u','return import(u)')`. CSP does **not** need `script-src 'unsafe-eval'`. Inline injection still needs a `nonce`, or use `externalRuntime`.
+The runtime IIFE targets es2020 and uses native `import()` for dynamic loads — **not** `Function('u','return import(u)')`. CSP does **not** need `script-src 'unsafe-eval'`. Any automatically injected inline script still needs a `nonce`; `externalRuntime` does not authorize the automatic inline `install(...)` call.
 
 ## CSP: nonce support
 
-Pass a nonce to the injected script tag:
+Pass a nonce to every injected script tag, including the inline `install(...)` script used with `externalRuntime`:
 
 ```ts
 resourceFallback({
@@ -24,17 +24,18 @@ resourceFallback({
 CSP header example:
 
 ```
-script-src 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
+script-src 'self' 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
 ```
 
-The nonce is applied to the injected inline runtime script. Fallback domains used for script loading should also appear in `script-src` if scripts are loaded from those hosts.
+The nonce is applied to every injected script tag. Fallback domains used for script loading should also appear in `script-src` if scripts are loaded from those hosts.
 
-## CSP: externalRuntime
+## CSP: externalRuntime (the automatic initializer still needs a nonce)
 
-When CSP forbids `unsafe-inline`, load the runtime as an external script:
+`externalRuntime` moves the runtime IIFE into an external script, which can reduce inline code. The plugin still injects a second inline `window.__RF__.install(...)` script, so CSP that forbids unauthorized inline scripts must also configure a nonce:
 
 ```ts
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   rules: [...],
@@ -44,7 +45,7 @@ resourceFallback({
 Deploy `runtime.js` yourself — use `getRuntimeCode()` from `@resource-fallback/core` to get file contents:
 
 ```ts
-import { getRuntimeCode, buildInjectedTags } from '@resource-fallback/core';
+import { getRuntimeCode } from '@resource-fallback/core';
 import { writeFileSync } from 'node:fs';
 
 writeFileSync('public/static/__rf/runtime.js', getRuntimeCode());
@@ -53,8 +54,10 @@ writeFileSync('public/static/__rf/runtime.js', getRuntimeCode());
 CSP example:
 
 ```
-script-src https://app.example.com/static/__rf/runtime.js https://cdn1.example.com;
+script-src 'self' 'nonce-XYZ123' https://cdn1.example.com;
 ```
+
+If the runtime file is not same-origin, add its origin to `script-src` as well.
 
 ::: tip hooks with externalRuntime
 `externalRuntime` only changes where the runtime script is placed for CSP. It does **not** make build-config callbacks serializable. `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls still serialize config first, so function-valued `hooks` are dropped in auto-injected setups.
@@ -72,7 +75,21 @@ window.__RF__.install({
 });
 ```
 
-For auto-injected setups, prefer DOM `rf:*` events. Choose `nonce` or `externalRuntime` separately for CSP compliance.
+For auto-injected setups, prefer DOM `rf:*` events. Under a strict CSP, `nonce` and `externalRuntime` are complementary: the nonce authorizes the inline initializer, while `externalRuntime` only controls where the runtime IIFE is placed.
+
+## CSP sources by resource type
+
+When CSP limits the origins for a resource type, include the primary and fallback origins actually used in the corresponding directive:
+
+| Resource type                 | resource-fallback path              | Relevant CSP directive |
+| ----------------------------- | ----------------------------------- | ---------------------- |
+| JavaScript                    | Page Observer / build-tool adapters | `script-src`           |
+| Stylesheets and CSS `@import` | Page Observer / Hybrid SW           | `style-src`            |
+| Images, including CSS `url()` | Hybrid SW                           | `img-src`              |
+| Fonts                         | Hybrid SW                           | `font-src`             |
+| Audio and video               | Hybrid SW                           | `media-src`            |
+
+This table covers CSP source restrictions only. Cross-origin fonts and Hybrid SW requests must still satisfy browser CORS, MIME, SRI, and related security constraints.
 
 ## SRI strategies
 
@@ -103,11 +120,11 @@ Service Worker returns different responses but **cannot modify** original HTML t
 
 Three ways to disable the runtime without a new release:
 
-| Method          | Example                        | Use case                               |
-| --------------- | ------------------------------ | -------------------------------------- |
-| Global variable | `window.__RF_DISABLE__ = true` | Inline before runtime `<script>`       |
-| Query parameter | Visit `?__rf=off`              | Temporary debugging                    |
-| Cookie          | `__rf_disable=1`               | Gateway-level disable per session/user |
+| Method          | Example                        | Use case                                                             |
+| --------------- | ------------------------------ | -------------------------------------------------------------------- |
+| Global variable | `window.__RF_DISABLE__ = true` | Nonced inline script or authorized external bootstrap before runtime |
+| Query parameter | Visit `?__rf=off`              | Temporary debugging                                                  |
+| Cookie          | `__rf_disable=1`               | Gateway-level disable per session/user                               |
 
 Customize names:
 
@@ -122,14 +139,18 @@ resourceFallback({
 
 Kill-switch globals accept only `true`, `1`, `'1'`, or `'true'`.
 
-Place global kill switch **before** the runtime script in HTML:
+### Strict CSP and the global kill switch
+
+The inline global bootstrap is also subject to `script-src`. Use the same per-response nonce supplied to the CSP header and `resourceFallback({ nonce })` (`XYZ123` below is a placeholder), and run it **before** the runtime script:
 
 ```html
-<script>
+<script nonce="XYZ123">
   window.__RF_DISABLE__ = true;
 </script>
 <!-- runtime injected below -->
 ```
+
+If the policy disallows an inline bootstrap entirely, put the same assignment in an external script authorized by `script-src` that runs before the runtime.
 
 ::: warning Emergency shutoff
 Kill switch disables page runtime. If Hybrid SW is enabled, verify SW pass-through behavior separately — SW may continue serving cached fallback responses until unregistered.

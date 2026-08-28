@@ -10,23 +10,23 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 
 ## PluginOptions
 
-| 字段                  | 类型                              | 默认值               | 说明                                                                |
-| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀      |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                         |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制 |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                            |
-| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                  |
-| `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                            |
-| `externalRuntime`     | `boolean`                         | `false`              | 仅改变 runtime script 的放置方式；不会保留构建配置里的函数钩子      |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                    |
-| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                  |
-| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                              |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                |
-| `hooks`               | `RuntimeHooks`                    | —                    | 序列化注入时函数会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件      |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                       |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                 |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                   |
+| 字段                  | 类型                              | 默认值               | 说明                                                                                              |
+| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                                    |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                                       |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制                               |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                                          |
+| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                                                |
+| `nonce`               | `string`                          | —                    | 附加到每个注入 `<script>`（包括自动内联 `install(...)`）的 CSP nonce                              |
+| `externalRuntime`     | `boolean`                         | `false`              | 只把 runtime IIFE 改为外链；自动 `install(...)` 仍内联且需 CSP 授权；不会保留构建配置里的函数钩子 |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                                                  |
+| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                                                |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                                                            |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                                              |
+| `hooks`               | `RuntimeHooks`                    | —                    | 序列化注入时函数会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件                                    |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                                                     |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                                               |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                                                 |
 
 ## FallbackRule
 
@@ -73,7 +73,7 @@ Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vit
 `buildInjectedTags()` 与插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象，函数值会被丢弃。因此：
 
 - 构建配置里的 `hooks` 不会在自动注入场景下保留下来；
-- `externalRuntime` 只改变 runtime script 是否外链，不会改变上述序列化行为；
+- `externalRuntime` 只改变 runtime IIFE 是否外链，不会改变上述序列化行为；自动 `install(...)` 仍是内联脚本，严格 CSP 下需要 `nonce` 或等效授权；
 - 推荐用 DOM `rf:*` 事件作为自动注入场景的监控接入方式；
 - 如需 JS hooks，请在页面代码里手动调用 `window.__RF__.install()`，直接传入函数对象。
 

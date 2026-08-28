@@ -141,7 +141,7 @@ window.__RF__.install({
 ```
 
 ::: warning hooks 限制
-`buildInjectedTags()` 与插件自动生成的 `install(...)` 调用都会先序列化配置对象，因此构建配置里的函数钩子总会被丢弃。`externalRuntime` 只改变 script 放置方式，不会保留这些函数。自动注入场景请使用 DOM `rf:*` 事件；如需 hooks，请在页面代码里手动调用 `window.__RF__.install()`。
+`buildInjectedTags()` 与插件自动生成的 `install(...)` 调用都会先序列化配置对象，因此构建配置里的函数钩子总会被丢弃。`externalRuntime` 只把 runtime IIFE 改为外链，自动 `install(...)` 仍是内联脚本；它同样不会保留这些函数。自动注入场景请使用 DOM `rf:*` 事件；如需 hooks，请在页面代码里手动调用 `window.__RF__.install()`。
 :::
 
 ## HookBus 与 adapter 关系

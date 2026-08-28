@@ -78,7 +78,7 @@ const tags = buildInjectedTags({
 // ]
 ```
 
-注意：`buildInjectedTags()` 和插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象。`hooks` 里的函数、以及其他函数类型字段，都会在这一阶段被丢弃。`externalRuntime` 只改变 runtime script 是内联还是外链，不会保留这些函数；自动注入场景推荐监听 DOM `rf:*` 事件。如需 JS hooks，请在页面里手动调用 `window.__RF__.install()`。
+注意：`buildInjectedTags()` 和插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象。`hooks` 里的函数、以及其他函数类型字段，都会在这一阶段被丢弃。`externalRuntime` 只把 runtime IIFE 改为外链，自动 `install(...)` 仍是一段内联脚本；严格 CSP 下应为它配置 nonce 或等效授权。它同样不会保留这些函数；自动注入场景推荐监听 DOM `rf:*` 事件。如需 JS hooks，请在页面里手动调用 `window.__RF__.install()`。
 
 ## 浏览器运行时
 

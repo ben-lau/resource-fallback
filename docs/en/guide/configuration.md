@@ -10,23 +10,23 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 
 ## PluginOptions
 
-| Field                 | Type                              | Default              | Description                                                                                          |
-| --------------------- | --------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first         |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                           |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                              |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` during fallback                                                    |
-| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                                      |
-| `nonce`               | `string`                          | —                    | CSP nonce appended to the injected `<script>` tag                                                    |
-| `externalRuntime`     | `boolean`                         | `false`              | Changes script placement only; it does not preserve function hooks from build config                 |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                                                 |
-| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                                            |
-| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | Position in `<head>` for injection                                                                   |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import`                            |
-| `hooks`               | `RuntimeHooks`                    | —                    | Functions are dropped during serialized injection; for auto-injected setups prefer DOM `rf:*` events |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                                                         |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                                             |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                                                    |
+| Field                 | Type                              | Default              | Description                                                                                                                                    |
+| --------------------- | --------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first                                                   |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                                                                     |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                                                                        |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` during fallback                                                                                              |
+| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                                                                                |
+| `nonce`               | `string`                          | —                    | CSP nonce appended to every injected `<script>`, including the automatic inline `install(...)`                                                 |
+| `externalRuntime`     | `boolean`                         | `false`              | Externalizes only the runtime IIFE; automatic `install(...)` stays inline and needs CSP authorization; it does not preserve build-config hooks |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                                                                                           |
+| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                                                                                      |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | Position in `<head>` for injection                                                                                                             |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import`                                                                      |
+| `hooks`               | `RuntimeHooks`                    | —                    | Functions are dropped during serialized injection; for auto-injected setups prefer DOM `rf:*` events                                           |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                                                                                                   |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                                                                                       |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                                                                                              |
 
 ## FallbackRule
 
@@ -73,7 +73,7 @@ The page-side RecoveryCoordinator also shares one in-flight recovery Promise per
 `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls both serialize the config before it reaches the page, and function values are dropped during that step. So:
 
 - `hooks` in build config do not survive automatic injection;
-- `externalRuntime` only changes whether the runtime script is inline or external, not the serialization behavior;
+- `externalRuntime` only changes whether the runtime IIFE is inline or external, not the serialization behavior; the automatic `install(...)` call remains inline and needs a `nonce` or equivalent authorization under a strict CSP;
 - DOM `rf:*` events are the recommended monitoring path for auto-injected setups;
 - use JS hooks only when you manually call `window.__RF__.install()` in page code and pass live function objects yourself.
 

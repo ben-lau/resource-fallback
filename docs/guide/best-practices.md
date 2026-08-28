@@ -139,10 +139,11 @@ pnpm --filter @resource-fallback-example/webpack-react start
 
 ### externalRuntime 部署
 
-若 CSP 禁止 `unsafe-inline`，使用外链模式：
+若希望将 runtime IIFE 部署为外链资源，可使用外链模式。它不会移除自动注入的内联 `install(...)` 调用；严格 CSP 下仍需提供 nonce：
 
 ```ts
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   rules: [...],

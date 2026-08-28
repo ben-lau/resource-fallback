@@ -109,7 +109,7 @@ window.__RF__.install({
 ```
 
 ::: warning Hook serialization limits
-`buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize the config before it reaches the page, so function hooks from build config are dropped. `externalRuntime` only changes whether the runtime script is inline or external; it does not preserve those functions. For auto-injected setups, use DOM `rf:*` events instead.
+`buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize the config before it reaches the page, so function hooks from build config are dropped. `externalRuntime` externalizes only the runtime IIFE; the automatic `install(...)` call remains inline, and it does not preserve those functions. For auto-injected setups, use DOM `rf:*` events instead.
 :::
 
 ## Monitoring integration

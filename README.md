@@ -183,23 +183,23 @@ module.exports = {
 
 ### PluginOptions
 
-| 字段                  | 类型                              | 默认值               | 说明                                                                           |
-| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------------ |
-| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                 |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                    |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制            |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                       |
-| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                             |
-| `nonce`               | `string`                          | —                    | 附加到注入的 `<script>` 标签的 CSP nonce                                       |
-| `externalRuntime`     | `boolean`                         | `false`              | 仅改变 runtime script 的放置方式；不会保留构建配置里的函数钩子                 |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                               |
-| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                             |
-| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                                         |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                           |
-| `hooks`               | `RuntimeHooks`                    | —                    | 配置对象中的函数在序列化到页面时会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件 |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                                  |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                            |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                              |
+| 字段                  | 类型                              | 默认值               | 说明                                                                                              |
+| --------------------- | --------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                                    |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                                       |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制                               |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                                          |
+| `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                                                |
+| `nonce`               | `string`                          | —                    | 附加到每个注入 `<script>`（包括自动内联 `install(...)`）的 CSP nonce                              |
+| `externalRuntime`     | `boolean`                         | `false`              | 只把 runtime IIFE 改为外链；自动 `install(...)` 仍内联且需 CSP 授权；不会保留构建配置里的函数钩子 |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | 外链运行时的路径                                                                                  |
+| `injectPreconnect`    | `boolean`                         | `true`               | 为每个 fallback 域名注入 `<link rel="preconnect">`                                                |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | 注入到 `<head>` 的位置                                                                            |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | 启用 Hybrid SW，接管非脚本子资源和受控 CSS `@import`                                              |
+| `hooks`               | `RuntimeHooks`                    | —                    | 配置对象中的函数在序列化到页面时会被丢弃；自动注入场景推荐监听 DOM `rf:*` 事件                    |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | 额外的 kill-switch 全局变量名                                                                     |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | 值为 `off` 时禁用运行时的查询参数名                                                               |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | 值为 `1` 时禁用运行时的 cookie 名                                                                 |
 
 ### FallbackRule
 
@@ -310,22 +310,23 @@ SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 
 
 ## CSP 指南
 
-运行时默认以**内联 `<script>`** 注入 `<head>`，需要配合 CSP 使用：
+运行时默认以**内联 `<script>`** 注入 `<head>`，需要配合 CSP 使用。`externalRuntime` 只会把 runtime IIFE 改为外链；自动生成的 `window.__RF__.install(...)` 仍是一段内联 `<script>`，因此严格 CSP 下仍需为它提供 nonce 或等效授权：
 
 ```ts
 // 方式一：通过 nonce
 resourceFallback({ nonce: 'XYZ123', ... })
-// CSP: script-src 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
+// CSP: script-src 'self' 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
 
-// 方式二：外链运行时（无需 nonce）
+// 方式二：外链 runtime；自动初始化脚本仍需 nonce
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   ...
 })
 ```
 
-外链模式需自行部署 `runtime.js`，可通过 `getRuntimeCode()` 获取文件内容。
+外链模式需自行部署 `runtime.js`，可通过 `getRuntimeCode()` 获取文件内容。CSP 还应允许 runtime 文件所在的来源（同源时通常是 `'self'`）及实际使用的 fallback 域名。
 
 ## SRI 策略
 

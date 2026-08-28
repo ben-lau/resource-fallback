@@ -173,11 +173,12 @@ export interface ResourceFallbackManifest {
 export interface PluginOptions extends RuntimeConfig {
   /** 在 dev/serve 模式下也注入运行时。默认 false。 */
   enableDev?: boolean;
-  /** 附加到注入的 `<script>` 标签上的 CSP nonce。 */
+  /** 附加到每个注入 `<script>`（包括自动内联 `install(...)`）的 CSP nonce。 */
   nonce?: string;
   /**
-   * 将运行时作为独立资源输出并通过 `<script src>` 引用，而非内联。
-   * 当 CSP 禁止 `unsafe-inline` 时适用。默认 false。
+   * 将 runtime IIFE 作为独立资源输出并通过 `<script src>` 引用，而非内联。
+   * 自动注入的 `install(...)` 调用仍是内联脚本；严格 CSP 下需配合 nonce
+   * 或等效授权。默认 false。
    */
   externalRuntime?: boolean;
   /** 当 {@link externalRuntime} 为 true 时使用的外链路径。默认 `/__rf/runtime.js`。 */

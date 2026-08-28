@@ -183,23 +183,23 @@ Full TypeScript types: [`packages/core/src/types.ts`](packages/core/src/types.ts
 
 ### PluginOptions
 
-| Field                 | Type                              | Default              | Description                                                                                   |
-| --------------------- | --------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
-| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first  |
-| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                    |
-| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                       |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback                                   |
-| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                               |
-| `nonce`               | `string`                          | —                    | CSP nonce appended to the injected `<script>` tag                                             |
-| `externalRuntime`     | `boolean`                         | `false`              | Changes script placement only; it does not preserve function hooks from build config          |
-| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                                          |
-| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                                     |
-| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | Position in `<head>` for injection                                                            |
-| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import`                     |
-| `hooks`               | `RuntimeHooks`                    | —                    | Functions in serialized config are dropped; for auto-injected setups prefer DOM `rf:*` events |
-| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                                                  |
-| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                                      |
-| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                                             |
+| Field                 | Type                              | Default              | Description                                                                                                                                    |
+| --------------------- | --------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first                                                   |
+| `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                                                                     |
+| `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                                                                        |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` attribute during fallback                                                                                    |
+| `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                                                                                |
+| `nonce`               | `string`                          | —                    | CSP nonce appended to every injected `<script>`, including the automatic inline `install(...)`                                                 |
+| `externalRuntime`     | `boolean`                         | `false`              | Externalizes only the runtime IIFE; automatic `install(...)` stays inline and needs CSP authorization; it does not preserve build-config hooks |
+| `externalRuntimePath` | `string`                          | `'/__rf/runtime.js'` | Path for the external runtime script                                                                                                           |
+| `injectPreconnect`    | `boolean`                         | `true`               | Inject `<link rel="preconnect">` for each fallback domain                                                                                      |
+| `htmlInject`          | `'head-prepend' \| 'head-append'` | `'head-prepend'`     | Position in `<head>` for injection                                                                                                             |
+| `serviceWorker`       | `boolean \| ServiceWorkerOptions` | `false`              | Enable Hybrid SW for non-script subresources and controlled CSS `@import`                                                                      |
+| `hooks`               | `RuntimeHooks`                    | —                    | Functions in serialized config are dropped; for auto-injected setups prefer DOM `rf:*` events                                                  |
+| `disableGlobals`      | `string[]`                        | `['__RF_DISABLE__']` | Additional kill-switch global variable names                                                                                                   |
+| `disableQueryParam`   | `string`                          | `'__rf'`             | Query param name that disables runtime when set to `off`                                                                                       |
+| `disableCookie`       | `string`                          | `'__rf_disable'`     | Cookie name that disables runtime when set to `1`                                                                                              |
 
 ### FallbackRule
 
@@ -310,22 +310,23 @@ Application code can listen via `window.addEventListener('rf:fallback', (e) => {
 
 ## CSP Guide
 
-The runtime is injected as an **inline `<script>`** in `<head>` by default. For CSP compliance:
+The runtime is injected as an **inline `<script>`** in `<head>` by default. `externalRuntime` externalizes only the runtime IIFE; the generated `window.__RF__.install(...)` call remains an inline `<script>`, so a strict CSP still needs a nonce or equivalent authorization for it:
 
 ```ts
 // Option 1: nonce
 resourceFallback({ nonce: 'XYZ123', ... })
-// CSP: script-src 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
+// CSP: script-src 'self' 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
 
-// Option 2: external runtime (no nonce needed)
+// Option 2: external runtime; the automatic initializer still needs a nonce
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   ...
 })
 ```
 
-For external mode, deploy `runtime.js` yourself — use `getRuntimeCode()` to get the file contents.
+For external mode, deploy `runtime.js` yourself — use `getRuntimeCode()` to get the file contents. CSP must also allow the runtime origin (`'self'` when it is same-origin) and the fallback origins actually used.
 
 ## SRI Strategies
 

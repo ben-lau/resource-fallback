@@ -8,15 +8,15 @@ resource-fallback 在设计时考虑了 Content Security Policy（CSP）和 Subr
 
 ## CSP 支持
 
-运行时默认以**内联 `<script>`** 注入 `<head>`，需要配合 CSP 使用。
+运行时默认以**内联 `<script>`** 注入 `<head>`，需要配合 CSP 使用。默认模式会在同一段内联脚本中运行 runtime IIFE 并调用 `install(...)`；开启 `externalRuntime` 后，只有 runtime IIFE 改为外链，自动 `install(...)` 调用仍是内联脚本。
 
 ::: tip 不需要 `unsafe-eval`
-运行时 IIFE 目标为 es2020，动态加载使用浏览器原生 `import()`，**不**通过 `Function('u','return import(u)')` 等方式求值。因此 CSP **不必**放行 `script-src 'unsafe-eval'`。内联脚本仍需 `nonce` 或改用 `externalRuntime`。
+运行时 IIFE 目标为 es2020，动态加载使用浏览器原生 `import()`，**不**通过 `Function('u','return import(u)')` 等方式求值。因此 CSP **不必**放行 `script-src 'unsafe-eval'`。任何自动注入的内联脚本仍需 `nonce`；`externalRuntime` 本身不能免除自动 `install(...)` 调用的授权。
 :::
 
 ### 方式一：nonce 支持
 
-通过 `nonce` 选项为注入的 `<script>` 标签附加 CSP nonce：
+通过 `nonce` 选项为每个注入的 `<script>` 标签附加 CSP nonce（包括外链模式下的内联 `install(...)`）：
 
 ```ts
 resourceFallback({
@@ -28,15 +28,16 @@ resourceFallback({
 对应的 CSP 策略：
 
 ```
-script-src 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
+script-src 'self' 'nonce-XYZ123' https://cdn1.example.com https://cdn2.example.com;
 ```
 
-### 方式二：externalRuntime 外链模式
+### 方式二：externalRuntime 外链模式（自动初始化仍需 nonce）
 
-将运行时作为独立资源输出并通过 `<script src>` 引用，无需 nonce：
+将 runtime IIFE 作为独立资源输出并通过 `<script src>` 引用，可以减少内联代码体积；插件自动生成的 `window.__RF__.install(...)` 仍会作为第二段内联 `<script>` 注入。因此 CSP 禁止未授权内联脚本时，需要同时配置 `nonce`：
 
 ```ts
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   rules: [...],
@@ -44,7 +45,7 @@ resourceFallback({
 ```
 
 ::: tip 部署 runtime 文件
-外链模式需自行部署 `runtime.js`。可通过 `@resource-fallback/core` 的 `getRuntimeCode()` 获取文件内容。
+外链模式需自行部署 `runtime.js`。可通过 `@resource-fallback/core` 的 `getRuntimeCode()` 获取文件内容；若它不在同源，还需在 `script-src` 中允许该来源。
 :::
 
 ### externalRuntime 与 hooks
@@ -63,7 +64,21 @@ window.__RF__.install({
 });
 ```
 
-自动注入场景推荐优先使用 DOM `rf:*` 事件；若只是为了满足 CSP，再单独选择 `nonce` 或 `externalRuntime`。
+自动注入场景推荐优先使用 DOM `rf:*` 事件。严格 CSP 下，`nonce` 与 `externalRuntime` 是可组合的：前者授权内联初始化脚本，后者只决定 runtime IIFE 是否外链。
+
+### 按资源类型配置 CSP
+
+当 CSP 会限制对应资源类型的来源时，请把实际使用的主、备用资源来源加入相应 directive：
+
+| 资源类型               | resource-fallback 路径         | 相关 CSP directive |
+| ---------------------- | ------------------------------ | ------------------ |
+| JavaScript             | 页面 Observer / 构建器 adapter | `script-src`       |
+| 样式表与 CSS `@import` | 页面 Observer / Hybrid SW      | `style-src`        |
+| 图片（含 CSS `url()`） | Hybrid SW                      | `img-src`          |
+| 字体                   | Hybrid SW                      | `font-src`         |
+| 音频与视频             | Hybrid SW                      | `media-src`        |
+
+这张表只覆盖 CSP 来源限制；跨源字体和 Hybrid SW 的网络请求仍需满足 CORS、MIME、SRI 等浏览器安全约束。
 
 ## SRI 策略
 
@@ -94,11 +109,11 @@ SW 只能返回不同响应，**不能修改**页面中原始标签上的 `integ
 
 三种方式可在不发版的情况下紧急禁用运行时：
 
-| 方式     | 示例                           | 适用场景                         |
-| -------- | ------------------------------ | -------------------------------- |
-| 全局变量 | `window.__RF_DISABLE__ = true` | 在运行时 `<script>` 之前内联设置 |
-| 查询参数 | 访问 `?__rf=off`               | 临时排查问题                     |
-| Cookie   | `__rf_disable=1`               | 网关按会话/用户维度禁用          |
+| 方式     | 示例                           | 适用场景                                                   |
+| -------- | ------------------------------ | ---------------------------------------------------------- |
+| 全局变量 | `window.__RF_DISABLE__ = true` | 在 runtime 前执行的带 nonce 内联脚本或已授权外链 bootstrap |
+| 查询参数 | 访问 `?__rf=off`               | 临时排查问题                                               |
+| Cookie   | `__rf_disable=1`               | 网关按会话/用户维度禁用                                    |
 
 可通过配置自定义 kill-switch 名称：
 
@@ -113,6 +128,19 @@ resourceFallback({
 
 ::: info 严格匹配
 kill-switch 全局变量仅接受 `true` / `1` / `'1'` / `'true'` 四种值触发禁用。cookie 匹配为精确相等，避免 `__rf_disable=10` 等误触。
+:::
+
+::: warning 严格 CSP 下的全局 Kill Switch
+表中的“内联”设置也受 `script-src` 限制。请使用与 CSP 响应头、`resourceFallback({ nonce })` 相同的每响应 nonce（以下的 `XYZ123` 为占位值），并确保它在 runtime 前执行：
+
+```html
+<script nonce="XYZ123">
+  window.__RF_DISABLE__ = true;
+</script>
+<!-- resource-fallback 注入的 runtime 位于其后 -->
+```
+
+若策略不允许任何内联 bootstrap，请将相同代码放入已被 `script-src` 授权、且在 runtime 前执行的外链脚本。
 :::
 
 ## 完整配置示例
@@ -130,8 +158,9 @@ resourceFallback({
   ],
 });
 
-// 外链 runtime 模式
+// 外链 runtime 模式；严格 CSP 下仍需授权自动内联 install(...)
 resourceFallback({
+  nonce: 'XYZ123',
   externalRuntime: true,
   externalRuntimePath: '/static/__rf/runtime.js',
   sri: 'keep',
