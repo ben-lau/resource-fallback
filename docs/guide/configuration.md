@@ -104,7 +104,7 @@ resourceFallback({
 | `cache.cacheOpaque`   | `boolean` | `false`                                                       | 是否缓存 opaque response。默认不缓存                                                                               |
 
 ::: info 缓存策略
-缓存策略默认保持保守：只缓存 fallback 成功后的可读 2xx 响应；显式设置 `cacheOpaque: true` 时也允许缓存 opaque 响应。网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
+缓存策略默认保持保守：只缓存 fallback 成功后的可读 2xx 响应；显式设置 `cacheOpaque: true` 时也允许缓存 opaque 响应。网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；命中该 cache 时当前实现会先派发 `rf:error`，不会补发 `rf:success`。新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
 :::
 
 ::: warning SW 熔断器独立性

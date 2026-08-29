@@ -101,10 +101,13 @@ resourceFallback({
 
 | Field                 | Default                                | Notes                                                                                |
 | --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `enabled`             | `true` for object config               | Set `false` to disable from an object config                                         |
 | `path`                | Derived from scope (`/` → `/rf-sw.js`) | Stays inside scope to avoid `Service-Worker-Allowed` header                          |
+| `scope`               | `'/'`                                  | Service Worker control scope                                                         |
 | `includeStyleImports` | `true`                                 | CSS `@import` when referrer matches manifest CSS asset                               |
 | `fallbackOnOpaque`    | `false`                                | CORS-probe cross-origin `no-cors` requests; CORS-unavailable responses remain opaque |
 | `cache.enabled`       | `true`                                 | Cache successful fallback responses; opaque needs `cacheOpaque`                      |
+| `cache.cacheOpaque`   | `false`                                | Whether opaque responses may be cached; disabled by default                          |
 
 Full reference: [Configuration Reference](./configuration.md#serviceworkeroptions).
 
@@ -116,6 +119,7 @@ SW uses an isolated in-memory circuit breaker — it does not share page-side `l
 
 - Cache only readable 2xx responses from successful fallback by default; `cacheOpaque: true` also permits opaque responses
 - Read the current manifest-version cache only after network retry/fallback is exhausted
+- When that cache is returned, the current implementation has already emitted `rf:error` and does not add `rf:success`
 - Clean old `resource-fallback-*` caches when a new manifest version activates
 
 ## Registration flow

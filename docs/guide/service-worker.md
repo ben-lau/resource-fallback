@@ -107,6 +107,7 @@ SW 事件会优先按 `FetchEvent.clientId` 定向投递，避免多标签页串
 
 - 默认只缓存 fallback 成功后的可读 2xx 响应；设置 `cacheOpaque: true` 时也允许缓存 opaque 响应
 - 网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底
+- 命中该 cache 时，当前实现已派发 `rf:error`，不会补发 `rf:success`
 - 新 manifest version 激活后会清理旧的 `resource-fallback-*` cache
 
 SW 内部 resolver 的熔断器始终使用独立内存状态，不会读写 `localStorage`。

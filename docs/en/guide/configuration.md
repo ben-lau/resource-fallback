@@ -104,7 +104,7 @@ resourceFallback({
 | `cache.cacheOpaque`   | `boolean` | `false`                                                                 | Whether to cache opaque responses. Disabled by default                                                                                                                        |
 
 ::: info Cache policy
-Conservative by default: only readable 2xx responses from successful fallback are cached; setting `cacheOpaque: true` also permits caching opaque responses. Manifest-version cache is read only after network retry/fallback is exhausted; old `resource-fallback-*` caches are cleaned when a new manifest version activates. Manifest version includes resources, fallback rules, and key SW cache policy.
+Conservative by default: only readable 2xx responses from successful fallback are cached; setting `cacheOpaque: true` also permits caching opaque responses. Manifest-version cache is read only after network retry/fallback is exhausted; when that cache is returned, the current implementation has already emitted `rf:error` and does not add `rf:success`. Old `resource-fallback-*` caches are cleaned when a new manifest version activates. Manifest version includes resources, fallback rules, and key SW cache policy.
 :::
 
 ::: warning SW circuit breaker isolation

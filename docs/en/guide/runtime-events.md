@@ -21,7 +21,7 @@ Page-side adapters (Observer, Vite, Webpack, SystemJS) hand failures to the Reco
 - For page Coordinator events, `ErrorEvent.reason` is an opaque `unknown` failure value from the transport/coordinator.
 - For SW-bridged events, `reason` may include resolver giveup reasons such as `'rules-exhausted'` or `'no-match'`.
 - Page `rf:success` is published only after a recovery session succeeds; it is not emitted for an initial first-try success.
-- SW `rf:success` is emitted for any usable SW response, including an initial successful fetch.
+- SW `rf:success` is emitted only for a usable **network** response, including an initial successful fetch and a successful fallback-URL fetch. If the network chain is exhausted and a cached response is returned, the current implementation emits `rf:error` first and does not add an `rf:success` event.
   :::
 
 ## DOM listener examples

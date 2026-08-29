@@ -21,7 +21,7 @@ resource-fallback 通过 DOM CustomEvent 和可选 JS 函数钩子暴露运行�
 - 页面侧 Coordinator 事件里的 `reason` 是 transport / coordinator 产生的 opaque failure value，类型为 `unknown`
 - SW 透传到页面的 `reason` 可能包含 resolver giveup 原因，例如 `'rules-exhausted'` 或 `'no-match'`
 - 页面侧 `rf:success` 只在一次恢复 session 成功后触发；首轮直接成功不会补发 page success 事件
-- SW `rf:success` 表示一次可用的 SW 响应，包含首轮 fetch 直接成功与 fallback 后成功
+- SW `rf:success` 只表示一次可用的**网络**响应，包含首轮 fetch 直接成功与 fallback URL 网络成功；若网络链路耗尽后命中缓存，当前实现会先发 `rf:error`，不会补发 `rf:success`
   :::
 
 ## 监听示例

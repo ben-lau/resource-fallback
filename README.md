@@ -262,7 +262,7 @@ resourceFallback({
 | `cache.enabled`       | `boolean` | `true`                                                        | fallback 网络链路成功后写入 Cache API                                                                              |
 | `cache.cacheOpaque`   | `boolean` | `false`                                                       | 是否缓存 opaque response。默认不缓存                                                                               |
 
-缓存策略默认保持保守：只缓存 fallback 成功后的可读 2xx 响应；显式设置 `cacheOpaque: true` 时也允许缓存 opaque 响应。网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
+缓存策略默认保持保守：只缓存 fallback 成功后的可读 2xx 响应；显式设置 `cacheOpaque: true` 时也允许缓存 opaque 响应。网络 retry/fallback 全部失败后，才读取当前 manifest version 对应的 cache 兜底；命中该 cache 时当前实现会先派发 `rf:error`，不会补发 `rf:success`。新 manifest version 激活后会清理旧的 `resource-fallback-*` cache。manifest version 会纳入资源、fallback rules 和关键 SW cache 策略，避免 rules 或 cache 配置变化后继续命中旧 cache。
 
 SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 `defaults.circuit.shareAcrossTabs` 为 `true`，SW 也不会读写 `localStorage`。若 SW fetch 链路最终 reject，会发出 `rf:error` 并返回 `Response.error()`，保持浏览器侧资源表现接近真实 network error。
 
