@@ -360,15 +360,17 @@ Hybrid SW 不在本轮接管 script，也不实现同步 classic script 的强�
 
 推荐通过 DOM 事件对接监控系统：
 
+TypeScript 中，`rf:*` 未扩展到 `WindowEventMap`，读取 `detail` 时需断言为 `CustomEvent`：
+
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  monitor.send('resource.retry', e.detail);
+  monitor.send('resource.retry', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:fallback', (e) => {
-  monitor.send('resource.fallback', e.detail);
+  monitor.send('resource.fallback', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:error', (e) => {
-  monitor.send('resource.error', e.detail);
+  monitor.send('resource.error', (e as CustomEvent).detail);
 });
 ```
 
@@ -386,7 +388,7 @@ window.__RF__.install({
 
 ## Demo
 
-- [`examples/vite-vue`](examples/vite-vue) — Vue 3 + Vite 5 + Vue Router 懒加载
+- [`examples/vite-vue`](examples/vite-vue) — Vue 3 + Vite + Vue Router 懒加载
 - [`examples/webpack-react`](examples/webpack-react) — React 18 + Webpack 5 + `React.lazy`
 
 两个 demo 使用 `.invalid` 域名（RFC 2606 保留，DNS 必然失败）作为 CDN，origin 使用 `/`（同源），**无需 mock 服务器**。
@@ -451,7 +453,7 @@ pnpm release                # build + publish 所有包到 npm
 
 ### 功能增强
 
-- [ ] **（高优先级）单次加载超时 / `retry.timeout`** — 已从公开类型中移除未实现的 `RetryOptions.timeout`。后续需在各加载路径（Observer、`__RF__.load`、webpack chunk 等）落地「超过 N ms 视为失败并驱动恢复流程」；可选配合 `fetch`+`AbortSignal` 或 HEAD 预检；经典 `<script>` 无原生超时 API，需单独权衡实现。
+- [ ] **（高优先级）公开可配置的超时 / `retry.timeout`** — 页面侧 RecoveryCoordinator 已有固定的单次 30 秒、session 120 秒超时；尚未支持公开的 `RetryOptions.timeout` 配置。后续需要在不改变现有 Observer、`__RF__.load`、webpack chunk 语义的前提下，设计可配置的超时策略；经典 `<script>` 无原生超时 API，仍需单独权衡。
 - [x] **Hybrid Service Worker 拦截模式（opt-in）** — SW 负责 `image`、`font`、`media`、CSS `url()` 和受控 CSS `@import`；现有 Observer/Vite/Webpack/SystemJS adapter 继续负责 script 与构建器语义
 - [x] **图片/字体资源支持（SW 模式）** — 已在 Hybrid SW 中覆盖 `<img>`、`@font-face`、CSS 背景图和媒体资源；仍需满足浏览器 CORS/MIME/SRI 等安全策略
 - [ ] **Vite dev 模式支持** — 当前 Vite dev 使用原生 ESM，动态 import 失败无法拦截

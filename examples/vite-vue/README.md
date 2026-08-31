@@ -4,7 +4,7 @@
 
 演示 `@resource-fallback/vite-plugin` 在 Vue 3 应用中的完整集成，包括：
 
-- Vue Router 懒加载路由（`() => import('./views/About.vue')`）
+- Vue Router 懒加载路由（`() => import('./About.vue')`）
 - `defineAsyncComponent` 异步组件
 - `@vitejs/plugin-legacy` 生成的 SystemJS legacy bundle
 - Hybrid Service Worker 对图片、字体、CSS `url()` 和受控 `@import` 的回退

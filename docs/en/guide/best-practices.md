@@ -113,7 +113,7 @@ Treat page `rf:error` as a terminal signal, and use `rf:retry` / `rf:fallback` t
 
 ```ts
 window.addEventListener('rf:error', (e) => {
-  analytics.track('resource_fallback_terminal', e.detail);
+  analytics.track('resource_fallback_terminal', (e as CustomEvent).detail);
 });
 ```
 
@@ -121,9 +121,10 @@ Track fallback chains:
 
 ```ts
 window.addEventListener('rf:fallback', (e) => {
+  const detail = (e as CustomEvent).detail;
   analytics.track('resource_fallback_switch', {
-    from: e.detail.from,
-    to: e.detail.to,
+    from: detail.from,
+    to: detail.to,
   });
 });
 ```

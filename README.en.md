@@ -360,15 +360,17 @@ Hybrid SW does not take over scripts and does not guarantee strict ordering for 
 
 Recommended approach — hook into DOM events:
 
+In TypeScript, `rf:*` is not added to `WindowEventMap`, so cast the event to `CustomEvent` before reading `detail`:
+
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  monitor.send('resource.retry', e.detail);
+  monitor.send('resource.retry', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:fallback', (e) => {
-  monitor.send('resource.fallback', e.detail);
+  monitor.send('resource.fallback', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:error', (e) => {
-  monitor.send('resource.error', e.detail);
+  monitor.send('resource.error', (e as CustomEvent).detail);
 });
 ```
 
@@ -386,7 +388,7 @@ window.__RF__.install({
 
 ## Demos
 
-- [`examples/vite-vue`](examples/vite-vue) — Vue 3 + Vite 5 + Vue Router lazy loading
+- [`examples/vite-vue`](examples/vite-vue) — Vue 3 + Vite + Vue Router lazy loading
 - [`examples/webpack-react`](examples/webpack-react) — React 18 + Webpack 5 + `React.lazy`
 
 Both demos use `.invalid` domains (RFC 2606 reserved, DNS will always fail) as CDN, with origin set to `/` (same origin) — **no mock server required**.
@@ -451,7 +453,7 @@ Upcoming improvements, optimizations, and known limitations, sorted by priority:
 
 ### Feature Enhancements
 
-- [ ] **(High priority) Per-load timeout / `retry.timeout`** — removed unimplemented `RetryOptions.timeout` from public types. Need to implement "fail after N ms" across all load paths (Observer, `__RF__.load`, webpack chunk, etc.); optionally with `fetch`+`AbortSignal` or HEAD preflight; classic `<script>` has no native timeout API, needs careful design.
+- [ ] **(High priority) Publicly configurable timeout / `retry.timeout`** — the page-side RecoveryCoordinator already has fixed 30-second per-attempt and 120-second session deadlines; a public `RetryOptions.timeout` setting is not supported. A future design must make timeout configurable without changing existing Observer, `__RF__.load`, or webpack-chunk semantics; classic `<script>` still has no native timeout API.
 - [x] **Hybrid Service Worker interception mode (opt-in)** — SW owns `image`, `font`, `media`, CSS `url()`, and controlled CSS `@import`; existing Observer/Vite/Webpack/SystemJS adapters continue to own scripts and build-tool semantics
 - [x] **Image/font resource support (SW mode)** — Hybrid SW covers `<img>`, `@font-face`, CSS background images, and media resources; browser CORS/MIME/SRI policies still apply
 - [ ] **Vite dev mode support** — Vite dev uses native ESM; dynamic import failures cannot be intercepted

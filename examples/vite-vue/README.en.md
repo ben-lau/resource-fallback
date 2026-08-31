@@ -4,7 +4,7 @@
 
 Demonstrates full integration of `@resource-fallback/vite-plugin` in a Vue 3 application, including:
 
-- Vue Router lazy-loaded routes (`() => import('./views/About.vue')`)
+- Vue Router lazy-loaded routes (`() => import('./About.vue')`)
 - `defineAsyncComponent` async components
 - `@vitejs/plugin-legacy` generated SystemJS legacy bundles
 - Hybrid Service Worker fallback for images, fonts, CSS `url()`, and controlled `@import`

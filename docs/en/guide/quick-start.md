@@ -91,7 +91,7 @@ Listen for `rf:retry` to confirm the runtime is active:
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  console.log('Retry:', e.detail);
+  console.log('Retry:', (e as CustomEvent).detail);
 });
 ```
 

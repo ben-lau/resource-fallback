@@ -26,26 +26,30 @@ resource-fallback 通过 DOM CustomEvent 和可选 JS 函数钩子暴露运行�
 
 ## 监听示例
 
+::: tip TypeScript
+库没有扩展 `WindowEventMap`，因此 `rf:*` 监听器的参数会被推断为 `Event`。在读取 `detail` 前请显式断言为 `CustomEvent`，如下例所示。
+:::
+
 ### 基础监听
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  console.log('重试:', e.detail);
+  console.log('重试:', (e as CustomEvent).detail);
   // { url: 'https://cdn1.example.com/assets/app.js', attempt: 1 }
 });
 
 window.addEventListener('rf:fallback', (e) => {
-  console.log('回退:', e.detail);
+  console.log('回退:', (e as CustomEvent).detail);
   // { from: 'https://cdn1.example.com/assets/app.js', to: 'https://cdn2.example.com/assets/app.js' }
 });
 
 window.addEventListener('rf:success', (e) => {
-  console.log('成功:', e.detail);
+  console.log('成功:', (e as CustomEvent).detail);
   // { url: 'https://cdn2.example.com/assets/app.js', attempts: 2 }
 });
 
 window.addEventListener('rf:error', (e) => {
-  console.log('失败:', e.detail);
+  console.log('失败:', (e as CustomEvent).detail);
   // 页面侧 reason 是 unknown；SW 透传时也可能是 'rules-exhausted' / 'no-match'
 });
 ```
@@ -84,15 +88,15 @@ window.addEventListener('rf:error', (e) => {
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  monitor.send('resource.retry', e.detail);
+  monitor.send('resource.retry', (e as CustomEvent).detail);
 });
 
 window.addEventListener('rf:fallback', (e) => {
-  monitor.send('resource.fallback', e.detail);
+  monitor.send('resource.fallback', (e as CustomEvent).detail);
 });
 
 window.addEventListener('rf:error', (e) => {
-  monitor.send('resource.error', e.detail);
+  monitor.send('resource.error', (e as CustomEvent).detail);
 });
 ```
 

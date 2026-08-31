@@ -26,23 +26,29 @@ Page-side adapters (Observer, Vite, Webpack, SystemJS) hand failures to the Reco
 
 ## DOM listener examples
 
+::: tip TypeScript
+The package does not augment `WindowEventMap`, so an `rf:*` listener parameter is inferred as `Event`. Cast it to `CustomEvent` before reading `detail`, as in the examples below.
+:::
+
 ### Basic logging
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  console.log('[RF] retry', e.detail);
+  console.log('[RF] retry', (e as CustomEvent).detail);
 });
 
 window.addEventListener('rf:fallback', (e) => {
-  console.log('[RF] fallback', e.detail.from, '→', e.detail.to);
+  const detail = (e as CustomEvent).detail;
+  console.log('[RF] fallback', detail.from, '→', detail.to);
 });
 
 window.addEventListener('rf:success', (e) => {
-  console.log('[RF] success', e.detail.url, 'after', e.detail.attempts, 'attempts');
+  const detail = (e as CustomEvent).detail;
+  console.log('[RF] success', detail.url, 'after', detail.attempts, 'attempts');
 });
 
 window.addEventListener('rf:error', (e) => {
-  console.error('[RF] error', e.detail);
+  console.error('[RF] error', (e as CustomEvent).detail);
 });
 ```
 
@@ -118,13 +124,13 @@ Recommended pattern — hook DOM events:
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  monitor.send('resource.retry', e.detail);
+  monitor.send('resource.retry', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:fallback', (e) => {
-  monitor.send('resource.fallback', e.detail);
+  monitor.send('resource.fallback', (e as CustomEvent).detail);
 });
 window.addEventListener('rf:error', (e) => {
-  monitor.send('resource.error', e.detail);
+  monitor.send('resource.error', (e as CustomEvent).detail);
 });
 ```
 

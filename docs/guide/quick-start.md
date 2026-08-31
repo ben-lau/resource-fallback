@@ -91,7 +91,7 @@ module.exports = {
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  console.log('重试:', e.detail);
+  console.log('重试:', (e as CustomEvent).detail);
 });
 ```
 

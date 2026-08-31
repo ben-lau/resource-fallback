@@ -104,7 +104,7 @@ function enNav() {
         { text: 'SW Design', link: '/en/design/sw-comparison' },
       ],
     },
-    { text: 'API', link: '/api/', activeMatch: '/api/' },
+    { text: 'API (中文)', link: '/api/', activeMatch: '/api/' },
     { text: 'Changelog', link: '/en/changelog' },
   ];
 }

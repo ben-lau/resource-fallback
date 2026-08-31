@@ -43,7 +43,7 @@ installSwAdapter({ config, bus, log });
 
 页面侧 adapter 现在共用的是 `RecoveryCoordinator`、ownership registry、共享的 page circuit 与 hook bus；它们不再各自直接跑同一个 `Resolver`。同一 owner + `logicalKey` 的并发恢复会复用同一个进行中的 recovery Promise，而跨 owner 的重复接管会在 ownership admission 阶段被拒绝。Service Worker 则保留独立的 fetch 层 resolver（`createSwResolver()`），只通过 manifest 与事件桥和页面协作。
 
-`packages/core/src/runtime/observer.ts` 负责捕获 `<script>` 和 `<link rel="stylesheet">` 的 `error` / `load` 事件，并原地替换为 retry 或 fallback URL。它明确不处理 `<img>`、`video`、字体文件和 CSS 内部 `url()` / `@import`。它还记录了同步 classic script 的限制：失败后再 `replaceChild` 无法让已经继续执行的后续脚本重新排序。
+`packages/core/src/runtime/observer.ts` 在捕获阶段监听 `<script>` 和 `<link rel="stylesheet">` 的 `error` 事件，并原地替换为 retry 或 fallback URL。每个替换后的标签会各自监听 `load` / `error` 来结束这次恢复尝试；它不会全局捕获 `load`。它明确不处理 `<img>`、`video`、字体文件和 CSS 内部 `url()` / `@import`。它还记录了同步 classic script 的限制：失败后再 `replaceChild` 无法让已经继续执行的后续脚本重新排序。
 
 `packages/core/src/runtime/adapter-vite.ts` 负责 Vite 动态 `import()` 的 Promise 语义、module map 失败缓存的 cache busting，以及 `vite:preloadError` 的 `preventDefault()` / URL 提取门禁。当前实现不会在 preload 事件里直接把页面失败写回旧 resolver；这些不是单纯 fetch 成功或失败能完整表达的行为。
 

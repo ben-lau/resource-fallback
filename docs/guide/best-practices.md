@@ -87,15 +87,15 @@ SW 调试请使用 `localhost` / `127.0.0.1` / HTTPS。普通局域网 IP 的 HT
 
 ```ts
 window.addEventListener('rf:retry', (e) => {
-  monitor.send('resource.retry', e.detail);
+  monitor.send('resource.retry', (e as CustomEvent).detail);
 });
 
 window.addEventListener('rf:fallback', (e) => {
-  monitor.send('resource.fallback', e.detail);
+  monitor.send('resource.fallback', (e as CustomEvent).detail);
 });
 
 window.addEventListener('rf:error', (e) => {
-  monitor.send('resource.error', e.detail);
+  monitor.send('resource.error', (e as CustomEvent).detail);
 });
 ```
 
