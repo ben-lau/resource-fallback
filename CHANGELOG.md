@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 Packages (`@resource-fallback/core`, `@resource-fallback/vite-plugin`, `@resource-fallback/webpack-plugin`) are released with the same version number.
 
+## [0.3.0](https://github.com/ben-lau/resource-fallback/compare/v0.2.0...v0.3.0) (2026-09-02)
+
+
+### Features
+
+* **core:** add canonical resource identity ([df9810b](https://github.com/ben-lau/resource-fallback/commit/df9810bccdf8082d5000fe544c09ffc10ad1dcf1))
+* **core:** add pure recovery state machine ([01c1964](https://github.com/ben-lau/resource-fallback/commit/01c19646b50ac0727f4c369c07cbffcb18e1cdee))
+* **core:** add runtime ownership leases ([e162502](https://github.com/ben-lau/resource-fallback/commit/e1625021a5a4ee052deb019f711f5d2178a9af63))
+* **core:** coordinate recovery sessions ([9196799](https://github.com/ben-lau/resource-fallback/commit/9196799611ccdb54325fb25a2a7c14c145640230))
+* **core:** seed coordinator from external failures ([e9df896](https://github.com/ben-lau/resource-fallback/commit/e9df8964983c807a6828f40ac62551490749bcae))
+* **core:** share same-entrance recovery sessions ([833ac18](https://github.com/ben-lau/resource-fallback/commit/833ac1808418c70ac3c9b632428ab5bf9294ac19))
+* **webpack:** delegate runtime recovery to core coordinator ([49d9081](https://github.com/ben-lau/resource-fallback/commit/49d9081c51693da9c043cc4d81f0f79c9549f350))
+
+
+### Bug Fixes
+
+* **ci:** 修改 release-please 配置 ([e8b9476](https://github.com/ben-lau/resource-fallback/commit/e8b947677a168ce646078b66de57b2c9c0082af6))
+* **ci:** 将 publish 和 docs 部署合并进 release-please workflow ([265e546](https://github.com/ben-lau/resource-fallback/commit/265e546506f47ccb337f7650913005f120b1c135))
+* **core:** close recovery session reentrancy gaps ([9112f1d](https://github.com/ben-lau/resource-fallback/commit/9112f1d0877f09f654e87e98628112a570c7b02a))
+* **core:** cover resource identity edge cases ([8ec7fbe](https://github.com/ben-lau/resource-fallback/commit/8ec7fbe0a7782edec19159e5ec19841bbfb984cb))
+* **core:** expose injected tag options type ([d2bcfdc](https://github.com/ben-lau/resource-fallback/commit/d2bcfdcbeae05a458918481159e753c23127de96))
+* **core:** harden recovery publication cleanup ([464f175](https://github.com/ben-lau/resource-fallback/commit/464f1752efc28e755c675cf198b258704d657ad3))
+* **core:** settle mapped recovery failures ([ee269e5](https://github.com/ben-lau/resource-fallback/commit/ee269e53415c01ed1ed23c8e99391a7ffeb60c3d))
+* **core:** 规则收口为 string base，runtime 改用原生 import ([7734b15](https://github.com/ben-lau/resource-fallback/commit/7734b159079cf35d63a9841044089070ffa2a704))
+
+
+### Code Refactoring
+
+* **core:** centralize runtime services ([09ce2ce](https://github.com/ben-lau/resource-fallback/commit/09ce2ce3edfb0dcfd113d7dca6252b35a65814a9))
+* **core:** compile immutable runtime config ([39f9427](https://github.com/ben-lau/resource-fallback/commit/39f94277d0450546b92325cd0028d48b9051408b))
+* **observer:** join shared recovery admissions ([9ec9229](https://github.com/ben-lau/resource-fallback/commit/9ec9229399f9250ae0757ec8125123fdd3be32bb))
+* **runtime:** connect adapters to shared lifecycle ([a780d8f](https://github.com/ben-lau/resource-fallback/commit/a780d8f53cf8174a8b67b0dbff477a376dd31f3c))
+* **runtime:** delegate observer recovery to coordinator ([1c085e7](https://github.com/ben-lau/resource-fallback/commit/1c085e789426de0afbe482e18c160cec510cb58a))
+* **runtime:** make systemjs adapter disposable ([9bda25a](https://github.com/ben-lau/resource-fallback/commit/9bda25ab9f7a0600b74548e952793ac01ed55851))
+* **runtime:** preserve webpack loading through coordinator ([7616484](https://github.com/ben-lau/resource-fallback/commit/761648431f0979806cbd208bfadd93dcd7e630bd))
+* **runtime:** route vite imports through coordinator ([0e84ec4](https://github.com/ben-lau/resource-fallback/commit/0e84ec4d69f73edf5a105d4dbc6b82426c0e5f69))
+* **systemjs:** join shared recovery admissions ([819217e](https://github.com/ben-lau/resource-fallback/commit/819217e039e7f6cad650dfb8983cc20f27f61e90))
+* **vite:** join shared recovery admissions ([829b201](https://github.com/ben-lau/resource-fallback/commit/829b201b2907d781ba6b171b22c62e346335822f))
+* **webpack:** enforce stable chunk admission ([e28d6b9](https://github.com/ben-lau/resource-fallback/commit/e28d6b90237e5dd1b7e1a8a1a43fc6353d5613a7))
+
 ## [0.2.0](https://github.com/ben-lau/resource-fallback/compare/v0.1.5...v0.2.0) (2026-06-15)
 
 ### Bug Fixes
