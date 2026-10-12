@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 Packages (`@resource-fallback/core`, `@resource-fallback/vite-plugin`, `@resource-fallback/webpack-plugin`) are released with the same version number.
 
+## [0.3.1](https://github.com/ben-lau/resource-fallback/compare/v0.3.0...v0.3.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **core:** 修复 sw 在第一次也派发 success 事件的问题 ([e0f597c](https://github.com/ben-lau/resource-fallback/commit/e0f597cc713813f10fdbcc81826924798e13dadd))
+
 ## [0.3.0](https://github.com/ben-lau/resource-fallback/compare/v0.2.0...v0.3.0) (2026-09-02)
 
 
