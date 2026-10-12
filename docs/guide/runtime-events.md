@@ -8,20 +8,20 @@ resource-fallback 通过 DOM CustomEvent 和可选 JS 函数钩子暴露运行�
 
 ## 事件列表
 
-| 事件名        | 触发时机                            | detail                  |
-| ------------- | ----------------------------------- | ----------------------- |
-| `rf:retry`    | 同一 URL 重试                       | `{ url, attempt }`      |
-| `rf:fallback` | 切换到下一个候选 URL                | `{ from, to, reason? }` |
-| `rf:success`  | 页面侧一次已恢复 session 成功结束   | `{ url, attempts }`     |
-| `rf:error`    | 页面侧 session 失败，或 SW 透传错误 | `{ url, reason? }`      |
+| 事件名        | 触发时机                                 | detail                  |
+| ------------- | ---------------------------------------- | ----------------------- |
+| `rf:retry`    | 同一 URL 重试                            | `{ url, attempt }`      |
+| `rf:fallback` | 切换到下一个候选 URL                     | `{ from, to, reason? }` |
+| `rf:success`  | 页面或 SW 经 retry / fallback 后恢复成功 | `{ url, attempts }`     |
+| `rf:error`    | 页面侧 session 失败，或 SW 透传错误      | `{ url, reason? }`      |
 
 ::: info 事件来源
 页面侧 adapter（Observer、Vite、Webpack、SystemJS）会先把失败交给 RecoveryCoordinator，再由 HookBus 派发 DOM CustomEvent。Hybrid SW 模式下，SW 通过 `postMessage` 将事件送回页面，再由页面 runtime 转发为相同的 `rf:*` 事件。
 
 - 页面侧 Coordinator 事件里的 `reason` 是 transport / coordinator 产生的 opaque failure value，类型为 `unknown`
 - SW 透传到页面的 `reason` 可能包含 resolver giveup 原因，例如 `'rules-exhausted'` 或 `'no-match'`
-- 页面侧 `rf:success` 只在一次恢复 session 成功后触发；首轮直接成功不会补发 page success 事件
-- SW `rf:success` 只表示一次可用的**网络**响应，包含首轮 fetch 直接成功与 fallback URL 网络成功；若网络链路耗尽后命中缓存，当前实现会先发 `rf:error`，不会补发 `rf:success`
+- 页面侧和 SW 的 `rf:success` 都只在经历 retry / fallback 后恢复成功时触发；首轮直接成功不会触发
+- SW 的恢复成功事件只针对可用的**网络**响应；若网络链路耗尽后命中缓存，当前实现会先发 `rf:error`，不会补发 `rf:success`
   :::
 
 ## 监听示例

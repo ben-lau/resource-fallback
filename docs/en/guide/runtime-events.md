@@ -12,7 +12,7 @@ resource-fallback exposes DOM CustomEvents and optional JS function hooks for mo
 | ------------- | ---------------------------------------------------- | ----------------------- |
 | `rf:retry`    | Same URL is retried                                  | `{ url, attempt }`      |
 | `rf:fallback` | Switched to next candidate URL                       | `{ from, to, reason? }` |
-| `rf:success`  | A recovered page-side session completes successfully | `{ url, attempts }`     |
+| `rf:success`  | Recovery succeeds after retry/fallback (page or SW)  | `{ url, attempts }`     |
 | `rf:error`    | A page-side session fails, or an SW error is bridged | `{ url, reason? }`      |
 
 ::: info Event sources
@@ -20,8 +20,8 @@ Page-side adapters (Observer, Vite, Webpack, SystemJS) hand failures to the Reco
 
 - For page Coordinator events, `ErrorEvent.reason` is an opaque `unknown` failure value from the transport/coordinator.
 - For SW-bridged events, `reason` may include resolver giveup reasons such as `'rules-exhausted'` or `'no-match'`.
-- Page `rf:success` is published only after a recovery session succeeds; it is not emitted for an initial first-try success.
-- SW `rf:success` is emitted only for a usable **network** response, including an initial successful fetch and a successful fallback-URL fetch. If the network chain is exhausted and a cached response is returned, the current implementation emits `rf:error` first and does not add an `rf:success` event.
+- Both the page and the SW emit `rf:success` only after retry/fallback recovery succeeds; an initial first-try success does not emit it.
+- SW recovery success events require a usable **network** response. If the network chain is exhausted and a cached response is returned, the current implementation emits `rf:error` first and does not add an `rf:success` event.
   :::
 
 ## DOM listener examples

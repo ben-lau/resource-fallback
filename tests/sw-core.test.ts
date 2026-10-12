@@ -101,25 +101,84 @@ describe('sw core', () => {
     ).toBe(false);
   });
 
+  it.each([
+    ['assets/logo.png', 'image'],
+    ['assets/font.woff2', 'font'],
+  ] as const)(
+    'does not emit recovery events for an initial %s success',
+    async (path, destination) => {
+      const events: string[] = [];
+
+      const response = await fetchWithFallback(requestLike(cdn + path, destination), {
+        manifest,
+        cache: { enabled: false, cacheOpaque: false },
+        fetcher: async () => new Response('initial-success', { status: 200 }),
+        emit: (type) => events.push(type),
+      });
+
+      expect(await response.text()).toBe('initial-success');
+      expect(events).toEqual([]);
+    },
+  );
+
+  it('emits one recovery success after a same-URL retry without caching the response', async () => {
+    const retryManifest: ResourceFallbackManifest = {
+      ...manifest,
+      rules: manifest.rules.map((rule) => ({ ...rule, retry: { ...rule.retry, max: 1 } })),
+    };
+    const requests: string[] = [];
+    const events: Array<{ type: string; event: unknown }> = [];
+    const caches = createMemoryCaches();
+
+    const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
+      manifest: retryManifest,
+      cache: { enabled: true, cacheOpaque: false },
+      caches,
+      fetcher: async (request) => {
+        requests.push(request.url);
+        if (requests.length === 1) throw new TypeError('network failed');
+        return new Response('retry-success', { status: 200 });
+      },
+      emit: (type, event) => events.push({ type, event }),
+    });
+
+    expect(await response.text()).toBe('retry-success');
+    expect(requests).toEqual([cdn + 'assets/logo.png', cdn + 'assets/logo.png']);
+    expect(events).toEqual([
+      { type: 'retry', event: { url: cdn + 'assets/logo.png', attempt: 1 } },
+      { type: 'success', event: { url: cdn + 'assets/logo.png', attempts: 2 } },
+    ]);
+    expect(caches.store.size).toBe(0);
+  });
+
   it('falls back over the network and caches only the fallback success response', async () => {
     const fetcher = vi.fn(async (request: Request) => {
       if (request.url.startsWith(origin)) return new Response('fallback', { status: 200 });
       throw new TypeError('network failed');
     });
     const caches = createMemoryCaches();
-    const events: string[] = [];
+    const events: Array<{ type: string; event: unknown }> = [];
 
     const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
       manifest,
       cache: { enabled: true, cacheOpaque: false },
       fetcher,
       caches,
-      emit: (type, event) => events.push(type + ':' + ('to' in event ? event.to : event.url)),
+      emit: (type, event) => events.push({ type, event }),
     });
 
     expect(await response.text()).toBe('fallback');
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(events).toContain('fallback:' + origin + 'assets/logo.png');
+    expect(events).toEqual([
+      {
+        type: 'fallback',
+        event: expect.objectContaining({
+          from: cdn + 'assets/logo.png',
+          to: origin + 'assets/logo.png',
+        }),
+      },
+      { type: 'success', event: { url: origin + 'assets/logo.png', attempts: 1 } },
+    ]);
     expect(await caches.store.get(cdn + 'assets/logo.png')?.text()).toBe('fallback');
   });
 
@@ -129,17 +188,19 @@ describe('sw core', () => {
     const fetcher = vi.fn(async () => {
       throw new TypeError('offline');
     });
+    const events: string[] = [];
 
     const response = await fetchWithFallback(requestLike(cdn + 'assets/logo.png', 'image'), {
       manifest,
       cache: { enabled: true, cacheOpaque: false },
       fetcher,
       caches,
-      emit: () => {},
+      emit: (type) => events.push(type),
     });
 
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(await response.text()).toBe('cached-fallback');
+    expect(events).toEqual(['fallback', 'error']);
   });
 
   it('keeps Request instances when cloning to fallback URLs', async () => {
@@ -325,6 +386,7 @@ describe('sw core', () => {
   it('cors upgrade: accepts opaque when CORS unavailable but server reachable', async () => {
     const opaque = new Response(null, { status: 200 });
     Object.defineProperty(opaque, 'type', { value: 'opaque' });
+    const events: string[] = [];
 
     const fetcher = createCorsUpgradeFetcher(
       async () => {
@@ -338,10 +400,11 @@ describe('sw core', () => {
       cache: { enabled: false, cacheOpaque: false },
       fallbackOnOpaque: false,
       fetcher,
-      emit: () => {},
+      emit: (type) => events.push(type),
     });
 
     expect(response.type).toBe('opaque');
+    expect(events).toEqual([]);
   });
 
   it('cors upgrade: falls back when both cors and no-cors fail (server unreachable)', async () => {

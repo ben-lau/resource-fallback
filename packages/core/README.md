@@ -134,12 +134,14 @@ interface RfGlobal {
 
 运行时在每个决策点分发 DOM `CustomEvent`：
 
-| 事件          | 触发时机                            | `event.detail`                                   |
-| ------------- | ----------------------------------- | ------------------------------------------------ |
-| `rf:retry`    | 同一 URL 重试                       | `{ url: string, attempt: number }`               |
-| `rf:fallback` | 切换到下一个候选 URL                | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success`  | 页面侧一次已恢复 session 成功       | `{ url: string, attempts: number }`              |
-| `rf:error`    | 页面侧 session 失败，或 SW 透传错误 | `{ url: string, reason?: unknown }`              |
+| 事件          | 触发时机                                 | `event.detail`                                   |
+| ------------- | ---------------------------------------- | ------------------------------------------------ |
+| `rf:retry`    | 同一 URL 重试                            | `{ url: string, attempt: number }`               |
+| `rf:fallback` | 切换到下一个候选 URL                     | `{ from: string, to: string, reason?: unknown }` |
+| `rf:success`  | 页面或 SW 经 retry / fallback 后恢复成功 | `{ url: string, attempts: number }`              |
+| `rf:error`    | 页面侧 session 失败，或 SW 透传错误      | `{ url: string, reason?: unknown }`              |
+
+页面侧和 SW 首轮直接成功都不会触发 `rf:success`。
 
 ## 导出
 

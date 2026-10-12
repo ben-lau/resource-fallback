@@ -184,7 +184,10 @@ export async function fetchWithFallback(
         isUsableNetworkResponse(response, currentRequest.url, options.fallbackOnOpaque === true)
       ) {
         resolver.recordSuccess(currentRequest.url);
-        options.emit('success', { url: currentRequest.url, attempts: attempt });
+        // Initial successful loads are not recoveries, matching the page coordinator.
+        if (attempt > 1 || usedFallback) {
+          options.emit('success', { url: currentRequest.url, attempts: attempt });
+        }
         if (usedFallback) await putFallbackCache(request, response, options);
         return response;
       }

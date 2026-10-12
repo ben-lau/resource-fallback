@@ -138,8 +138,10 @@ The runtime dispatches DOM `CustomEvent` at each decision point:
 | ------------- | ---------------------------------------------------- | ------------------------------------------------ |
 | `rf:retry`    | Same URL retried                                     | `{ url: string, attempt: number }`               |
 | `rf:fallback` | Switched to next candidate URL                       | `{ from: string, to: string, reason?: unknown }` |
-| `rf:success`  | A recovered page-side session succeeds               | `{ url: string, attempts: number }`              |
+| `rf:success`  | Recovery succeeds after retry/fallback (page or SW)  | `{ url: string, attempts: number }`              |
 | `rf:error`    | A page-side session fails, or an SW error is bridged | `{ url: string, reason?: unknown }`              |
+
+An initial first-try success does not emit `rf:success` on either the page or the SW.
 
 ## Exports
 
