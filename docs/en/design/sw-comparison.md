@@ -243,4 +243,4 @@ Not for less work — SW-first cannot cross first-control, SRI attrs, opaque res
 
 - [Hybrid Service Worker](../guide/service-worker.md)
 - [Configuration Reference](../guide/configuration.md)
-- [Case Studies](../experience/case-studies.md#410-hybrid-service-worker-images-fonts-css-subresources-sw-is-not-universal-onerror)
+- [Case Studies](../experience/case-studies.md#_4-10-hybrid-service-worker-images-fonts-css-subresources-—-sw-is-not-universal-onerror)

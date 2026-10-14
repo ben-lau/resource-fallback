@@ -20,6 +20,25 @@ export default withMermaid(
 
     markdown: {
       lineNumbers: true,
+      config(md) {
+        md.core.ruler.after('anchor', 'resource-fallback-api-anchor', (state) => {
+          if (!/(^|\/)api\/types\.md$/.test(state.env.relativePath ?? '')) return;
+
+          // TypeDoc links to a suffixed re-export anchor while VitePress uses the heading slug.
+          const index = state.tokens.findIndex(
+            (token) => token.attrGet('id') === 'htmltagattributes',
+          );
+          if (
+            index === -1 ||
+            state.tokens.some((token) => token.attrGet('id') === 'htmltagattributes-1')
+          )
+            return;
+
+          const alias = new state.Token('html_block', '', 0);
+          alias.content = '<span id="htmltagattributes-1" aria-hidden="true"></span>\n';
+          state.tokens.splice(index, 0, alias);
+        });
+      },
     },
 
     themeConfig: {
