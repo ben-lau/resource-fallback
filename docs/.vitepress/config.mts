@@ -44,7 +44,33 @@ export default withMermaid(
     themeConfig: {
       logo: '/logo.svg',
       socialLinks: [{ icon: 'github', link: 'https://github.com/ben-lau/resource-fallback' }],
-      search: { provider: 'local' },
+      search: {
+        provider: 'local',
+        options: {
+          locales: {
+            root: {
+              translations: {
+                button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+                modal: {
+                  displayDetails: '显示详情',
+                  resetButtonTitle: '清除搜索',
+                  backButtonTitle: '返回',
+                  noResultsText: '没有找到结果',
+                  footer: {
+                    selectText: '打开',
+                    selectKeyAriaLabel: '回车键',
+                    navigateText: '切换结果',
+                    navigateUpKeyAriaLabel: '向上键',
+                    navigateDownKeyAriaLabel: '向下键',
+                    closeText: '关闭',
+                    closeKeyAriaLabel: 'Esc 键',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       editLink: {
         pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
       },
@@ -65,7 +91,7 @@ export default withMermaid(
           },
           docFooter: { prev: '上一篇', next: '下一篇' },
           returnToTopLabel: '返回顶部',
-          sidebarMenuLabel: '菜单',
+          sidebarMenuLabel: '文档目录',
           darkModeSwitchLabel: '外观',
           langMenuLabel: '切换语言',
         },
