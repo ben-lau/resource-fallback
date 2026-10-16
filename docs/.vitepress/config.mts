@@ -5,7 +5,7 @@ export default withMermaid(
   defineConfig({
     base: '/resource-fallback/',
     title: 'Resource Fallback',
-    description: '零心智负担的前端资源回退方案',
+    description: '为 Vite 和 Webpack 构建产物提供运行时重试、多 CDN 回退和回源。',
 
     head: [['link', { rel: 'icon', href: '/resource-fallback/logo.svg' }]],
 
@@ -99,7 +99,8 @@ export default withMermaid(
       en: {
         label: 'English',
         lang: 'en-US',
-        description: 'Zero-intrusion frontend resource fallback for Webpack & Vite',
+        description:
+          'Runtime retries, CDN fallback, and origin recovery for Vite and Webpack builds.',
         themeConfig: {
           nav: enNav(),
           sidebar: enSidebar(),
@@ -149,7 +150,7 @@ function enNav() {
         { text: 'SW Design', link: '/en/design/sw-comparison' },
       ],
     },
-    { text: 'API (中文)', link: '/api/', activeMatch: '/api/' },
+    { text: 'API', link: '/en/api/', activeMatch: '/en/api/' },
     { text: 'Changelog', link: '/en/changelog' },
   ];
 }
@@ -158,11 +159,10 @@ function zhSidebar() {
   return {
     '/guide/': [
       {
-        text: '开始',
+        text: '开始使用',
         items: [
           { text: '简介', link: '/guide/introduction' },
           { text: '快速开始', link: '/guide/quick-start' },
-          { text: '配置参考', link: '/guide/configuration' },
         ],
       },
       {
@@ -170,11 +170,12 @@ function zhSidebar() {
         items: [
           { text: 'Vite', link: '/guide/vite' },
           { text: 'Webpack', link: '/guide/webpack' },
+          { text: '配置参考', link: '/guide/configuration' },
           { text: 'Hybrid Service Worker', link: '/guide/service-worker' },
         ],
       },
       {
-        text: '进阶',
+        text: '上线与排查',
         items: [
           { text: '运行时事件', link: '/guide/runtime-events' },
           { text: 'CSP 与 SRI', link: '/guide/csp-sri' },
@@ -201,7 +202,7 @@ function zhSidebar() {
         items: [{ text: 'SW 资源回退对比', link: '/design/sw-comparison' }],
       },
     ],
-    '/api/': apiSidebar(),
+    '/api/': apiSidebar('zh'),
   };
 }
 
@@ -213,7 +214,6 @@ function enSidebar() {
         items: [
           { text: 'Introduction', link: '/en/guide/introduction' },
           { text: 'Quick Start', link: '/en/guide/quick-start' },
-          { text: 'Configuration', link: '/en/guide/configuration' },
         ],
       },
       {
@@ -221,11 +221,12 @@ function enSidebar() {
         items: [
           { text: 'Vite', link: '/en/guide/vite' },
           { text: 'Webpack', link: '/en/guide/webpack' },
+          { text: 'Configuration', link: '/en/guide/configuration' },
           { text: 'Hybrid Service Worker', link: '/en/guide/service-worker' },
         ],
       },
       {
-        text: 'Advanced',
+        text: 'Production',
         items: [
           { text: 'Runtime Events', link: '/en/guide/runtime-events' },
           { text: 'CSP & SRI', link: '/en/guide/csp-sri' },
@@ -252,19 +253,20 @@ function enSidebar() {
         items: [{ text: 'SW Fallback Comparison', link: '/en/design/sw-comparison' }],
       },
     ],
-    '/api/': apiSidebar(),
+    '/en/api/': apiSidebar('en'),
   };
 }
 
-function apiSidebar() {
+function apiSidebar(locale: 'zh' | 'en') {
+  const root = locale === 'en' ? '/en/api/' : '/api/';
   return [
     {
-      text: 'API Reference',
+      text: locale === 'en' ? 'API Reference' : 'API 参考',
       items: [
-        { text: 'Overview', link: '/api/' },
-        { text: 'Functions & Helpers', link: '/api/index' },
-        { text: 'Types & Interfaces', link: '/api/types' },
-        { text: 'Service Worker', link: '/api/service-worker' },
+        { text: locale === 'en' ? 'Overview' : '概览', link: root + 'README' },
+        { text: locale === 'en' ? 'Functions & Helpers' : '函数与工具', link: root },
+        { text: locale === 'en' ? 'Types & Interfaces' : '类型与接口', link: root + 'types' },
+        { text: 'Service Worker', link: root + 'service-worker' },
       ],
     },
   ];
