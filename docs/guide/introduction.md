@@ -4,17 +4,17 @@ title: 简介
 
 # 简介
 
+Resource Fallback 为 Vite 和 Webpack 构建的 JavaScript 和 CSS 资源提供运行时恢复。加载失败时，它先重试原地址，再按配置切换 CDN，最后可以回到页面源站。
+
 ## 什么是 resource-fallback
 
-**resource-fallback** 是一个零心智负担的前端资源回退方案。它为 Webpack 与 Vite 构建产物（同步 / 异步 JS、CSS）提供运行时 **重试 → 多 CDN 回退 → 回源** 能力，业务代码无需任何改动。
+在构建配置中注册插件，插件会注入运行时。React.lazy、Vue 异步组件和懒加载路由可以沿用现有写法。需要恢复图片、字体等子资源时，可以启用 [Hybrid Service Worker](./service-worker.md)。
 
-项目包含三个 npm 包：
-
-| 包                                  | 说明                                 |
-| ----------------------------------- | ------------------------------------ |
-| `@resource-fallback/core`           | 浏览器 IIFE 运行时 + Node 端工具函数 |
-| `@resource-fallback/vite-plugin`    | Vite 4+ 插件                         |
-| `@resource-fallback/webpack-plugin` | Webpack 5+ 插件                      |
+| 资源                                       | 恢复链路                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| 入口脚本、静态或动态注入的样式表           | 页面侧 Observer 监听对应标签的加载错误                                              |
+| 动态加载的 JS chunk                        | Vite 或 Webpack 适配器接入各自的加载链路                                            |
+| 图片、字体、媒体和符合条件的 CSS `@import` | 可选的 Hybrid Service Worker，详见[覆盖范围](./service-worker.md#同步-异步覆盖矩阵) |
 
 ## 为什么需要资源回退
 

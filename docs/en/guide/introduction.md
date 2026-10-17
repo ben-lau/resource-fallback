@@ -4,17 +4,17 @@ title: Introduction
 
 # Introduction
 
+Resource Fallback recovers JavaScript and CSS assets built with Vite or Webpack. After a load fails, it retries the original URL, follows the configured CDN order, and can fall back to the page origin.
+
 ## What is resource-fallback
 
-**resource-fallback** is a zero-mental-overhead frontend resource fallback solution. It provides runtime **retry → multi-CDN fallback → origin** capabilities for Webpack and Vite build outputs (sync / async JS, CSS) — no changes to business code required.
+Register the plugin in your build configuration to inject the runtime. Keep your existing React.lazy calls, Vue async components, and lazy-loaded routes. For images, fonts, and other subresources, enable [Hybrid Service Worker](./service-worker.md).
 
-The project ships three npm packages:
-
-| Package                             | Description                                   |
-| ----------------------------------- | --------------------------------------------- |
-| `@resource-fallback/core`           | Browser IIFE runtime + Node utility functions |
-| `@resource-fallback/vite-plugin`    | Vite 4+ plugin                                |
-| `@resource-fallback/webpack-plugin` | Webpack 5+ plugin                             |
+| Asset                                                        | Recovery path                                                                                 |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Entry scripts and static or dynamically inserted stylesheets | The page observer listens for load errors on the relevant elements                            |
+| Dynamically loaded JS chunks                                 | The Vite or Webpack adapter integrates with its bundler's loader                              |
+| Images, fonts, media, and eligible CSS `@import`             | Optional Hybrid Service Worker. See [resource ownership](./service-worker.md#ownership-model) |
 
 ## Why resource fallback matters
 
