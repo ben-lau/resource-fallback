@@ -4,6 +4,8 @@ title: 快速开始
 
 # 快速开始
 
+选择你的构建工具，配置资源 URL 的匹配前缀与候选地址，然后用生产构建验证一次 CDN 故障。
+
 ## 安装
 
 ::: code-group
@@ -85,15 +87,35 @@ module.exports = {
 
 ## 验证
 
-构建并预览后，打开 DevTools → Network 可观察完整的 **重试 → 回退 → 回源** 链路。
+### 预期的请求顺序
 
-监听 `rf:retry` 事件确认运行时已生效：
+假设页面位于 `https://app.example.com/`，要加载的文件是 `assets/app.js`。按上方配置，资源路径在各地址间保持一致。没有熔断且前面的地址持续失败时，浏览器会依次尝试下表中的 URL。
 
-```ts
-window.addEventListener('rf:retry', (e) => {
-  console.log('重试:', (e as CustomEvent).detail);
-});
+| 地址              | 请求 URL                                   |
+| ----------------- | ------------------------------------------ |
+| 主 CDN            | `https://cdn1.example.com/assets/app.js`   |
+| 备用 CDN          | `https://cdn2.example.com/assets/app.js`   |
+| 自建静态源        | `https://backup.example.com/assets/app.js` |
+| 页面源站（`'/'`） | `https://app.example.com/assets/app.js`    |
+
+将同一份构建产物部署到各地址对应的路径。配置中的 `'/'` 指页面源站的根路径。如果产物发布在 `/app/` 下，就把对应候选写成 `'/app/'`。
+
+### 模拟 CDN 故障
+
+1. 预览生产构建。Vite 可运行 `pnpm exec vite build` 和 `pnpm exec vite preview`。Webpack 可运行 `pnpm exec webpack --mode production`，再用静态服务器提供构建输出。
+2. 在 DevTools 的 Network 面板关闭缓存，并屏蔽待测资源在主 CDN 上的请求。只屏蔽一个懒加载 chunk，便于应用启动后反复验证。重试可能附加查询参数，屏蔽规则要覆盖这些请求。
+3. 在触发懒加载前注册下方监听器。触发后，查看同一个资源的 `rf:retry`、`rf:fallback` 和 `rf:success`，并核对 Network 中成功请求的主机。
+4. 在新的浏览器会话中屏蔽同一资源的所有 CDN 候选，验证回源。再屏蔽源站，核对候选耗尽时的 `rf:error`，以及应用的降级界面。
+
+```js
+for (const name of ['rf:retry', 'rf:fallback', 'rf:success', 'rf:error']) {
+  window.addEventListener(name, (event) => {
+    console.log(name, event.detail);
+  });
+}
 ```
+
+如果测试的是入口脚本，在页面触发首次加载前注册监听器。参见[入口失败降级 UI](./runtime-events.md#入口失败降级-ui)。
 
 ### Demo 项目
 

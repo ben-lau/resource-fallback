@@ -4,6 +4,8 @@ title: Quick Start
 
 # Quick Start
 
+Choose your build tool, configure the asset prefix and fallback destinations, then verify a CDN failure against a production build.
+
 ## Installation
 
 ::: code-group
@@ -85,15 +87,35 @@ module.exports = {
 
 ## Verification
 
-After building and previewing, open DevTools → Network to observe the full **retry → fallback → origin** chain.
+### Expected request order
 
-Listen for `rf:retry` to confirm the runtime is active:
+Suppose `https://app.example.com/` loads `assets/app.js`. With the config above, each fallback keeps the asset path. With closed circuits and each preceding address still failing, the browser tries these URLs in order.
 
-```ts
-window.addEventListener('rf:retry', (e) => {
-  console.log('Retry:', (e as CustomEvent).detail);
-});
+| Destination               | Request URL                                |
+| ------------------------- | ------------------------------------------ |
+| Primary CDN               | `https://cdn1.example.com/assets/app.js`   |
+| Backup CDN                | `https://cdn2.example.com/assets/app.js`   |
+| Self-hosted static server | `https://backup.example.com/assets/app.js` |
+| Page origin (`'/'`)       | `https://app.example.com/assets/app.js`    |
+
+Deploy the same build output to the corresponding paths at every destination. The `'/'` prefix resolves at the root of the page origin. Use `'/app/'` when the build is served under that path.
+
+### Simulate a CDN failure
+
+1. Preview the production build. For Vite, run `pnpm exec vite build` and `pnpm exec vite preview`. For Webpack, run `pnpm exec webpack --mode production` and serve the build output with a static server.
+2. Disable caching in the DevTools Network panel and block the primary CDN request for one lazy-loaded chunk. The app can still start while you test that chunk. Match requests with query parameters too, since retries may add one.
+3. Register the listeners below before triggering the lazy load. Check for `rf:retry`, `rf:fallback`, and `rf:success` for the same asset, then confirm the successful request's host in Network.
+4. In a fresh browser session, block that asset at every CDN to verify origin recovery. Block the origin too and check for `rf:error` and your application's fallback UI.
+
+```js
+for (const name of ['rf:retry', 'rf:fallback', 'rf:success', 'rf:error']) {
+  window.addEventListener(name, (event) => {
+    console.log(name, event.detail);
+  });
+}
 ```
+
+To test an entry script, register the listener before the page first requests the asset. See [fallback UI for entry failures](./runtime-events.md).
 
 ### Demo projects
 
