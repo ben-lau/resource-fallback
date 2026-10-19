@@ -1,0 +1,199 @@
+:root {
+  --vp-font-family-base: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --vp-sidebar-width: 256px;
+
+  --vp-c-bg: #f5f8f4;
+  --vp-c-bg-alt: #edf3ed;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #e8f0e9;
+  --vp-c-text-1: #102d29;
+  --vp-c-text-2: #3b5650;
+  --vp-c-text-3: #526c65;
+  --vp-c-divider: #d7e3da;
+  --vp-c-gutter: var(--vp-c-divider);
+  --vp-c-brand-1: #17604c;
+  --vp-c-brand-2: #14533f;
+  --vp-c-brand-3: #114b3a;
+  --vp-c-brand-soft: #dceee3;
+  --vp-c-tip-1: var(--vp-c-brand-1);
+  --vp-c-tip-soft: var(--vp-c-brand-soft);
+  --vp-c-note-1: var(--vp-c-brand-1);
+  --vp-c-note-soft: var(--vp-c-brand-soft);
+  --vp-code-block-bg: #eaf1eb;
+  --vp-local-search-highlight-bg: var(--vp-c-brand-soft);
+  --vp-local-search-highlight-text: var(--vp-c-text-1);
+
+  --rf-gutter: clamp(1.25rem, 5.05vw, 5rem);
+  --rf-measure: 89.125rem;
+  --rf-route: #a8d8c1;
+  --rf-console: #10352e;
+  --rf-console-layer: #244d43;
+  --rf-console-text: #f1faf3;
+  --rf-console-muted: #bbd5c8;
+  --rf-console-accent: #a5ebc3;
+  --rf-console-idle: #77988c;
+  --rf-action-ink: #ffffff;
+  --rf-stage-match: #e0f1e7;
+  --rf-stage-retry: #d2ebdd;
+  --rf-stage-switch: #c4e4d4;
+  --rf-stage-result: #b4ddc8;
+}
+
+.dark {
+  --vp-c-bg: #101e1b;
+  --vp-c-bg-alt: #142622;
+  --vp-c-bg-elv: #1d332d;
+  --vp-c-bg-soft: #1b302a;
+  --vp-c-text-1: #ebf7ee;
+  --vp-c-text-2: #c3d8cb;
+  --vp-c-text-3: #a5bfb0;
+  --vp-c-divider: #2e4940;
+  --vp-c-brand-1: #a5e8c2;
+  --vp-c-brand-2: #b8efd0;
+  --vp-c-brand-3: #cbf5dd;
+  --vp-c-brand-soft: #24493a;
+  --vp-code-block-bg: #172b25;
+
+  --rf-route: #28634f;
+  --rf-console: #193b32;
+  --rf-console-layer: #284e42;
+  --rf-action-ink: #102d29;
+  --rf-stage-match: #1b302a;
+  --rf-stage-retry: #1d392f;
+  --rf-stage-switch: #214337;
+  --rf-stage-result: #264d3e;
+}
+
+/* Match the home header to the content grid while keeping the documentation shell. */
+.Layout:has(.rf-home) .VPNavBar .wrapper {
+  padding-inline: var(--rf-gutter);
+}
+
+.Layout:has(.rf-home) .VPNavBar .container {
+  max-width: var(--rf-measure);
+}
+
+.Layout:has(.rf-home) .VPNavBar .title .logo {
+  width: 2rem;
+  height: 2rem;
+}
+
+.Layout:has(.rf-home) .VPNavBar .divider {
+  display: none;
+}
+
+.VPContent.is-home .VPHome:has(.rf-home) {
+  margin-bottom: 0;
+}
+
+.VPNavBar .content-body,
+.VPNavBar.home {
+  background-color: var(--vp-c-bg);
+}
+
+.VPFlyout:not(:hover) > .button[aria-expanded='false'] + .menu {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .VPNavBar.home .VPNavBarSearch .DocSearch-Button {
+    min-width: clamp(12rem, 20vw, 20rem);
+    justify-content: space-between;
+  }
+}
+
+.VPSidebarItem.level-0 > .item .text {
+  color: var(--vp-c-text-1);
+  font-weight: 700;
+}
+
+.VPSidebarItem.is-link > .item .link {
+  border-radius: 4px;
+  padding-inline: 10px;
+}
+
+.VPSidebarItem.is-link > .item .link:hover,
+.VPSidebarItem.is-active > .item .link {
+  background: var(--vp-c-brand-soft);
+}
+
+.VPDoc .content-container .vp-doc {
+  font-size: 1rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.vp-doc h1 {
+  font-size: clamp(2.125rem, 4vw, 3.25rem);
+  line-height: 1.13;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.vp-doc h1 + p {
+  margin-top: 24px;
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.vp-doc h2 {
+  margin: 48px 0 16px;
+  padding-top: 0;
+  border-top: 0;
+  font-size: clamp(1.5rem, 2.3vw, 1.875rem);
+  line-height: 1.28;
+}
+
+.vp-doc h3 {
+  margin-top: 28px;
+  line-height: 1.35;
+}
+
+.vp-doc p,
+.vp-doc li {
+  line-height: inherit;
+}
+
+.vp-doc th {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-1);
+  text-align: start;
+}
+
+.vp-doc td,
+.vp-doc th {
+  min-width: 6.5em;
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.vp-doc td:first-child code {
+  white-space: nowrap;
+}
+
+.vp-doc [class*='language-'] pre {
+  line-height: 1.65;
+}
+
+.vp-doc .custom-block {
+  padding: 16px 20px;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+.vp-doc .custom-block p {
+  line-height: inherit;
+}
+
+.VPDocAsideOutline .outline-link {
+  font-size: 0.875rem;
+}
+
+.VPDocFooter .pager-link {
+  background: var(--vp-c-bg-alt);
+}
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}

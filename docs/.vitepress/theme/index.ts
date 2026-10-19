@@ -1,4 +1,4 @@
 import DefaultTheme from 'vitepress/theme';
-import './morandi.css';
+import './theme.css';
 
 export default DefaultTheme;

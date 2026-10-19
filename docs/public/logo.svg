@@ -1,12 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6B7B8D"/>
-      <stop offset="100%" stop-color="#8B7355"/>
-    </linearGradient>
-  </defs>
-
-  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="26" fill="#17604c"/>
 
   <!-- R -->
   <path d="
@@ -21,6 +14,6 @@
 
   <!-- fallback arrow: curves from R's leg back under to suggest retry/fallback -->
   <path d="M68 78 c6 4 10 6 14 6 h12 c6 0 10-3 10-8 v-6"
-        stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>
-  <path d="M100 74 l4-7 4 7" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+        stroke="#a5ebc3" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M100 74 l4-7 4 7" stroke="#a5ebc3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
