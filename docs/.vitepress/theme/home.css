@@ -44,12 +44,12 @@
 
 .rf-home:lang(en) .rf-hero h1 {
   font-size: clamp(3rem, 5.65vw, 5.625rem);
-  letter-spacing: -0.06em;
+  letter-spacing: -0.045em;
   line-height: 1.02;
 }
 
 .rf-hero-copy > p {
-  max-width: 29em;
+  max-width: 26em;
   margin-top: clamp(24px, 2.65vw, 42px);
   font-size: clamp(1.125rem, 1.45vw, 1.375rem);
   line-height: 1.65;
@@ -59,13 +59,14 @@
 .rf-action {
   display: inline-flex;
   align-items: center;
-  gap: 18px;
-  min-height: 54px;
+  justify-content: space-between;
+  gap: clamp(18px, 1.9vw, 30px);
+  min-height: clamp(54px, 4.05vw, 64px);
   margin-top: clamp(24px, 2.65vw, 42px);
-  padding: 10px 24px;
+  padding: 10px clamp(24px, 2.15vw, 34px);
   background: var(--vp-c-brand-1);
   color: var(--rf-action-ink);
-  font-size: 1.125rem;
+  font-size: clamp(1.125rem, 1.45vw, 1.375rem);
   font-weight: 650;
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
 }

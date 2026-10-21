@@ -98,7 +98,7 @@ onMounted(() => {
   gap: 14px;
   min-block-size: 25rem;
   margin: 0;
-  padding: clamp(20px, 2.55vw, 40px);
+  padding: clamp(20px, 2.3vw, 36px) clamp(20px, 2.55vw, 40px);
   background: var(--rf-console);
   color: var(--rf-console-text);
   clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
@@ -123,7 +123,7 @@ onMounted(() => {
 
 .trace-heading > span {
   color: var(--rf-console-muted);
-  font-size: 0.875rem;
+  font-size: clamp(0.875rem, 1.1vw, 1rem);
 }
 
 .trace-request {
@@ -190,6 +190,7 @@ onMounted(() => {
 }
 
 .trace-destination strong {
+  font-size: clamp(1rem, 1.28vw, 1.25rem);
   font-weight: 650;
 }
 
@@ -200,6 +201,7 @@ onMounted(() => {
 }
 
 .trace-state {
+  font-size: clamp(0.875rem, 1.1vw, 1rem);
   text-align: end;
 }
 
@@ -238,12 +240,13 @@ onMounted(() => {
   place-items: center;
   height: 100%;
   min-height: 44px;
-  padding: 5px;
+  padding: 5px 2px;
   background: var(--rf-console-layer);
-  font-size: clamp(0.8125rem, 1vw, 0.9375rem);
+  font-size: clamp(0.8125rem, 1.1vw, 1rem);
   font-weight: 600;
   line-height: 1.3;
   text-align: center;
+  text-wrap: balance;
 }
 
 .trace-option input:checked + span {
