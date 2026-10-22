@@ -45,7 +45,7 @@ window.addEventListener('rf:fallback', (e) => {
 
 window.addEventListener('rf:success', (e) => {
   console.log('成功:', (e as CustomEvent).detail);
-  // { url: 'https://cdn2.example.com/assets/app.js', attempts: 2 }
+  // { url: 'https://cdn2.example.com/assets/app.js', attempts: 3 }
 });
 
 window.addEventListener('rf:error', (e) => {
@@ -56,19 +56,26 @@ window.addEventListener('rf:error', (e) => {
 
 ### 入口失败降级 UI
 
-`rf:error` 不只可能来自入口 bundle；它也可能发生在页面已启动后的其他资源，或来自 SW 透传。因此不要对每个 `rf:error` 都直接替换整个页面。若你只想处理入口失败，请按**已知入口资源 URL**过滤，并在应用成功启动后移除这个监听：
+页面侧 `rf:error.detail.url` 是恢复终止时的当前地址。给入口脚本做降级时，将构建产物对应的主 CDN、备用 CDN 和回源 URL 都纳入匹配。下面的监听只处理同一入口脚本，应用启动后可以移除。
 
 ```html
 <p id="rf-entry-fallback" hidden>资源加载失败，请刷新页面</p>
 <script>
   (function () {
-    var expectedEntry = 'https://cdn.example.com/assets/main.js';
+    const entryUrls = new Set(
+      [
+        'https://cdn1.example.com/assets/main.js',
+        'https://cdn2.example.com/assets/main.js',
+        '/assets/main.js',
+      ].map((url) => new URL(url, window.location.href).href),
+    );
 
     function onRfError(event) {
-      var detail = event.detail || {};
-      if (detail.url !== expectedEntry) return;
+      const url = event.detail?.url;
+      if (typeof url !== 'string' || !entryUrls.has(new URL(url, window.location.href).href))
+        return;
 
-      var fallback = document.getElementById('rf-entry-fallback');
+      const fallback = document.getElementById('rf-entry-fallback');
       if (fallback) fallback.hidden = false;
     }
 
@@ -80,7 +87,7 @@ window.addEventListener('rf:error', (e) => {
 </script>
 ```
 
-这个入口兜底建议保持**通用终态 UI**：页面侧 `rf:error.detail.reason` 不应被当成稳定 reason 枚举；如果你只想判断“是否真的进入过回退链”，请改看 `rf:retry` / `rf:fallback`。
+将示例路径替换为实际发布的入口文件名（包括构建哈希），并在入口加载前注册监听。入口兜底使用通用失败文案。判断请求是否进入过回退链时，观察 `rf:retry` 和 `rf:fallback`。
 
 ## 与监控系统对接
 

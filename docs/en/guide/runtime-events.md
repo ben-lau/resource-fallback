@@ -54,19 +54,26 @@ window.addEventListener('rf:error', (e) => {
 
 ### Degraded UI for entry failures
 
-`rf:error` is not entry-only; it can also fire for later page resources or for SW-bridged failures. So do not replace the whole page for every `rf:error`. If you only want entry failure UI, filter by the **known entry resource URL** and remove the listener after the app boots:
+For page-side recovery, `rf:error.detail.url` is the current destination when the session ends. Include the primary, backup, and origin URLs for the entry asset. This listener handles that entry and can be removed after the app boots.
 
 ```html
 <p id="rf-entry-fallback" hidden>Resources failed to load. Please refresh.</p>
 <script>
   (function () {
-    var expectedEntry = 'https://cdn.example.com/assets/main.js';
+    const entryUrls = new Set(
+      [
+        'https://cdn1.example.com/assets/main.js',
+        'https://cdn2.example.com/assets/main.js',
+        '/assets/main.js',
+      ].map((url) => new URL(url, window.location.href).href),
+    );
 
     function onRfError(event) {
-      var detail = event.detail || {};
-      if (detail.url !== expectedEntry) return;
+      const url = event.detail?.url;
+      if (typeof url !== 'string' || !entryUrls.has(new URL(url, window.location.href).href))
+        return;
 
-      var fallback = document.getElementById('rf-entry-fallback');
+      const fallback = document.getElementById('rf-entry-fallback');
       if (fallback) fallback.hidden = false;
     }
 
@@ -78,7 +85,7 @@ window.addEventListener('rf:error', (e) => {
 </script>
 ```
 
-Keep this entry fallback generic. Page-side `rf:error.detail.reason` is not a stable reason-string contract; if you need proof that fallback actually ran, watch `rf:retry` / `rf:fallback` separately.
+Use the deployed entry filename, including its build hash, and register the listener before the browser requests the entry. Keep the entry fallback message generic. Watch `rf:retry` and `rf:fallback` to confirm recovery ran.
 
 ### Detect whether fallback actually ran
 
