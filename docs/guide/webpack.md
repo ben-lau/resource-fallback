@@ -180,29 +180,7 @@ class ChunkErrorBoundary extends React.Component<
 
 ### 入口脚本兜底
 
-入口脚本（entry bundle）如果所有 fallback 都失败，React/Vue 不会初始化，页面白屏。但 `rf:error` 也可能在页面启动后因其他资源或 SW 透传而触发，所以不要对每个 `rf:error` 都直接替换整个页面。建议在 `index.html` 中添加**只匹配入口资源**的内联监听，并在应用启动后移除它：
-
-```html
-<p id="rf-entry-fallback" hidden>资源加载失败，请刷新页面</p>
-<script>
-  (function () {
-    var expectedEntry = 'https://cdn.example.com/assets/main.js';
-
-    function onRfError(event) {
-      var detail = event.detail || {};
-      if (detail.url !== expectedEntry) return;
-
-      var fallback = document.getElementById('rf-entry-fallback');
-      if (fallback) fallback.hidden = false;
-    }
-
-    window.addEventListener('rf:error', onRfError);
-
-    // 应用成功启动后请在入口代码里执行：
-    // window.removeEventListener('rf:error', onRfError);
-  })();
-</script>
-```
+入口脚本耗尽所有候选时，React 或 Vue 还没启动。可在 `index.html` 中注册[入口失败监听](./runtime-events.md#入口失败降级-ui)，按入口的完整候选 URL 显示降级文案，并在应用启动后移除监听。
 
 ### dispose 清理
 

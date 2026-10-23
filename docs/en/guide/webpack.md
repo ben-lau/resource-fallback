@@ -205,29 +205,7 @@ class ChunkErrorBoundary extends React.Component<
 
 ### Entry script fallback
 
-If the entry bundle exhausts all fallbacks, React/Vue never initializes. But `rf:error` can also happen after boot for later resources or for SW-bridged failures, so do not replace the whole page for every `rf:error`. Add an inline listener in `index.html` that filters to the **known entry resource**, then remove it after the app boots:
-
-```html
-<p id="rf-entry-fallback" hidden>Resource load failed. Please refresh the page.</p>
-<script>
-  (function () {
-    var expectedEntry = 'https://cdn.example.com/assets/main.js';
-
-    function onRfError(event) {
-      var detail = event.detail || {};
-      if (detail.url !== expectedEntry) return;
-
-      var fallback = document.getElementById('rf-entry-fallback');
-      if (fallback) fallback.hidden = false;
-    }
-
-    window.addEventListener('rf:error', onRfError);
-
-    // Remove this from your app entry after successful boot:
-    // window.removeEventListener('rf:error', onRfError);
-  })();
-</script>
-```
+If the entry bundle exhausts all candidates, React or Vue has yet to boot. Register the [entry failure listener](./runtime-events.md#degraded-ui-for-entry-failures) in `index.html`, match the entry's full set of candidate URLs, and remove the listener after a successful boot.
 
 ### dispose cleanup
 
