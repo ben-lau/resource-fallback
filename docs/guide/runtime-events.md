@@ -185,6 +185,8 @@ localStorage.__RF_DEBUG__ = '1';
 
 ## 相关文档
 
+- [故障排查](./troubleshooting.md#terminal-result) — 区分终态失败与缓存恢复
+
 - [快速开始 — 验证](./quick-start.md#验证)
 - [最佳实践 — 线上监控](./best-practices.md#线上监控)
 - [CSP 与 SRI — externalRuntime](./csp-sri.md)

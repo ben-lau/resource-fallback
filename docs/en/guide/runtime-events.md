@@ -182,6 +182,8 @@ location.reload();
 
 ## Related docs
 
+- [Troubleshooting](./troubleshooting.md#terminal-result) — distinguish terminal failure from cache recovery
+
 - [Best Practices](./best-practices.md)
 - [CSP & SRI](./csp-sri.md)
 - [Configuration Reference](./configuration.md)

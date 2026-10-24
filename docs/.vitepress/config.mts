@@ -177,6 +177,7 @@ function zhSidebar() {
       {
         text: '上线与排查',
         items: [
+          { text: '故障排查', link: '/guide/troubleshooting' },
           { text: '运行时事件', link: '/guide/runtime-events' },
           { text: 'CSP 与 SRI', link: '/guide/csp-sri' },
           { text: '最佳实践', link: '/guide/best-practices' },
@@ -228,6 +229,7 @@ function enSidebar() {
       {
         text: 'Production',
         items: [
+          { text: 'Troubleshooting', link: '/en/guide/troubleshooting' },
           { text: 'Runtime Events', link: '/en/guide/runtime-events' },
           { text: 'CSP & SRI', link: '/en/guide/csp-sri' },
           { text: 'Best Practices', link: '/en/guide/best-practices' },
