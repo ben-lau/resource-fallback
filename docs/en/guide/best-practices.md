@@ -153,6 +153,8 @@ Hybrid SW does not take over scripts and does not guarantee strict ordering for 
 
 ## Related docs
 
+- [Troubleshooting](./troubleshooting.md) — diagnose failures and verify recovery before release
+
 - [Quick Start](./quick-start.md)
 - [Configuration Reference](./configuration.md)
 - [Dev Experience: Principles](../experience/principles.md)

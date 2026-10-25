@@ -1,5 +1,6 @@
 ---
 title: Quick Start
+outline: [2, 3]
 ---
 
 # Quick Start
@@ -148,6 +149,7 @@ The plugin is inactive in dev by default (`enableDev: false`). Use `vite build &
 
 ## Next steps
 
+- [Troubleshooting](./troubleshooting.md) — diagnose a failure with Network and recovery events
 - [Configuration Reference](./configuration.md) — full options
 - [Runtime Events](./runtime-events.md) — event listening and monitoring
 - [Best Practices](./best-practices.md) — production recommendations

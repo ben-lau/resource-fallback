@@ -1,5 +1,6 @@
 ---
 title: 快速开始
+outline: [2, 3]
 ---
 
 # 快速开始
@@ -148,6 +149,7 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 
 ## 下一步
 
+- [故障排查](./troubleshooting.md) — 从 Network 与事件定位失败环节
 - [配置参考](./configuration.md) — 完整配置选项
 - [运行时事件](./runtime-events.md) — 事件监听与监控对接
 - [最佳实践](./best-practices.md) — 生产环境建议

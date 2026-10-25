@@ -173,10 +173,12 @@ resourceFallback({
 
 ## React / Vue 异步组件
 
-- **React**：`React.lazy()` 失败时 `<Suspense>` 不处理错误，需包裹 `ErrorBoundary`（参见 [Webpack 集成](./webpack.md#react-lazy-错误处理)）
+- **React**：`React.lazy()` 失败时由 `ErrorBoundary` 处理，可将它包在 `<Suspense>` 外层。参见 [Webpack 集成](./webpack.md#react-lazy-错误处理)。
 - **Vue**：`defineAsyncComponent` 和 Vue Router 懒加载无需改动，插件自动拦截 chunk 加载失败
 
 ## 相关文档
+
+- [故障排查](./troubleshooting.md) — 按现象定位失败，并做上线验证
 
 - [快速开始](./quick-start.md)
 - [配置参考](./configuration.md)
