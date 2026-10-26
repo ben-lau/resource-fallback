@@ -1,0 +1,354 @@
+.rf-trace {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-block-size: 26rem;
+  margin: 0;
+  padding: clamp(16px, 1.8vw, 29px) clamp(16px, 2.15vw, 34px);
+  background: var(--rf-console);
+  color: var(--rf-console-text);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+
+.rf-trace code {
+  font-family: var(--vp-font-family-mono);
+}
+
+.trace-heading,
+.trace-request {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trace-heading h2 {
+  font-size: clamp(1.25rem, 1.95vw, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.trace-play {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-inline-size: 7.25rem;
+  min-block-size: 44px;
+  padding-inline: 10px;
+  background: var(--rf-console-accent);
+  color: var(--rf-console);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.trace-play:hover {
+  background: var(--rf-console-text);
+}
+
+.trace-request {
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--rf-console-layer);
+  line-height: 1.45;
+}
+
+.trace-request code {
+  font-size: clamp(0.875rem, 1.22vw, 1.125rem);
+}
+
+.trace-request span {
+  color: var(--rf-console-muted);
+  font-size: 0.8125rem;
+}
+
+.trace-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.trace-option {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.trace-option input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.trace-option span {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 44px;
+  padding: 4px 3px;
+  border-bottom: 2px solid transparent;
+  background: var(--rf-console-layer);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.trace-option input:checked + span {
+  border-bottom-color: var(--rf-console-accent);
+  color: var(--rf-console-accent);
+}
+
+.trace-option input:hover + span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.trace-play:focus-visible,
+.trace-option input:focus-visible + span,
+.trace-footer :focus-visible {
+  outline: 2px solid var(--rf-console-text);
+  outline-offset: 2px;
+}
+
+.trace-track {
+  position: relative;
+}
+
+.trace-path {
+  display: grid;
+  grid-auto-rows: minmax(54px, 1fr);
+}
+
+.trace-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-block: 5px;
+  padding-inline-end: 8px;
+}
+
+.trace-node[aria-current='step'] {
+  background: var(--rf-console-layer);
+}
+
+.trace-node:not(:last-child)::after {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 10px;
+  width: 2px;
+  height: 100%;
+  background: var(--rf-console-idle);
+  content: '';
+}
+
+.trace-node[data-state='failed']::after {
+  background: var(--rf-console-accent);
+}
+
+.trace-marker {
+  z-index: 1;
+  place-self: center;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--rf-console-idle);
+  border-radius: 50%;
+  background: var(--rf-console);
+}
+
+.trace-node[data-state='failed'] .trace-marker {
+  border-color: var(--rf-console-muted);
+  border-radius: 0;
+  background: var(--rf-console-muted);
+}
+
+.trace-node[data-state='recovered'] .trace-marker {
+  width: 14px;
+  height: 14px;
+  border-color: var(--rf-console-accent);
+  background: var(--rf-console-accent);
+}
+
+.trace-signal {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: calc(100% / 3);
+  transform: translateY(calc(100% * var(--trace-node)));
+  pointer-events: none;
+}
+
+.trace-signal > span {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--rf-console-text);
+  border-radius: 50%;
+  background: var(--rf-console-accent);
+}
+
+.trace-destination {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.trace-destination strong {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.trace-destination code,
+.trace-state {
+  color: var(--rf-console-muted);
+  font-size: 0.8125rem;
+}
+
+.trace-destination code {
+  overflow-wrap: anywhere;
+}
+
+.trace-state {
+  max-inline-size: 8em;
+  line-height: 1.35;
+  text-align: end;
+}
+
+.trace-node[aria-current='step'] .trace-state,
+.trace-node[data-state='recovered'] .trace-state {
+  color: var(--rf-console-accent);
+  font-weight: 650;
+}
+
+.trace-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-block-size: 52px;
+  padding: 6px 10px;
+  background: var(--rf-console-layer);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.trace-result code,
+.trace-log code {
+  color: var(--rf-console-accent);
+}
+
+.trace-result[data-event='error'] code {
+  color: var(--rf-console-text);
+  font-weight: 700;
+}
+
+.trace-footer {
+  position: relative;
+  font-size: 0.875rem;
+}
+
+.trace-footer > a {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--rf-console-accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.trace-footer > a:hover {
+  color: var(--rf-console-text);
+}
+
+.trace-log summary {
+  width: fit-content;
+  min-height: 44px;
+  padding-block: 10px;
+  color: var(--rf-console-text);
+  cursor: pointer;
+}
+
+.trace-log summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.trace-log summary span {
+  color: var(--rf-console-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trace-log ol,
+.trace-log > p {
+  padding: 8px 10px;
+  background: var(--rf-console-layer);
+}
+
+.trace-log li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding-block: 4px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trace-signal {
+    transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .trace-signal > span {
+    animation: trace-pulse 360ms ease-out;
+  }
+
+  .trace-play:active,
+  .trace-option input:active + span {
+    transform: translateY(1px);
+  }
+
+  @keyframes trace-pulse {
+    from {
+      opacity: 0.65;
+      transform: scale(0.6);
+    }
+  }
+}
+
+@media (max-width: 479px) {
+  .rf-trace {
+    min-block-size: 0;
+    gap: 8px;
+  }
+
+  .trace-node {
+    gap: 6px;
+    padding-inline-end: 4px;
+  }
+}
+
+@media (forced-colors: active) {
+  .trace-option input:checked + span {
+    outline: 2px solid SelectedItem;
+    outline-offset: -2px;
+  }
+}

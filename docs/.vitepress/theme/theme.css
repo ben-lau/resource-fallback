@@ -149,6 +149,10 @@
   line-height: 1.35;
 }
 
+.vp-doc a:not(.header-anchor) {
+  text-underline-offset: 0.2em;
+}
+
 .vp-doc p,
 .vp-doc li {
   line-height: inherit;
@@ -176,9 +180,16 @@
 }
 
 .vp-doc .custom-block {
+  border: 0;
+  border-radius: 4px;
   padding: 16px 20px;
   font-size: 0.9375rem;
   line-height: 1.65;
+}
+
+.vp-doc .custom-block-title {
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .vp-doc .custom-block p {
@@ -186,7 +197,24 @@
 }
 
 .VPDocAsideOutline .outline-link {
+  padding: 5px 8px;
+  border-radius: 4px;
   font-size: 0.875rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.VPDocAsideOutline .outline-link:hover,
+.VPDocAsideOutline .outline-link.active {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}
+
+@media (max-width: 639px) {
+  .vp-doc div[class*='language-'],
+  .vp-doc .vp-code-group .tabs {
+    margin-inline: 0;
+  }
 }
 
 .VPDocFooter .pager-link {

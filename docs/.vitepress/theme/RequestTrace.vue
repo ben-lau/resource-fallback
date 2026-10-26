@@ -1,79 +1,153 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { example, type Locale } from './home-copy';
+import { data as traces, type Scenario, type TraceFrame } from './request-trace.data';
 
 const props = defineProps<{ locale: Locale }>();
-const scenarios = ['backup', 'origin', 'none'] as const;
-type Scenario = (typeof scenarios)[number];
+const scenarios: Scenario[] = ['backup', 'origin', 'none'];
+const stepDuration = 650;
 
 const labels = {
   zh: {
-    title: '请求轨迹',
-    example: '交互示例',
+    title: '请求演练',
+    simulation: '模拟请求',
+    play: '播放回退',
+    finish: '查看结果',
     nodes: ['主 CDN', '备用 CDN', '源站'],
-    states: { failed: '重试后失败', recovered: '已恢复', skipped: '未请求' },
-    selector: '可用的回退地址',
-    options: { backup: '备用 CDN 可用', origin: '仅源站可用', none: '全部不可用' },
-    result: {
-      backup: '资源已从备用 CDN 加载。',
-      origin: '资源已从页面源站加载。',
-      none: '已用尽所有配置的地址。',
+    states: {
+      failed: '重试后失败',
+      recovered: '已恢复',
+      skipped: '未请求',
+      requesting: '请求中',
+      retrying: '重试中',
+      switching: '切换中',
     },
+    selector: '选择故障场景',
+    options: { backup: '备用 CDN 可用', origin: '仅源站可用', none: '全部不可用' },
+    log: '事件记录',
+    waiting: '等待首个恢复事件。',
+    request: (node: string) => `向${node}请求资源。`,
+    retry: (node: string, attempt: number) => `${node}加载失败，进行第 ${attempt} 次重试。`,
+    fallback: (from: string, to: string) => `从${from}切换到${to}。`,
+    success: (node: string, attempts: number) => `第 ${attempts} 次尝试从${node}加载成功。`,
+    error: (attempts: number) => `${attempts} 次尝试后，候选地址全部耗尽。`,
   },
   en: {
-    title: 'Request trace',
-    example: 'Interactive example',
+    title: 'Request replay',
+    simulation: 'Simulation',
+    play: 'Play trace',
+    finish: 'Show result',
     nodes: ['Primary CDN', 'Backup CDN', 'Origin'],
-    states: { failed: 'Failed after retry', recovered: 'Recovered', skipped: 'Not requested' },
-    selector: 'Available fallback destination',
-    options: { backup: 'Backup available', origin: 'Origin only', none: 'All unavailable' },
-    result: {
-      backup: 'Asset loaded from the backup CDN.',
-      origin: 'Asset loaded from the page origin.',
-      none: 'All configured addresses failed.',
+    states: {
+      failed: 'Retry failed',
+      recovered: 'Recovered',
+      skipped: 'Not requested',
+      requesting: 'Requesting',
+      retrying: 'Retrying',
+      switching: 'Switching',
     },
+    selector: 'Choose a failure scenario',
+    options: { backup: 'Backup available', origin: 'Origin only', none: 'All unavailable' },
+    log: 'Event log',
+    waiting: 'Waiting for the first recovery event.',
+    request: (node: string) => `Requesting the asset from ${node}.`,
+    retry: (node: string, attempt: number) => `${node} failed. Retrying the same URL (${attempt}).`,
+    fallback: (from: string, to: string) => `Switching from ${from} to ${to}.`,
+    success: (node: string, attempts: number) => `${node} recovered on attempt ${attempts}.`,
+    error: (attempts: number) => `All destinations exhausted after ${attempts} attempts.`,
   },
 };
 
 const copy = computed(() => labels[props.locale]);
 const scenario = ref<Scenario>('backup');
 const interactive = ref(false);
+const cursor = ref<number | null>(null);
+const log = ref<HTMLDetailsElement>();
+let timer: ReturnType<typeof setTimeout> | undefined;
 
-const recoveryIndex = computed(() => ['primary', 'backup', 'origin'].indexOf(scenario.value));
-const rows = computed(() =>
-  example.hosts.map((host, index) => {
-    if (index === recoveryIndex.value) return { host, state: 'recovered' as const };
-    if (recoveryIndex.value >= 0 && index > recoveryIndex.value)
-      return { host, state: 'skipped' as const };
-    return { host, state: 'failed' as const };
-  }),
-);
+const frames = computed(() => traces[scenario.value]);
+const playing = computed(() => cursor.value !== null);
+const frameIndex = computed(() => cursor.value ?? frames.value.length - 1);
+const current = computed(() => frames.value[frameIndex.value]);
+const events = computed(() => frames.value.slice(1, frameIndex.value + 1));
 
+function stateAt(index: number) {
+  const { node, kind } = current.value;
+  if (index > node) return 'skipped';
+  if (index < node || kind === 'error') return 'failed';
+  if (kind === 'success') return 'recovered';
+  if (kind === 'retry') return 'retrying';
+  return kind === 'fallback' ? 'switching' : 'requesting';
+}
+
+function describe(frame: TraceFrame) {
+  const { nodes } = copy.value;
+  const node = nodes[frame.node];
+  switch (frame.kind) {
+    case 'request':
+      return copy.value.request(node);
+    case 'retry':
+      return copy.value.retry(node, frame.attempt);
+    case 'fallback':
+      return copy.value.fallback(nodes[frame.from], node);
+    case 'success':
+      return copy.value.success(node, frame.attempts);
+    case 'error':
+      return copy.value.error(frame.attempts);
+  }
+}
+
+function showResult() {
+  clearTimeout(timer);
+  cursor.value = null;
+}
+
+function advance() {
+  if (cursor.value === null) return;
+  const next = cursor.value + 1;
+  if (next >= frames.value.length - 1) {
+    showResult();
+    return;
+  }
+  cursor.value = next;
+  timer = setTimeout(advance, stepDuration);
+}
+
+function toggleReplay() {
+  if (playing.value) {
+    showResult();
+  } else if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (log.value) log.value.open = true;
+  } else {
+    cursor.value = 0;
+    timer = setTimeout(advance, stepDuration);
+  }
+}
+
+watch(scenario, showResult, { flush: 'sync' });
 onMounted(() => {
   interactive.value = true;
 });
+onUnmounted(() => clearTimeout(timer));
 </script>
 
 <template>
   <figure class="rf-trace" data-ui aria-labelledby="rf-trace-title">
     <figcaption class="trace-heading">
       <h2 id="rf-trace-title">{{ copy.title }}</h2>
-      <span>{{ copy.example }}</span>
+      <button v-if="interactive" type="button" class="trace-play" @click="toggleReplay">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M4 2.5v11L12 8z" />
+          <path v-if="playing" d="M12 3h2v10h-2z" />
+        </svg>
+        {{ playing ? copy.finish : copy.play }}
+      </button>
     </figcaption>
+
     <p class="trace-request">
       <code>GET {{ example.path }}</code>
+      <span>{{ copy.simulation }}</span>
     </p>
-
-    <ol class="trace-path">
-      <li v-for="(row, index) in rows" :key="row.host" class="trace-node" :data-state="row.state">
-        <span class="trace-marker" aria-hidden="true"></span>
-        <span class="trace-destination">
-          <strong>{{ copy.nodes[index] }}</strong>
-          <code>{{ row.host }}</code>
-        </span>
-        <span class="trace-state">{{ copy.states[row.state] }}</span>
-      </li>
-    </ol>
 
     <fieldset v-if="interactive" class="trace-options">
       <legend class="visually-hidden">{{ copy.selector }}</legend>
@@ -83,236 +157,53 @@ onMounted(() => {
       </label>
     </fieldset>
 
-    <p class="trace-result" role="status">
-      <code>{{ scenario === 'none' ? 'rf:error' : 'rf:success' }}</code>
-      <span>{{ copy.result[scenario] }}</span>
+    <div class="trace-track">
+      <ol class="trace-path">
+        <li
+          v-for="(host, index) in example.hosts"
+          :key="host"
+          class="trace-node"
+          :data-state="stateAt(index)"
+          :aria-current="playing && index === current.node ? 'step' : undefined"
+        >
+          <span class="trace-marker" aria-hidden="true"></span>
+          <span class="trace-destination">
+            <strong>{{ copy.nodes[index] }}</strong>
+            <code>{{ host }}</code>
+          </span>
+          <span class="trace-state">{{ copy.states[stateAt(index)] }}</span>
+        </li>
+      </ol>
+      <span
+        v-if="playing"
+        class="trace-signal"
+        :style="{ '--trace-node': current.node }"
+        aria-hidden="true"
+        ><span :key="frameIndex"></span
+      ></span>
+    </div>
+
+    <p class="trace-result" :data-event="current.kind">
+      <code v-if="current.kind !== 'request'">rf:{{ current.kind }}</code>
+      <span>{{ describe(current) }}</span>
     </p>
+    <span role="status" class="visually-hidden">{{ playing ? '' : describe(current) }}</span>
+
+    <div class="trace-footer">
+      <details ref="log" class="trace-log">
+        <summary>
+          {{ copy.log }} <span>({{ events.length }})</span>
+        </summary>
+        <ol v-if="events.length">
+          <li v-for="(event, index) in events" :key="index">
+            <code>rf:{{ event.kind }}</code>
+            <span>{{ describe(event) }}</span>
+          </li>
+        </ol>
+        <p v-else>{{ copy.waiting }}</p>
+      </details>
+    </div>
   </figure>
 </template>
 
-<style scoped>
-.rf-trace {
-  position: relative;
-  display: grid;
-  align-content: center;
-  gap: 14px;
-  min-block-size: 25rem;
-  margin: 0;
-  padding: clamp(20px, 2.3vw, 36px) clamp(20px, 2.55vw, 40px);
-  background: var(--rf-console);
-  color: var(--rf-console-text);
-  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
-}
-
-.rf-trace code {
-  font-family: var(--vp-font-family-mono);
-}
-
-.trace-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.trace-heading h2 {
-  font-size: clamp(1.375rem, 2.05vw, 2rem);
-  font-weight: 650;
-  line-height: 1.25;
-}
-
-.trace-heading > span {
-  color: var(--rf-console-muted);
-  font-size: clamp(0.875rem, 1.1vw, 1rem);
-}
-
-.trace-request {
-  padding: 7px 14px;
-  background: var(--rf-console-layer);
-  font-size: clamp(0.9375rem, 1.3vw, 1.25rem);
-  line-height: 1.45;
-}
-
-.trace-path {
-  display: grid;
-  gap: 10px;
-  padding: 4px 0;
-}
-
-.trace-node {
-  position: relative;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
-}
-
-.trace-node:not(:last-child)::after {
-  position: absolute;
-  inset-block: 12px -22px;
-  inset-inline-start: 8px;
-  width: 2px;
-  background: var(--rf-console-accent);
-  content: '';
-}
-
-.trace-node[data-state='recovered']::after,
-.trace-node[data-state='skipped']::after {
-  background: var(--rf-console-idle);
-}
-
-.trace-marker {
-  z-index: 1;
-  place-self: start center;
-  width: 10px;
-  height: 10px;
-  margin-top: 8px;
-  background: var(--rf-console-accent);
-}
-
-.trace-node[data-state='recovered'] .trace-marker {
-  width: 14px;
-  height: 14px;
-  margin-top: 6px;
-  border-radius: 50%;
-}
-
-.trace-node[data-state='skipped'] .trace-marker {
-  border: 2px solid var(--rf-console-idle);
-  border-radius: 50%;
-  background: var(--rf-console);
-}
-
-.trace-destination {
-  display: grid;
-  gap: 2px;
-  line-height: 1.4;
-}
-
-.trace-destination strong {
-  font-size: clamp(1rem, 1.28vw, 1.25rem);
-  font-weight: 650;
-}
-
-.trace-destination code,
-.trace-state {
-  color: var(--rf-console-muted);
-  font-size: 0.875rem;
-}
-
-.trace-state {
-  font-size: clamp(0.875rem, 1.1vw, 1rem);
-  text-align: end;
-}
-
-.trace-node[data-state='recovered'] .trace-state {
-  color: var(--rf-console-accent);
-  font-weight: 650;
-}
-
-.trace-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.trace-option {
-  position: relative;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.trace-option input {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: inherit;
-}
-
-.trace-option span {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  min-height: 44px;
-  padding: 5px 2px;
-  background: var(--rf-console-layer);
-  font-size: clamp(0.8125rem, 1.1vw, 1rem);
-  font-weight: 600;
-  line-height: 1.3;
-  text-align: center;
-  text-wrap: balance;
-}
-
-.trace-option input:checked + span {
-  background: var(--rf-console-accent);
-  color: var(--rf-console);
-}
-
-.trace-option input:focus-visible + span {
-  outline: 2px solid var(--rf-console-text);
-  outline-offset: 2px;
-}
-
-.trace-option input:hover + span {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .trace-option input:active + span {
-    transform: translateY(1px);
-  }
-
-  .trace-node[data-state='recovered'] .trace-marker {
-    animation: trace-arrival 260ms ease-out;
-  }
-
-  @keyframes trace-arrival {
-    from {
-      opacity: 0.5;
-      transform: scale(0.75);
-    }
-  }
-}
-
-.trace-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 12px;
-  color: var(--rf-console-text);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-}
-
-.trace-result code {
-  color: var(--rf-console-accent);
-}
-
-@media (max-width: 479px) {
-  .rf-trace {
-    min-block-size: 0;
-    gap: 12px;
-  }
-
-  .trace-node {
-    gap: 8px;
-  }
-}
-
-@media (forced-colors: active) {
-  .trace-option input:checked + span {
-    border: 2px solid SelectedItem;
-  }
-
-  .trace-marker {
-    forced-color-adjust: none;
-  }
-}
-</style>
+<style scoped src="./request-trace.css"></style>
