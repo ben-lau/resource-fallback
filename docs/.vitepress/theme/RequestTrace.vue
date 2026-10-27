@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { example, type Locale } from './home-copy';
 import { data as traces, type Scenario, type TraceFrame } from './request-trace.data';
 
-const props = defineProps<{ locale: Locale }>();
+const props = defineProps<{ locale: Locale; guideLink: string }>();
 const scenarios: Scenario[] = ['backup', 'origin', 'none'];
 const stepDuration = 650;
 
@@ -26,6 +26,7 @@ const labels = {
     options: { backup: '备用 CDN 可用', origin: '仅源站可用', none: '全部不可用' },
     log: '事件记录',
     waiting: '等待首个恢复事件。',
+    guide: '故障排查',
     request: (node: string) => `向${node}请求资源。`,
     retry: (node: string, attempt: number) => `${node}加载失败，进行第 ${attempt} 次重试。`,
     fallback: (from: string, to: string) => `从${from}切换到${to}。`,
@@ -50,6 +51,7 @@ const labels = {
     options: { backup: 'Backup available', origin: 'Origin only', none: 'All unavailable' },
     log: 'Event log',
     waiting: 'Waiting for the first recovery event.',
+    guide: 'Troubleshooting',
     request: (node: string) => `Requesting the asset from ${node}.`,
     retry: (node: string, attempt: number) => `${node} failed. Retrying the same URL (${attempt}).`,
     fallback: (from: string, to: string) => `Switching from ${from} to ${to}.`,
@@ -202,6 +204,7 @@ onUnmounted(() => clearTimeout(timer));
         </ol>
         <p v-else>{{ copy.waiting }}</p>
       </details>
+      <a :href="guideLink">{{ copy.guide }}</a>
     </div>
   </figure>
 </template>

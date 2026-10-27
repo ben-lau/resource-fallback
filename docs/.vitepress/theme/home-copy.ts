@@ -155,6 +155,14 @@ export const guideGroups = [
     label: { zh: '上线与排查', en: 'Production' },
     links: [
       {
+        path: '/guide/troubleshooting',
+        zh: { title: '故障排查', body: '对照请求和事件，定位规则、候选地址或缓存问题。' },
+        en: {
+          title: 'Troubleshooting',
+          body: 'Match requests and events to rule, destination, or cache issues.',
+        },
+      },
+      {
         path: '/guide/runtime-events',
         zh: { title: '运行时事件', body: '读取 rf:* 事件，串起重试、切换和最终结果。' },
         en: {

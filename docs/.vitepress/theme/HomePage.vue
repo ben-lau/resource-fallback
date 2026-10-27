@@ -58,7 +58,7 @@ onUnmounted(() => observer?.disconnect());
               </svg>
             </a>
           </div>
-          <RequestTrace :locale="locale" />
+          <RequestTrace :locale="locale" :guide-link="docsLink('/guide/troubleshooting')" />
         </div>
       </section>
 
