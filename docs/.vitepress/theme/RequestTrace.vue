@@ -27,10 +27,10 @@ const labels = {
     log: '事件记录',
     waiting: '等待首个恢复事件。',
     guide: '故障排查',
-    request: (node: string) => `向${node}请求资源。`,
-    retry: (node: string, attempt: number) => `${node}加载失败，进行第 ${attempt} 次重试。`,
-    fallback: (from: string, to: string) => `从${from}切换到${to}。`,
-    success: (node: string, attempts: number) => `第 ${attempts} 次尝试从${node}加载成功。`,
+    request: (node: string) => `正在请求 ${node} 上的资源。`,
+    retry: (node: string, attempt: number) => `在 ${node} 上进行第 ${attempt} 次重试。`,
+    fallback: (from: string, to: string) => `请求从 ${from} 切换到 ${to}。`,
+    success: (node: string, attempts: number) => `第 ${attempts} 次尝试成功，资源来自 ${node}。`,
     error: (attempts: number) => `${attempts} 次尝试后，候选地址全部耗尽。`,
   },
   en: {
@@ -196,13 +196,15 @@ onUnmounted(() => clearTimeout(timer));
         <summary>
           {{ copy.log }} <span>({{ events.length }})</span>
         </summary>
-        <ol v-if="events.length">
-          <li v-for="(event, index) in events" :key="index">
-            <code>rf:{{ event.kind }}</code>
-            <span>{{ describe(event) }}</span>
-          </li>
-        </ol>
-        <p v-else>{{ copy.waiting }}</p>
+        <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
+          <ol v-if="events.length">
+            <li v-for="(event, index) in events" :key="index">
+              <code>rf:{{ event.kind }}</code>
+              <span>{{ describe(event) }}</span>
+            </li>
+          </ol>
+          <p v-else>{{ copy.waiting }}</p>
+        </div>
       </details>
       <a :href="guideLink">{{ copy.guide }}</a>
     </div>

@@ -105,6 +105,7 @@
 
 .trace-option input:checked + span {
   border-bottom-color: var(--rf-console-accent);
+  background: var(--rf-console-active);
   color: var(--rf-console-accent);
 }
 
@@ -140,7 +141,7 @@
 }
 
 .trace-node[aria-current='step'] {
-  background: var(--rf-console-layer);
+  background: var(--rf-console-active);
 }
 
 .trace-node:not(:last-child)::after {
@@ -225,6 +226,7 @@
 
 .trace-state {
   max-inline-size: 8em;
+  font-size: 0.875rem;
   line-height: 1.35;
   text-align: end;
 }
@@ -297,8 +299,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.trace-log ol,
-.trace-log > p {
+.trace-log-entries {
+  block-size: 9rem;
+  overflow-y: auto;
   padding: 8px 10px;
   background: var(--rf-console-layer);
 }
@@ -340,9 +343,17 @@
     gap: 8px;
   }
 
+  .trace-path {
+    grid-auto-rows: minmax(48px, 1fr);
+  }
+
   .trace-node {
     gap: 6px;
     padding-inline-end: 4px;
+  }
+
+  .trace-state {
+    font-size: 0.8125rem;
   }
 }
 

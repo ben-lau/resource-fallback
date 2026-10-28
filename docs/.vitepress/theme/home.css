@@ -204,7 +204,7 @@
   line-height: 1.55;
 }
 
-.rf-guide-group li:nth-child(odd) {
+.rf-guide-group ul {
   background: var(--vp-c-bg-alt);
 }
 
@@ -337,7 +337,7 @@
 @media (max-width: 767px) {
   .rf-hero-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
+    gap: 26px;
     min-height: 0;
     padding-block: 40px 58px;
   }

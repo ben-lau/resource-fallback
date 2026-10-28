@@ -28,6 +28,7 @@
   --rf-route: #a8d8c1;
   --rf-console: #10352e;
   --rf-console-layer: #244d43;
+  --rf-console-active: #315b4f;
   --rf-console-text: #f1faf3;
   --rf-console-muted: #bbd5c8;
   --rf-console-accent: #a5ebc3;
@@ -57,6 +58,7 @@
   --rf-route: #28634f;
   --rf-console: #193b32;
   --rf-console-layer: #284e42;
+  --rf-console-active: #365f51;
   --rf-action-ink: #102d29;
   --rf-stage-match: #1b302a;
   --rf-stage-retry: #1d392f;
