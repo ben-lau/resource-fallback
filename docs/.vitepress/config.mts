@@ -21,6 +21,28 @@ export default withMermaid(
     markdown: {
       lineNumbers: true,
       config(md) {
+        md.core.ruler.after('anchor', 'resource-fallback-chapter-cover', (state) => {
+          const { tokens } = state;
+          const title = tokens.findIndex(
+            (token) => token.type === 'heading_open' && token.tag === 'h1' && token.level === 0,
+          );
+          if (title === -1) return;
+
+          // Keep the authored title, anchor and optional lead as Markdown tokens.
+          const afterTitle = title + 3;
+          const end = tokens[afterTitle]?.type === 'paragraph_open' ? afterTitle + 3 : afterTitle;
+          const open = new state.Token('html_block', '', 0);
+          open.content = `<header class="rf-doc-cover">
+<svg class="rf-doc-route" viewBox="0 0 264 224" fill="none" aria-hidden="true" focusable="false">
+  <path d="M64 244V159a47 47 0 0 1 47-47h43a47 47 0 0 0 47-47V42" stroke="currentColor" stroke-width="8"/>
+  <circle cx="201" cy="42" r="13" stroke="currentColor" stroke-width="6"/>
+</svg>
+`;
+          const close = new state.Token('html_block', '', 0);
+          close.content = '</header>\n';
+          tokens.splice(end, 0, close);
+          tokens.splice(title, 0, open);
+        });
         md.core.ruler.after('anchor', 'resource-fallback-api-anchor', (state) => {
           if (!/(^|\/)api\/types\.md$/.test(state.env.relativePath ?? '')) return;
 

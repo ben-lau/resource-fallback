@@ -137,6 +137,10 @@ onUnmounted(() => clearTimeout(timer));
   <figure class="rf-trace" data-ui aria-labelledby="rf-trace-title">
     <figcaption class="trace-heading">
       <h2 id="rf-trace-title">{{ copy.title }}</h2>
+      <p class="trace-request">
+        <code>GET {{ example.path }}</code>
+        <span>{{ copy.simulation }}</span>
+      </p>
       <button v-if="interactive" type="button" class="trace-play" @click="toggleReplay">
         <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
           <path d="M4 2.5v11L12 8z" />
@@ -145,11 +149,6 @@ onUnmounted(() => clearTimeout(timer));
         {{ playing ? copy.finish : copy.play }}
       </button>
     </figcaption>
-
-    <p class="trace-request">
-      <code>GET {{ example.path }}</code>
-      <span>{{ copy.simulation }}</span>
-    </p>
 
     <fieldset v-if="interactive" class="trace-options">
       <legend class="visually-hidden">{{ copy.selector }}</legend>
@@ -168,7 +167,12 @@ onUnmounted(() => clearTimeout(timer));
           :data-state="stateAt(index)"
           :aria-current="playing && index === current.node ? 'step' : undefined"
         >
-          <span class="trace-marker" aria-hidden="true"></span>
+          <span class="trace-marker" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none">
+              <path class="trace-cross" d="m5 5 6 6m0-6-6 6" />
+              <path class="trace-check" d="m4 8 2.5 2.5L12 5" />
+            </svg>
+          </span>
           <span class="trace-destination">
             <strong>{{ copy.nodes[index] }}</strong>
             <code>{{ host }}</code>
@@ -185,28 +189,30 @@ onUnmounted(() => clearTimeout(timer));
       ></span>
     </div>
 
-    <p class="trace-result" :data-event="current.kind">
-      <code v-if="current.kind !== 'request'">rf:{{ current.kind }}</code>
-      <span>{{ describe(current) }}</span>
-    </p>
-    <span role="status" class="visually-hidden">{{ playing ? '' : describe(current) }}</span>
+    <div class="trace-output">
+      <p class="trace-result" :data-event="current.kind">
+        <code v-if="current.kind !== 'request'">rf:{{ current.kind }}</code>
+        <span>{{ describe(current) }}</span>
+      </p>
+      <span role="status" class="visually-hidden">{{ playing ? '' : describe(current) }}</span>
 
-    <div class="trace-footer">
-      <details ref="log" class="trace-log">
-        <summary>
-          {{ copy.log }} <span>({{ events.length }})</span>
-        </summary>
-        <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
-          <ol v-if="events.length">
-            <li v-for="(event, index) in events" :key="index">
-              <code>rf:{{ event.kind }}</code>
-              <span>{{ describe(event) }}</span>
-            </li>
-          </ol>
-          <p v-else>{{ copy.waiting }}</p>
-        </div>
-      </details>
-      <a :href="guideLink">{{ copy.guide }}</a>
+      <div class="trace-footer">
+        <details ref="log" class="trace-log">
+          <summary>
+            {{ copy.log }} <span>({{ events.length }})</span>
+          </summary>
+          <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
+            <ol v-if="events.length">
+              <li v-for="(event, index) in events" :key="index">
+                <code>rf:{{ event.kind }}</code>
+                <span>{{ describe(event) }}</span>
+              </li>
+            </ol>
+            <p v-else>{{ copy.waiting }}</p>
+          </div>
+        </details>
+        <a :href="guideLink">{{ copy.guide }} <span aria-hidden="true">↗</span></a>
+      </div>
     </div>
   </figure>
 </template>

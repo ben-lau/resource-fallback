@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useData, withBase } from 'vitepress';
 import RequestTrace from './RequestTrace.vue';
-import { guideGroups, homeCopy, recoverySteps, type Locale } from './home-copy';
+import { homeCopy, readingRoutes, type Locale } from './home-copy';
 
 const { lang } = useData();
 const locale = computed<Locale>(() => (lang.value === 'en-US' ? 'en' : 'zh'));
@@ -37,113 +37,67 @@ onUnmounted(() => observer?.disconnect());
   <div ref="home" class="rf-home" :lang="lang">
     <main>
       <section class="rf-hero" aria-labelledby="rf-title">
-        <svg class="rf-route" viewBox="0 0 1040 690" preserveAspectRatio="none" aria-hidden="true">
-          <path
-            d="M1040 71H540a72 72 0 0 0-72 72v352a72 72 0 0 1-72 72H59"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="47"
-          />
-          <path d="m0 567 82-60v120z" fill="currentColor" />
-        </svg>
-
-        <div class="rf-wrap rf-hero-grid">
-          <div class="rf-hero-copy">
-            <h1 id="rf-title">{{ copy.title[0] }}<br />{{ copy.title[1] }}</h1>
-            <p>{{ copy.summary }}</p>
-            <a class="rf-action" :href="docsLink('/guide/quick-start')">
+        <div class="rf-wrap">
+          <h1 id="rf-title" data-arrive>{{ copy.title }}</h1>
+          <div class="rf-hero-lead">
+            <p data-arrive>{{ copy.summary }}</p>
+            <a class="rf-action" :href="docsLink('/guide/quick-start')" data-arrive>
               {{ copy.start }}
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-                <path d="M3 12h17m-7-7 7 7-7 7" stroke="currentColor" stroke-width="2" />
-              </svg>
+              <span aria-hidden="true">→</span>
             </a>
           </div>
-          <RequestTrace :locale="locale" :guide-link="docsLink('/guide/troubleshooting')" />
+          <RequestTrace
+            :locale="locale"
+            :guide-link="docsLink('/guide/troubleshooting')"
+            data-arrive
+          />
         </div>
       </section>
 
-      <section class="rf-wrap rf-process" aria-labelledby="rf-process-title">
-        <div class="rf-section-intro" data-arrive>
-          <h2 id="rf-process-title">{{ copy.process }}</h2>
-          <p>{{ copy.processIntro }}</p>
-        </div>
-        <ol class="rf-steps">
-          <li
-            v-for="step in recoverySteps"
-            :key="step.kind"
-            class="rf-step"
-            :data-stage="step.kind"
-            data-arrive
-          >
-            <h3>{{ step[locale].title }}</h3>
-            <figure class="rf-sample" data-ui>
+      <section class="rf-wrap rf-reading" aria-labelledby="rf-reading-title">
+        <h2 id="rf-reading-title" data-arrive>{{ copy.directory }}</h2>
+        <ol class="rf-reading-list">
+          <li v-for="(route, index) in readingRoutes" :key="route.file" class="rf-reading-row">
+            <span class="rf-reading-number" aria-hidden="true">0{{ index + 1 }}</span>
+            <div class="rf-reading-copy" data-arrive>
+              <h3>{{ route[locale].title }}</h3>
+              <p>{{ route[locale].body }}</p>
+              <ul>
+                <li v-for="link in route[locale].links" :key="link.path">
+                  <a :href="docsLink(link.path)">
+                    {{ link.label }} <span aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <figure class="rf-code-sample" data-ui data-arrive>
               <figcaption>
-                <code>{{ step.symbol }}</code>
+                <code>{{ route.file }}</code>
               </figcaption>
-              <dl>
-                <div v-for="field in step.fields" :key="field.name">
-                  <dt>
-                    <code>{{ field.name }}</code>
-                  </dt>
-                  <dd>
-                    <code>{{ field.value }}<wbr v-if="field.path" />{{ field.path }}</code>
-                  </dd>
-                </div>
-              </dl>
+              <pre><code>{{ route.code }}</code></pre>
             </figure>
-            <p>{{ step[locale].body }}</p>
           </li>
         </ol>
-      </section>
-
-      <section class="rf-wrap rf-directory" aria-labelledby="rf-directory-title">
-        <div class="rf-section-intro" data-arrive>
-          <h2 id="rf-directory-title">{{ copy.directory }}</h2>
-          <p>{{ copy.directoryIntro }}</p>
-        </div>
-        <div v-for="group in guideGroups" :key="group.label.en" class="rf-guide-group" data-arrive>
-          <h3>{{ group.label[locale] }}</h3>
-          <ul>
-            <li v-for="guide in group.links" :key="guide.path">
-              <a :href="docsLink(guide.path)">
-                <strong>{{ guide[locale].title }}</strong>
-                <span>{{ guide[locale].body }}</span>
-              </a>
-            </li>
-          </ul>
-        </div>
       </section>
     </main>
 
     <footer class="rf-footer" data-arrive>
       <div class="rf-wrap">
         <p class="rf-footer-mark">
-          <img :src="withBase('/logo.svg')" alt="" width="72" height="72" />
+          <img :src="withBase('/logo.svg')" alt="" width="34" height="34" />
           <span>Resource Fallback</span>
         </p>
-        <div class="rf-footer-links">
-          <ul>
-            <li><a :href="repository">GitHub</a></li>
-            <li><a :href="repository + '/actions/workflows/ci.yml'">CI</a></li>
-            <li>
-              <a href="https://codecov.io/gh/ben-lau/resource-fallback">{{ copy.coverage }}</a>
-            </li>
-            <li>
-              <a :href="repository + '/blob/main/LICENSE'">{{ copy.license }}</a>
-            </li>
-          </ul>
-          <ul aria-label="npm">
-            <li><a href="https://www.npmjs.com/package/@resource-fallback/core">Core</a></li>
-            <li>
-              <a href="https://www.npmjs.com/package/@resource-fallback/vite-plugin">Vite plugin</a>
-            </li>
-            <li>
-              <a href="https://www.npmjs.com/package/@resource-fallback/webpack-plugin"
-                >Webpack plugin</a
-              >
-            </li>
-          </ul>
-        </div>
+        <ul>
+          <li><a :href="repository">GitHub</a></li>
+          <li><a :href="repository + '/actions/workflows/ci.yml'">CI</a></li>
+          <li>
+            <a href="https://codecov.io/gh/ben-lau/resource-fallback">{{ copy.coverage }}</a>
+          </li>
+          <li>
+            <a :href="repository + '/blob/main/LICENSE'">{{ copy.license }}</a>
+          </li>
+          <li><a href="https://www.npmjs.com/package/@resource-fallback/core">npm</a></li>
+        </ul>
       </div>
     </footer>
   </div>
