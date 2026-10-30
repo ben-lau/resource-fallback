@@ -9,7 +9,7 @@ export const example = {
 export const homeCopy = {
   zh: {
     title: '前端资源回退',
-    summary: '为 Vite 和 Webpack 的静态资源提供运行时重试、备用 CDN 和回源。',
+    summary: 'Vite 与 Webpack 静态资源的运行时重试、CDN 回退与回源。',
     start: '快速开始',
     directory: '阅读路线',
     coverage: '测试覆盖率',

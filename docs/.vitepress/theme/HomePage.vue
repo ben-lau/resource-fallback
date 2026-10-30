@@ -57,8 +57,7 @@ onUnmounted(() => observer?.disconnect());
       <section class="rf-wrap rf-reading" aria-labelledby="rf-reading-title">
         <h2 id="rf-reading-title" data-arrive>{{ copy.directory }}</h2>
         <ol class="rf-reading-list">
-          <li v-for="(route, index) in readingRoutes" :key="route.file" class="rf-reading-row">
-            <span class="rf-reading-number" aria-hidden="true">0{{ index + 1 }}</span>
+          <li v-for="route in readingRoutes" :key="route.file" class="rf-reading-row">
             <div class="rf-reading-copy" data-arrive>
               <h3>{{ route[locale].title }}</h3>
               <p>{{ route[locale].body }}</p>

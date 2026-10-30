@@ -8,7 +8,7 @@
 }
 
 .rf-hero {
-  padding-block: clamp(2.125rem, 4.6vw, 4.25rem) var(--rf-gutter);
+  padding-block: clamp(2.125rem, 3.5vw, 3.5rem) clamp(1.125rem, 2.5vw, 2.75rem);
   background: var(--rf-signal);
   color: var(--rf-ink);
 }
@@ -16,10 +16,10 @@
 .rf-hero h1 {
   max-width: 100%;
   margin: 0 auto;
-  font-size: clamp(2.75rem, 9.55vw, 9rem);
+  font-size: clamp(2.875rem, 10.25vw, 9.5rem);
   font-weight: 800;
   line-height: 1.04;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.055em;
   text-align: center;
   text-wrap: balance;
 }
@@ -28,18 +28,22 @@
   font-size: clamp(3rem, 8vw, 7.625rem);
 }
 
+.rf-home:lang(zh) .rf-hero h1 {
+  -webkit-text-stroke: 0.018em currentColor;
+}
+
 .rf-hero-lead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.875rem clamp(1.25rem, 3vw, 2.75rem);
-  margin-block: clamp(1.125rem, 2.25vw, 2.25rem) clamp(1.625rem, 2.45vw, 2.375rem);
+  margin-block: clamp(1.125rem, 1.3vw, 1.5rem) clamp(1.625rem, 2.4vw, 2.375rem);
 }
 
 .rf-hero-lead p {
   max-width: 54ch;
-  font-size: clamp(1rem, 1.4vw, 1.3125rem);
+  font-size: clamp(1.125rem, 1.6vw, 1.5rem);
   line-height: 1.5;
   text-wrap: pretty;
 }
@@ -50,7 +54,7 @@
   align-items: center;
   justify-content: center;
   gap: 1.5rem;
-  padding: 0.625rem 1rem;
+  padding: 0.625rem 1.25rem;
   background: var(--rf-ink);
   color: var(--rf-signal);
   font-weight: 750;
@@ -70,14 +74,11 @@
 }
 
 .rf-reading {
-  display: grid;
-  grid-template-columns: minmax(9rem, 1fr) minmax(0, 3.2fr);
-  gap: 2rem clamp(1.5rem, 3.4vw, 3.25rem);
-  align-items: start;
-  padding-block: clamp(3.75rem, 7vw, 6.5rem);
+  padding-block: clamp(2.25rem, 3vw, 3rem) clamp(3rem, 6vw, 5rem);
 }
 
 .rf-reading h2 {
+  margin-block-end: clamp(1.75rem, 2.6vw, 2.5rem);
   font-size: clamp(2.125rem, 3.75vw, 3.5rem);
   font-weight: 780;
   line-height: 1.05;
@@ -86,27 +87,15 @@
 }
 
 .rf-reading-list {
-  min-width: 0;
+  display: grid;
+  gap: clamp(2rem, 3vw, 3.5rem);
 }
 
 .rf-reading-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(19rem, 1.45fr);
-  gap: 0.75rem clamp(1rem, 2vw, 2rem);
-  align-items: start;
-  padding-block: 1.75rem;
-  border-block-start: 1px solid var(--vp-c-divider);
-}
-
-.rf-reading-row:last-child {
-  border-block-end: 1px solid var(--vp-c-divider);
-}
-
-.rf-reading-number {
-  color: var(--vp-c-brand-1);
-  font-size: 0.8125rem;
-  font-weight: 740;
-  font-variant-numeric: tabular-nums;
+  grid-template-columns: minmax(0, 0.95fr) minmax(19rem, 1.05fr);
+  gap: 0.875rem clamp(1rem, 3vw, 3rem);
+  align-items: center;
 }
 
 .rf-reading-copy h3 {
@@ -118,10 +107,10 @@
 }
 
 .rf-reading-copy p {
-  max-width: 40ch;
+  max-width: 48ch;
   margin-block: 0.875rem 0.5rem;
   color: var(--vp-c-text-2);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.7;
 }
 
@@ -152,13 +141,13 @@
 .rf-code-sample {
   min-width: 0;
   min-height: 12.75rem;
-  background: var(--vp-c-bg-alt);
+  background: var(--rf-console);
 }
 
 .rf-code-sample figcaption {
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--vp-c-divider);
-  color: var(--vp-c-brand-1);
+  background: var(--rf-console-layer);
+  color: var(--rf-console-muted);
   font-size: 0.8125rem;
   font-weight: 650;
 }
@@ -166,7 +155,7 @@
 .rf-code-sample pre {
   overflow-x: auto;
   padding: 0.875rem 1rem 1.125rem;
-  color: var(--vp-c-text-1);
+  color: var(--rf-console-text);
   font-size: 0.8125rem;
   line-height: 1.6;
   tab-size: 2;
@@ -174,7 +163,6 @@
 
 .rf-footer {
   padding-block: 1.5rem;
-  border-block-start: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg-alt);
 }
 
@@ -195,42 +183,23 @@
   font-weight: 750;
 }
 
-@media (max-width: 1100px) {
-  .rf-reading {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 759px) {
-  .rf-hero h1 {
-    letter-spacing: -0.055em;
-  }
-
   .rf-hero-lead {
     text-align: center;
   }
 
   .rf-reading-row {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .rf-code-sample {
-    grid-column: 2;
     min-height: 0;
   }
 }
 
 @media (max-width: 479px) {
-  .rf-hero-lead {
-    margin-inline: auto;
-  }
-
   .rf-action {
     min-height: 44px;
-  }
-
-  .rf-code-sample {
-    grid-column: 1 / -1;
   }
 }
 

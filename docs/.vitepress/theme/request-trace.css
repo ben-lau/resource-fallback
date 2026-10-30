@@ -1,10 +1,11 @@
 .rf-trace {
-  --trace-stop: 2.25rem;
+  --trace-stop: 2.625rem;
+  --trace-track-inset: clamp(1.5rem, 2.45vw, 2.5rem);
 
   display: grid;
   min-width: 0;
   margin: 0;
-  padding: clamp(1.125rem, 2.4vw, 2.25rem);
+  padding: clamp(1.125rem, 1.7vw, 1.75rem) clamp(1.125rem, 2.4vw, 2.25rem);
   background: var(--rf-console);
   color: var(--rf-console-text);
 }
@@ -19,7 +20,7 @@
 
 .trace-heading h2 {
   margin: 0;
-  font-size: clamp(1.25rem, 1.9vw, 1.875rem);
+  font-size: clamp(1.25rem, 2.15vw, 2rem);
   font-weight: 750;
   line-height: 1.15;
   letter-spacing: -0.03em;
@@ -53,12 +54,12 @@
   align-items: center;
   justify-content: center;
   gap: 0.4375rem;
-  min-inline-size: 7.25rem;
+  min-inline-size: clamp(7.25rem, 10vw, 9rem);
   min-block-size: 44px;
   padding-inline: 0.875rem;
   background: var(--rf-signal);
   color: var(--rf-ink);
-  font-size: 0.875rem;
+  font-size: clamp(0.875rem, 1.05vw, 1rem);
   font-weight: 750;
 }
 
@@ -67,10 +68,10 @@
 }
 
 .trace-options {
-  display: flex;
-  gap: clamp(0.625rem, 2.25vw, 2.125rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   min-inline-size: 0;
-  margin: clamp(0.75rem, 1.6vw, 1.5rem) 0 0;
+  margin: clamp(0.75rem, 1.4vw, 1.25rem) 0 0;
   padding: 0;
   border: 0;
   border-block-end: 1px solid var(--rf-console-line);
@@ -109,6 +110,7 @@
 
 .trace-option input:checked + span {
   border-block-end-color: var(--rf-signal);
+  background-color: var(--rf-console-layer);
   color: var(--rf-signal);
 }
 
@@ -125,7 +127,7 @@
 
 .trace-track {
   position: relative;
-  padding-block: clamp(1.75rem, 3.1vw, 3.375rem) clamp(1.375rem, 2.5vw, 2.5rem);
+  padding-block: var(--trace-track-inset) clamp(1.25rem, 2vw, 1.875rem);
 }
 
 .trace-path {
@@ -146,10 +148,10 @@
 
 .trace-node:not(:last-child)::after {
   position: absolute;
-  inset-block-start: calc(var(--trace-stop) / 2 - 2px);
+  inset-block-start: calc(var(--trace-stop) / 2 - 3px);
   inset-inline-start: 50%;
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: var(--rf-console-line);
   content: '';
 }
@@ -198,7 +200,7 @@
 .trace-signal {
   position: absolute;
   z-index: 2;
-  inset-block-start: clamp(1.75rem, 3.1vw, 3.375rem);
+  inset-block-start: var(--trace-track-inset);
   inset-inline-start: 0;
   display: grid;
   place-items: center;
@@ -266,7 +268,7 @@
   align-items: baseline;
   gap: 0.125rem 0.625rem;
   min-block-size: 44px;
-  font-size: 0.875rem;
+  font-size: clamp(0.875rem, 1.05vw, 1rem);
   line-height: 1.45;
 }
 
@@ -380,13 +382,15 @@
   }
 
   .trace-options {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.375rem;
   }
 
   .trace-option span {
     font-size: 0.8125rem;
+  }
+
+  .trace-option input:checked + span {
+    background-color: transparent;
   }
 
   .trace-track {
