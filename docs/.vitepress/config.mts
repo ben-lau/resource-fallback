@@ -20,6 +20,7 @@ export default withMermaid(
 
     markdown: {
       lineNumbers: true,
+      theme: { light: 'github-light', dark: 'github-dark-default' },
       config(md) {
         md.core.ruler.after('anchor', 'resource-fallback-chapter-cover', (state) => {
           const { tokens } = state;
@@ -33,9 +34,9 @@ export default withMermaid(
           const end = tokens[afterTitle]?.type === 'paragraph_open' ? afterTitle + 3 : afterTitle;
           const open = new state.Token('html_block', '', 0);
           open.content = `<header class="rf-doc-cover">
-<svg class="rf-doc-route" viewBox="0 0 264 224" fill="none" aria-hidden="true" focusable="false">
-  <path d="M64 244V159a47 47 0 0 1 47-47h43a47 47 0 0 0 47-47V42" stroke="currentColor" stroke-width="8"/>
-  <circle cx="201" cy="42" r="13" stroke="currentColor" stroke-width="6"/>
+<svg class="rf-doc-route" viewBox="0 0 288 224" fill="none" aria-hidden="true" focusable="false">
+  <path d="M20 234c42-27 59-53 59-90v-13a45 45 0 0 1 45-45h176" stroke="currentColor" stroke-width="14"/>
+  <circle cx="132" cy="86" r="13" fill="var(--rf-ink)" stroke="var(--rf-console-text)" stroke-width="5"/>
 </svg>
 `;
           const close = new state.Token('html_block', '', 0);
