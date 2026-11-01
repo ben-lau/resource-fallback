@@ -49,9 +49,13 @@ Hybrid SW can still find a Cache API response after exhausting network destinati
 
 ## Verify before release {#release-checks}
 
-- With a **healthy primary CDN**, confirm the asset loads directly. An initial success emits no recovery event.
-- With the **primary CDN unavailable**, check the `rf:fallback` destination and the asset that loads.
-- With **all CDNs unavailable**, confirm the asset loads from the expected path on the page origin.
-- With the **origin unavailable too**, check `rf:error` and the user-facing degraded state. For Hybrid SW, test separately with a cold cache and a populated cache.
+| Scenario                     | What to check in Network                              | Runtime events and page behavior                                           |
+| ---------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Healthy primary CDN          | The initial request succeeds                          | An initial success emits no recovery event                                 |
+| Backup CDN available         | The backup CDN serves the asset                       | `rf:fallback.detail.to` points to the backup CDN, followed by `rf:success` |
+| Origin only                  | The page origin serves the asset at the expected path | `rf:success.detail.url` points to the origin                               |
+| All destinations unavailable | The configured candidates are exhausted               | `rf:error` fires and the expected degraded UI appears                      |
 
-Verify the entry script and a lazy-loaded chunk separately. For Hybrid SW, also test an image or font that the page uses.
+Play the last three scenarios in the [homepage request replay](../index.md#rf-trace-title) and open the event log to see the order. The replay allows one retry per URL. When the primary CDN fails twice and the backup succeeds on its first request, `rf:success.detail.attempts` is `3`.
+
+Verify the entry script and a lazy-loaded chunk separately. For Hybrid SW, test an image or font used by the page with both a cold and a populated cache.
