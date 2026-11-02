@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitepress';
 import { withMermaid } from 'vitepress-plugin-mermaid';
 
+const apiPage = /(^|\/)api\//;
+
 export default withMermaid(
   defineConfig({
     base: '/resource-fallback/',
@@ -11,6 +13,10 @@ export default withMermaid(
 
     lastUpdated: true,
     cleanUrls: true,
+
+    transformPageData({ relativePath, frontmatter }) {
+      if (apiPage.test(relativePath)) frontmatter.outline ??= [2, 3];
+    },
 
     srcExclude: [
       'superpowers/**',
@@ -29,20 +35,33 @@ export default withMermaid(
           );
           if (title === -1) return;
 
-          // Keep the authored title, anchor and optional lead as Markdown tokens.
+          // Weight CJK glyphs more heavily when deciding whether copy fits the cover.
+          const measure = (text: string) => text.replace(/\p{Script=Han}/gu, 'xx').length;
+          const longTitle = measure(tokens[title + 1].content) > 40;
           const afterTitle = title + 3;
-          const end = tokens[afterTitle]?.type === 'paragraph_open' ? afterTitle + 3 : afterTitle;
+          const shortLead =
+            tokens[afterTitle]?.type === 'paragraph_open' &&
+            measure(tokens[afterTitle + 1].content) <= 210;
+
+          // The shared API breadcrumb already links to the module overview.
+          const moduleNav =
+            apiPage.test(state.env.relativePath ?? '') &&
+            title === 3 &&
+            tokens[0].type === 'paragraph_open' &&
+            tokens[1].content.startsWith('[@resource-fallback/core](README.md) / ');
+          const start = moduleNav ? 0 : title;
+          const end = shortLead ? afterTitle + 3 : afterTitle;
           const open = new state.Token('html_block', '', 0);
-          open.content = `<header class="rf-doc-cover">
+          open.content = `<header class="rf-doc-cover${longTitle ? ' rf-doc-cover--long' : ''}">
 <svg class="rf-doc-route" viewBox="0 0 288 224" fill="none" aria-hidden="true" focusable="false">
   <path d="M20 234c42-27 59-53 59-90v-13a45 45 0 0 1 45-45h176" stroke="currentColor" stroke-width="14"/>
-  <circle cx="132" cy="86" r="13" fill="var(--rf-ink)" stroke="var(--rf-console-text)" stroke-width="5"/>
+  <circle cx="132" cy="86" r="13" fill="var(--rf-chapter)" stroke="var(--rf-console-text)" stroke-width="5"/>
 </svg>
 `;
           const close = new state.Token('html_block', '', 0);
           close.content = '</header>\n';
           tokens.splice(end, 0, close);
-          tokens.splice(title, 0, open);
+          tokens.splice(start, title - start, open);
         });
         md.core.ruler.after('anchor', 'resource-fallback-api-anchor', (state) => {
           if (!/(^|\/)api\/types\.md$/.test(state.env.relativePath ?? '')) return;

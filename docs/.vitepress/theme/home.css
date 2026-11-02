@@ -78,7 +78,7 @@
 }
 
 .rf-reading h2 {
-  margin-block-end: clamp(1.75rem, 2.6vw, 2.5rem);
+  margin-block-end: clamp(1.25rem, 1.65vw, 1.625rem);
   font-size: clamp(2.125rem, 3.75vw, 3.5rem);
   font-weight: 780;
   line-height: 1.05;
@@ -95,7 +95,11 @@
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(19rem, 1.05fr);
   gap: 0.875rem clamp(1rem, 3vw, 3rem);
-  align-items: center;
+  align-items: start;
+}
+
+.rf-reading-copy {
+  padding-block-start: 0.5rem;
 }
 
 .rf-reading-copy h3 {

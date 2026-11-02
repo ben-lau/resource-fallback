@@ -11,7 +11,7 @@ const sections = {
   guide: { zh: '指南', en: 'Guide', path: '/guide/introduction' },
   design: { zh: '设计', en: 'Design', path: '/design/sw-comparison' },
   experience: { zh: '开发经验', en: 'Dev experience', path: '/experience/' },
-  api: { zh: 'API', en: 'API', path: '/api/' },
+  api: { zh: 'API', en: 'API', path: '/api/README' },
 };
 
 const pagePath = computed(
