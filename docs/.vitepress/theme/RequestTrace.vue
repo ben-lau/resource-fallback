@@ -30,7 +30,7 @@ const labels = {
     request: (node: string) => `正在请求 ${node} 上的资源。`,
     retry: (node: string, attempt: number) => `在 ${node} 上进行第 ${attempt} 次重试。`,
     fallback: (from: string, to: string) => `请求从 ${from} 切换到 ${to}。`,
-    success: (node: string, attempts: number) => `第 ${attempts} 次尝试成功，资源来自 ${node}。`,
+    success: (node: string, attempts: number) => `第 ${attempts} 次尝试成功，资源来自${node}。`,
     error: (attempts: number) => `${attempts} 次尝试后，候选地址全部耗尽。`,
   },
   en: {
@@ -203,7 +203,7 @@ onUnmounted(() => clearTimeout(timer));
           </summary>
           <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
             <ol v-if="events.length">
-              <li v-for="(event, index) in events" :key="index">
+              <li v-for="(event, index) in events" :key="index" :data-event="event.kind">
                 <code>rf:{{ event.kind }}</code>
                 <span>{{ describe(event) }}</span>
               </li>
@@ -211,7 +211,12 @@ onUnmounted(() => clearTimeout(timer));
             <p v-else>{{ copy.waiting }}</p>
           </div>
         </details>
-        <a :href="guideLink">{{ copy.guide }} <span aria-hidden="true">↗</span></a>
+        <a :href="guideLink">
+          {{ copy.guide }}
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+            <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
+          </svg>
+        </a>
       </div>
     </div>
   </figure>

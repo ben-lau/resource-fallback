@@ -43,7 +43,10 @@ export const readingRoutes: ReadingRoute[] = [
     code: `resourceFallback({
   rules: [{
     base: 'https://${example.hosts[0]}/',
-    urls: ['https://${example.hosts[1]}/', '/'],
+    urls: [
+      'https://${example.hosts[1]}/',
+      '/',
+    ],
     retry: { max: ${example.retries} },
   }],
 })`,

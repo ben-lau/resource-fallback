@@ -1,13 +1,15 @@
 .rf-trace {
-  --trace-stop: 2.625rem;
+  --trace-stop: clamp(2.375rem, 3.25vw, 3rem);
   --trace-track-inset: clamp(1.5rem, 2.45vw, 2.5rem);
 
   display: grid;
   min-width: 0;
   margin: 0;
-  padding: clamp(1.125rem, 1.7vw, 1.75rem) clamp(1.125rem, 2.4vw, 2.25rem);
-  background: var(--rf-console);
-  color: var(--rf-console-text);
+  padding: clamp(1rem, 1.55vw, 1.5rem) clamp(1rem, 2vw, 1.75rem);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: calc(2 * var(--rf-radius));
+  background: var(--rf-map);
+  color: var(--vp-c-text-1);
 }
 
 .trace-heading {
@@ -21,9 +23,13 @@
 .trace-heading h2 {
   margin: 0;
   font-size: clamp(1.25rem, 2.15vw, 2rem);
-  font-weight: 750;
+  font-weight: 710;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+}
+
+.trace-heading h2:lang(zh) {
+  letter-spacing: 0;
 }
 
 .trace-request {
@@ -32,7 +38,7 @@
   align-items: baseline;
   gap: 0 0.75rem;
   padding-inline-start: 1rem;
-  border-inline-start: 1px solid var(--rf-console-line);
+  border-inline-start: 1px solid var(--vp-c-divider);
   line-height: 1.45;
 }
 
@@ -45,7 +51,7 @@
 }
 
 .trace-request span {
-  color: var(--rf-console-muted);
+  color: var(--vp-c-text-3);
   font-size: 0.8125rem;
 }
 
@@ -54,27 +60,29 @@
   align-items: center;
   justify-content: center;
   gap: 0.4375rem;
-  min-inline-size: clamp(7.25rem, 10vw, 9rem);
+  min-inline-size: clamp(7.25rem, 12vw, 10.5rem);
   min-block-size: 44px;
   padding-inline: 0.875rem;
-  background: var(--rf-signal);
-  color: var(--rf-ink);
+  border-radius: var(--rf-radius);
+  background: var(--rf-line);
+  color: var(--rf-on-line);
   font-size: clamp(0.875rem, 1.05vw, 1rem);
-  font-weight: 750;
+  font-weight: 680;
 }
 
 .trace-play:hover {
-  background: var(--rf-console-text);
+  background: var(--vp-c-brand-2);
 }
 
 .trace-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-inline-size: 0;
-  margin: clamp(0.75rem, 1.4vw, 1.25rem) 0 0;
+  margin: clamp(0.75rem, 1.35vw, 1.25rem) 0 0;
   padding: 0;
   border: 0;
-  border-block-end: 1px solid var(--rf-console-line);
+  border-block-end: 1px solid var(--vp-c-divider);
+  padding-block-end: 0.625rem;
 }
 
 .trace-option {
@@ -94,34 +102,54 @@
 }
 
 .trace-option span {
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.625rem;
+  width: min(100%, 19rem);
   height: 100%;
   min-height: 44px;
-  padding: 0.25rem 0;
-  border-block-end: 2px solid transparent;
-  color: var(--rf-console-muted);
-  font-size: 0.875rem;
-  font-weight: 650;
+  margin-inline: auto;
+  padding: 0.25rem 0.375rem;
+  border-radius: var(--rf-radius);
+  color: var(--vp-c-text-2);
+  font-size: clamp(0.875rem, 1.12vw, 1rem);
+  font-weight: 580;
   line-height: 1.3;
   text-align: center;
   text-wrap: balance;
 }
 
+.trace-option span::before {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--rf-station-idle);
+  border-radius: 50%;
+  background: var(--rf-map);
+  content: '';
+}
+
 .trace-option input:checked + span {
-  border-block-end-color: var(--rf-signal);
-  background-color: var(--rf-console-layer);
-  color: var(--rf-signal);
+  background: var(--vp-c-brand-soft);
+  color: var(--rf-line);
+  font-weight: 650;
+}
+
+.trace-option input:checked + span::before {
+  border-width: 3px;
+  border-color: currentColor;
+  transform: scale(1.1);
 }
 
 .trace-option input:hover + span {
-  color: var(--rf-console-text);
+  color: var(--rf-line);
 }
 
 .trace-play:focus-visible,
 .trace-option input:focus-visible + span,
 .trace-footer :focus-visible {
-  outline: 2px solid var(--rf-console-text);
+  outline: 2px solid var(--rf-line);
   outline-offset: 2px;
 }
 
@@ -148,16 +176,16 @@
 
 .trace-node:not(:last-child)::after {
   position: absolute;
-  inset-block-start: calc(var(--trace-stop) / 2 - 3px);
+  inset-block-start: calc(var(--trace-stop) / 2 - 4px);
   inset-inline-start: 50%;
   width: 100%;
-  height: 6px;
-  background: var(--rf-console-line);
+  height: 8px;
+  background: var(--rf-rail);
   content: '';
 }
 
 .trace-node[data-state='failed']::after {
-  background: var(--rf-signal);
+  background: var(--rf-line);
 }
 
 .trace-marker {
@@ -168,16 +196,19 @@
   align-self: center;
   width: var(--trace-stop);
   height: var(--trace-stop);
-  border: 3px solid var(--rf-console-idle);
+  border: 4px solid currentColor;
   border-radius: 50%;
-  background: var(--rf-console);
-  color: var(--rf-ink);
+  background: var(--rf-map);
+  color: var(--rf-station-idle);
 }
 
-.trace-node[data-state='failed'] .trace-marker,
-.trace-node[data-state='recovered'] .trace-marker {
-  border-color: var(--rf-signal);
-  background: var(--rf-signal);
+.trace-node[data-state='failed'] .trace-marker {
+  color: var(--rf-failure);
+}
+
+.trace-node[data-state='recovered'] .trace-marker,
+.trace-node[aria-current='step'] .trace-marker {
+  color: var(--rf-line);
 }
 
 .trace-marker svg {
@@ -213,9 +244,9 @@
 .trace-signal > span {
   width: 1rem;
   height: 1rem;
-  border: 2px solid var(--rf-console);
+  border: 2px solid var(--rf-map);
   border-radius: 50%;
-  background: var(--rf-signal);
+  background: var(--rf-line);
 }
 
 .trace-destination {
@@ -228,27 +259,28 @@
 
 .trace-destination strong {
   font-size: clamp(1rem, 1.65vw, 1.5rem);
-  font-weight: 720;
-  letter-spacing: -0.025em;
-}
-
-.trace-destination code,
-.trace-state {
-  color: var(--rf-console-muted);
-  font-size: clamp(0.75rem, 1.05vw, 0.9375rem);
+  font-weight: 700;
 }
 
 .trace-destination code {
+  color: var(--vp-c-text-2);
+  font-size: clamp(0.75rem, 1.05vw, 0.9375rem);
   overflow-wrap: anywhere;
 }
 
 .trace-state {
-  line-height: 1.35;
+  color: var(--vp-c-text-3);
+  font-size: clamp(0.8125rem, 1.05vw, 0.9375rem);
+  line-height: 1.4;
+}
+
+.trace-node[data-state='failed'] .trace-state {
+  color: var(--rf-failure);
 }
 
 .trace-node[aria-current='step'] .trace-state,
 .trace-node[data-state='recovered'] .trace-state {
-  color: var(--rf-signal);
+  color: var(--rf-line);
   font-weight: 650;
 }
 
@@ -258,7 +290,7 @@
   align-items: start;
   gap: 0.875rem;
   padding-block-start: 0.625rem;
-  border-block-start: 1px solid var(--rf-console-line);
+  border-block-start: 1px solid var(--vp-c-divider);
 }
 
 .trace-result {
@@ -274,12 +306,12 @@
 
 .trace-result code,
 .trace-log code {
-  color: var(--rf-signal);
+  color: var(--rf-line);
 }
 
-.trace-result[data-event='error'] code {
-  color: var(--rf-console-text);
-  font-weight: 700;
+.trace-result[data-event='error'] code,
+.trace-log li[data-event='error'] code {
+  color: var(--rf-failure);
 }
 
 .trace-footer {
@@ -300,7 +332,11 @@
 }
 
 .trace-footer > a {
-  color: var(--rf-signal);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--rf-line);
+  font-weight: 650;
 }
 
 .trace-footer > a:hover,
@@ -320,7 +356,7 @@
 }
 
 .trace-log summary span {
-  color: var(--rf-console-muted);
+  color: var(--vp-c-text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -329,7 +365,7 @@
   max-block-size: 10rem;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
-  background: var(--rf-console-layer);
+  background: var(--vp-c-bg-soft);
 }
 
 .trace-log li {
@@ -386,11 +422,20 @@
   }
 
   .trace-option span {
+    flex-direction: column;
+    gap: 0.3125rem;
+    min-height: 3.25rem;
+    padding: 0.375rem 0.125rem;
     font-size: 0.8125rem;
   }
 
-  .trace-option input:checked + span {
-    background-color: transparent;
+  .trace-option span::before {
+    width: 0.625rem;
+    height: 0.625rem;
+  }
+
+  .trace-option input:checked + span::before {
+    border-width: 2px;
   }
 
   .trace-track {
@@ -417,7 +462,7 @@
   }
 
   .trace-state {
-    max-inline-size: 6em;
+    max-inline-size: 7em;
     text-align: end;
   }
 
@@ -442,7 +487,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .trace-signal {
-    transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 360ms var(--rf-ease);
   }
 
   .trace-signal > span {
@@ -451,6 +496,10 @@
 
   .trace-play:active {
     transform: translateY(1px);
+  }
+
+  .trace-option span::before {
+    transition: transform 200ms var(--rf-ease);
   }
 
   @keyframes trace-pulse {

@@ -43,7 +43,9 @@ onUnmounted(() => observer?.disconnect());
             <p data-arrive>{{ copy.summary }}</p>
             <a class="rf-action" :href="docsLink('/guide/quick-start')" data-arrive>
               {{ copy.start }}
-              <span aria-hidden="true">→</span>
+              <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
+              </svg>
             </a>
           </div>
           <RequestTrace
@@ -58,13 +60,16 @@ onUnmounted(() => observer?.disconnect());
         <h2 id="rf-reading-title" data-arrive>{{ copy.directory }}</h2>
         <ol class="rf-reading-list">
           <li v-for="route in readingRoutes" :key="route.file" class="rf-reading-row">
-            <div class="rf-reading-copy" data-arrive>
-              <h3>{{ route[locale].title }}</h3>
-              <p>{{ route[locale].body }}</p>
-              <ul>
+            <div class="rf-reading-copy">
+              <h3 data-arrive>{{ route[locale].title }}</h3>
+              <p data-arrive>{{ route[locale].body }}</p>
+              <ul data-arrive>
                 <li v-for="link in route[locale].links" :key="link.path">
                   <a :href="docsLink(link.path)">
-                    {{ link.label }} <span aria-hidden="true">↗</span>
+                    {{ link.label }}
+                    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+                      <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
+                    </svg>
                   </a>
                 </li>
               </ul>

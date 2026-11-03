@@ -54,8 +54,8 @@ export default withMermaid(
           const open = new state.Token('html_block', '', 0);
           open.content = `<header class="rf-doc-cover${longTitle ? ' rf-doc-cover--long' : ''}">
 <svg class="rf-doc-route" viewBox="0 0 288 224" fill="none" aria-hidden="true" focusable="false">
-  <path d="M20 234c42-27 59-53 59-90v-13a45 45 0 0 1 45-45h176" stroke="currentColor" stroke-width="14"/>
-  <circle cx="132" cy="86" r="13" fill="var(--rf-chapter)" stroke="var(--rf-console-text)" stroke-width="5"/>
+  <path d="M20 234l48-49a42 42 0 0 0 13-30v-23a46 46 0 0 1 46-46h173" stroke="currentColor" stroke-width="13"/>
+  <circle cx="142" cy="86" r="13" fill="var(--rf-chapter)" stroke="currentColor" stroke-width="5"/>
 </svg>
 `;
           const close = new state.Token('html_block', '', 0);
@@ -131,7 +131,7 @@ export default withMermaid(
             text: '在 GitHub 上编辑此页',
             pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
           },
-          docFooter: { prev: '上一篇', next: '下一篇' },
+          docFooter: { prev: '上一站', next: '下一站' },
           returnToTopLabel: '返回顶部',
           sidebarMenuLabel: '文档目录',
           darkModeSwitchLabel: '外观',
@@ -146,6 +146,7 @@ export default withMermaid(
         themeConfig: {
           nav: enNav(),
           sidebar: enSidebar(),
+          docFooter: { prev: 'Previous stop', next: 'Next stop' },
           editLink: {
             text: 'Edit this page on GitHub',
             pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
