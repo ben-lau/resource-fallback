@@ -27,6 +27,10 @@
   .VPSidebar .nav {
     padding-block-start: 1rem;
   }
+
+  .VPSidebar .nav .group {
+    width: calc(var(--vp-sidebar-width) - 3.25rem);
+  }
 }
 
 @media (min-width: 1280px) {
@@ -150,9 +154,10 @@
 }
 
 .VPDocAsideOutline .outline-marker {
-  left: -0.25rem;
+  left: 0.3125rem;
   width: 0.5rem;
   height: 0.5rem;
+  margin-top: -0.1875rem;
   border-radius: 50%;
 }
 
@@ -554,13 +559,33 @@ html:not(.dark) .vp-doc .vp-code span {
   }
 
   .rf-doc-route {
-    opacity: 0.22;
+    inset-block-end: -0.625rem;
+    width: min(23%, 9rem);
+    opacity: 0.3;
     animation: none;
   }
 
   .vp-doc div[class*='language-'],
   .vp-doc .vp-code-group .tabs {
     margin-inline: 0;
+  }
+
+  .vp-doc .vp-code-group div.language-bash pre > code:has(> .line:only-child) {
+    width: 100%;
+    padding-inline: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .vp-doc .vp-code-group div.language-bash pre > code > .line:only-child > span {
+    display: inline-block;
+    max-inline-size: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .VPDocAsideOutline .outline-marker {
+    transition: none;
   }
 }
 

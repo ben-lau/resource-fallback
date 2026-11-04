@@ -48,7 +48,7 @@
 .rf-action {
   display: inline-flex;
   min-height: 3rem;
-  min-width: 10rem;
+  min-width: clamp(10rem, 14.4vw, 13.375rem);
   align-items: center;
   justify-content: center;
   gap: 1.125rem;
