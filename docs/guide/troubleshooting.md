@@ -35,6 +35,17 @@ outline: [2, 3]
 - 核对候选是否部署了同一份产物，以及 Console 是否报告跨域、CSP 或完整性问题。启用 SRI 时，对照 [CSP 与 SRI](./csp-sri.md) 核对候选文件和校验策略。
 - 某个候选始终没被请求时，检查 `urls` 的顺序、前一候选是否已经成功，以及主机是否处在熔断冷却期。可用[调试日志](./best-practices.md#debug-模式)辅助判断。
 
+### 切换后少了一段路径 {#candidate-prefix}
+
+假设首次请求是 `https://cdn1.example.com/app/assets/app.js`，规则的 `base` 是 `https://cdn1.example.com/app/`。切到首个候选时，回退引擎会替换整个匹配前缀，保留后面的 `assets/app.js`。
+
+| `urls` 中的首个候选             | Network 中的回退地址                         |
+| ------------------------------- | -------------------------------------------- |
+| `https://cdn2.example.com/`     | `https://cdn2.example.com/assets/app.js`     |
+| `https://cdn2.example.com/app/` | `https://cdn2.example.com/app/assets/app.js` |
+
+如果备用 CDN 也把文件部署在 `/app/` 下，就选第二种前缀。回源同理，候选写成 `'/app/'`。排查时先比对 `rf:fallback.detail.to` 与发布路径，再确认响应正文是预期的资源文件。
+
 ## 区分终态失败与缓存恢复 {#terminal-result}
 
 `rf:success.detail.url` 指向恢复成功的资源。页面侧 `rf:error.detail.url` 指向终止时的当前候选，可能是备用 CDN 或源站。入口降级界面应匹配同一入口的[完整候选 URL](./runtime-events.md#入口失败降级-ui)。

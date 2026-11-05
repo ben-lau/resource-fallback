@@ -35,6 +35,17 @@ If the same URL recovers after `rf:retry`, expect `rf:success` as the terminal e
 - Confirm that each destination serves the same build output. Check Console for cross-origin, CSP, and integrity errors. If you use SRI, check the files and integrity policy against the [CSP and SRI guide](./csp-sri.md).
 - When a destination never receives a request, check the `urls` order, whether an earlier destination already recovered, and whether the host's circuit is open. Use [debug logging](./best-practices.md#enable-debug-logging) to investigate.
 
+### The fallback URL lost a path segment {#candidate-prefix}
+
+Suppose the initial request is `https://cdn1.example.com/app/assets/app.js` and the rule's `base` is `https://cdn1.example.com/app/`. The first fallback replaces the full matching prefix and carries forward `assets/app.js`.
+
+| First candidate in `urls`       | Fallback request in Network                  |
+| ------------------------------- | -------------------------------------------- |
+| `https://cdn2.example.com/`     | `https://cdn2.example.com/assets/app.js`     |
+| `https://cdn2.example.com/app/` | `https://cdn2.example.com/app/assets/app.js` |
+
+Use the second prefix if the backup CDN also serves the build under `/app/`. The same applies to the page origin, where the candidate is `'/app/'`. Compare `rf:fallback.detail.to` with the deployed path, then verify the response body contains the expected asset.
+
 ## Distinguish error from cache recovery {#terminal-result}
 
 `rf:success.detail.url` points to the recovered asset. For page-side recovery, `rf:error.detail.url` points to the current destination when the session ends. That can be a backup CDN or the origin. An entry failure UI should match the entry's [full set of candidate URLs](./runtime-events.md#degraded-ui-for-entry-failures).
