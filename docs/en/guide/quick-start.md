@@ -5,7 +5,7 @@ outline: [2, 3]
 
 # Quick Start
 
-Choose your build tool, configure the asset prefix and fallback destinations, then verify a CDN failure against a production build.
+Choose your build tool, set the asset prefix and fallback destinations, and test a CDN failure in a production build. Follow the [homepage replay](../index.md#rf-trace-title) first to see what to look for.
 
 ## Installation
 
@@ -87,6 +87,20 @@ module.exports = {
 :::
 
 ## Verification
+
+### Read the request replay {#read-the-replay}
+
+The replay uses `https://cdn1.example.com/` as `rules[].base`, followed by `https://cdn2.example.com/` and `'/'` as fallback prefixes. With `retry.max: 1`, each URL gets one retry after its initial request fails.
+
+Select **Backup available**, play the trace, and open the event log.
+
+| Event         | Fields to check in the runtime     | What happens in the replay                                            |
+| ------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `rf:retry`    | `detail.url` and `detail.attempt`  | The primary CDN URL is retried with `attempt: 1`                      |
+| `rf:fallback` | `detail.from` and `detail.to`      | The request moves to the backup CDN and keeps `assets/app.js`         |
+| `rf:success`  | `detail.url` and `detail.attempts` | The first backup request succeeds, bringing the total to `3` attempts |
+
+Replace the example addresses with the prefixes where you publish your build output. Check the final URL in Network. If its path differs from what you expected, [check the prefix substitution](./troubleshooting.md#candidate-prefix).
 
 ### Expected request order
 

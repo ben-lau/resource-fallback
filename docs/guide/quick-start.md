@@ -5,7 +5,7 @@ outline: [2, 3]
 
 # 快速开始
 
-选择你的构建工具，配置资源 URL 的匹配前缀与候选地址，然后用生产构建验证一次 CDN 故障。
+选择你的构建工具，配置资源 URL 的匹配前缀与候选地址，然后用生产构建验证一次 CDN 故障。先看[首页的请求演练](../index.md#rf-trace-title)，再用自己的构建复现。
 
 ## 安装
 
@@ -87,6 +87,20 @@ module.exports = {
 :::
 
 ## 验证
+
+### 对照请求演练 {#read-the-replay}
+
+首页演练使用 `https://cdn1.example.com/` 作为 `rules[].base`，依次尝试 `https://cdn2.example.com/` 和 `'/'` 两个回退前缀。它把 `retry.max` 设为 `1`，因此每个地址首次加载失败后还有一次重试机会。
+
+选择 **备用 CDN 可用**，播放并展开事件记录。
+
+| 事件          | 在运行时数据里看什么              | 这次演练的结果                                  |
+| ------------- | --------------------------------- | ----------------------------------------------- |
+| `rf:retry`    | `detail.url` 和 `detail.attempt`  | 重试原来的 CDN 地址，`attempt` 为 `1`           |
+| `rf:fallback` | `detail.from` 和 `detail.to`      | 请求从主 CDN 切到备用 CDN，保留 `assets/app.js` |
+| `rf:success`  | `detail.url` 和 `detail.attempts` | 备用 CDN 首次请求成功，总共尝试 `3` 次          |
+
+接入时，把示例地址换成构建产物的实际发布前缀。用 Network 核对最终 URL。若路径与预期不符，先[检查候选前缀如何替换](./troubleshooting.md#candidate-prefix)。
 
 ### 预期的请求顺序
 
