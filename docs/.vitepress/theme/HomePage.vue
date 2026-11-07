@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useData, withBase } from 'vitepress';
+import ArrowIcon from './ArrowIcon.vue';
 import RequestTrace from './RequestTrace.vue';
-import { homeCopy, readingRoutes, type Locale } from './home-copy';
+import { exampleConfig, guideEntries, homeCopy, type Locale } from './home-copy';
 
 const { lang } = useData();
 const locale = computed<Locale>(() => (lang.value === 'en-US' ? 'en' : 'zh'));
@@ -36,52 +37,55 @@ onUnmounted(() => observer?.disconnect());
 <template>
   <div ref="home" class="rf-home" :lang="lang">
     <main>
-      <section class="rf-hero" aria-labelledby="rf-title">
-        <div class="rf-wrap">
+      <section class="rf-wrap rf-hero" aria-labelledby="rf-title">
+        <div class="rf-intro">
           <h1 id="rf-title" data-arrive>{{ copy.title }}</h1>
-          <div class="rf-hero-lead">
-            <p data-arrive>{{ copy.summary }}</p>
-            <a class="rf-action" :href="docsLink('/guide/quick-start')" data-arrive>
-              {{ copy.start }}
-              <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
-                <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
-              </svg>
+          <p data-arrive>{{ copy.summary }}</p>
+          <div class="rf-hero-actions" data-arrive>
+            <a class="rf-action" :href="docsLink('/guide/quick-start')">
+              {{ copy.start }} <ArrowIcon />
             </a>
+            <a class="rf-text-action" href="#rf-case">{{ copy.explain }}</a>
           </div>
-          <RequestTrace
-            :locale="locale"
-            :guide-link="docsLink('/guide/troubleshooting')"
-            data-arrive
-          />
         </div>
+        <RequestTrace
+          :locale="locale"
+          :guide-link="docsLink('/guide/troubleshooting')"
+          data-arrive
+        />
       </section>
 
-      <section class="rf-wrap rf-reading" aria-labelledby="rf-reading-title">
-        <h2 id="rf-reading-title" data-arrive>{{ copy.directory }}</h2>
-        <ol class="rf-reading-list">
-          <li v-for="route in readingRoutes" :key="route.file" class="rf-reading-row">
-            <div class="rf-reading-copy">
-              <h3 data-arrive>{{ route[locale].title }}</h3>
-              <p data-arrive>{{ route[locale].body }}</p>
-              <ul data-arrive>
-                <li v-for="link in route[locale].links" :key="link.path">
-                  <a :href="docsLink(link.path)">
-                    {{ link.label }}
-                    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
-                      <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
-                    </svg>
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <figure class="rf-code-sample" data-ui data-arrive>
-              <figcaption>
-                <code>{{ route.file }}</code>
-              </figcaption>
-              <pre><code>{{ route.code }}</code></pre>
-            </figure>
-          </li>
-        </ol>
+      <section id="rf-case" class="rf-wrap rf-case" aria-labelledby="rf-case-title">
+        <div class="rf-case-copy">
+          <h2 id="rf-case-title" data-arrive>{{ copy.caseTitle }}</h2>
+          <p data-arrive>{{ copy.caseBody }}</p>
+          <a
+            class="rf-text-action"
+            :href="docsLink('/guide/quick-start#read-the-replay')"
+            data-arrive
+          >
+            {{ copy.caseLink }} <ArrowIcon />
+          </a>
+        </div>
+        <figure class="rf-code-sample" data-ui data-arrive>
+          <figcaption><code>vite.config.ts</code></figcaption>
+          <pre><code>{{ exampleConfig }}</code></pre>
+        </figure>
+      </section>
+
+      <section class="rf-wrap rf-directory" aria-labelledby="rf-directory-title">
+        <h2 id="rf-directory-title" data-arrive>{{ copy.directory }}</h2>
+        <div class="rf-directory-list">
+          <div v-for="entry in guideEntries[locale]" :key="entry.title" class="rf-guide-entry">
+            <h3 data-arrive>{{ entry.title }}</h3>
+            <p data-arrive>{{ entry.body }}</p>
+            <ul data-arrive>
+              <li v-for="link in entry.links" :key="link.path">
+                <a :href="docsLink(link.path)">{{ link.label }} <ArrowIcon /></a>
+              </li>
+            </ul>
+          </div>
+        </div>
       </section>
     </main>
 

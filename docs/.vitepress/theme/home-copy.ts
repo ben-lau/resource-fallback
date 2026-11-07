@@ -6,41 +6,7 @@ export const example = {
   retries: 1,
 };
 
-export const homeCopy = {
-  zh: {
-    title: '前端资源回退',
-    summary: 'Vite 与 Webpack 静态资源的运行时重试、CDN 回退与回源。',
-    start: '快速开始',
-    directory: '阅读路线',
-    coverage: '测试覆盖率',
-    license: 'MIT 许可证',
-  },
-  en: {
-    title: 'Frontend asset fallback',
-    summary: 'Runtime retries, backup CDNs, and origin recovery for Vite and Webpack assets.',
-    start: 'Quick start',
-    directory: 'Reading routes',
-    coverage: 'Test coverage',
-    license: 'MIT license',
-  },
-};
-
-type ReadingRoute = {
-  file: string;
-  code: string;
-} & Record<
-  Locale,
-  {
-    title: string;
-    body: string;
-    links: { label: string; path: string }[];
-  }
->;
-
-export const readingRoutes: ReadingRoute[] = [
-  {
-    file: 'vite.config.ts',
-    code: `resourceFallback({
+export const exampleConfig = `resourceFallback({
   rules: [{
     base: 'https://${example.hosts[0]}/',
     urls: [
@@ -49,72 +15,88 @@ export const readingRoutes: ReadingRoute[] = [
     ],
     retry: { max: ${example.retries} },
   }],
-})`,
-    zh: {
+})`;
+
+export const homeCopy = {
+  zh: {
+    title: '前端资源回退',
+    summary: '为 Vite 和 Webpack 构建的资源提供运行时重试、备用 CDN 和回源。',
+    start: '快速开始',
+    explain: '看懂这次回退',
+    caseTitle: '从演练到接入',
+    caseBody:
+      '示例先匹配主 CDN，重试失败后切换到备用 CDN，最后尝试页面源站。把这份规则里的地址换成你的部署前缀，就可以用自己的构建验证同样的流程。',
+    caseLink: '对照配置与事件',
+    directory: '按任务查阅',
+    coverage: '测试覆盖率',
+    license: 'MIT 许可证',
+  },
+  en: {
+    title: 'Frontend asset fallback',
+    summary: 'Runtime retries, backup CDNs, and origin recovery for Vite and Webpack assets.',
+    start: 'Quick start',
+    explain: 'Read the replay',
+    caseTitle: 'Use the replay as a starting point',
+    caseBody:
+      'The rule matches the primary CDN, retries once, then tries the backup CDN and the page origin in order. Replace the prefixes with your deployment paths to verify the same sequence in your own build.',
+    caseLink: 'Match the rule to the events',
+    directory: 'Find the right guide',
+    coverage: 'Test coverage',
+    license: 'MIT license',
+  },
+};
+
+export const guideEntries = {
+  zh: [
+    {
       title: '接入构建',
-      body: '为构建产物指定匹配前缀和候选地址，再验证主 CDN 失效后的加载结果。',
+      body: '安装插件并用生产构建验证第一次回退。',
       links: [
-        { label: '快速开始', path: '/guide/quick-start' },
-        { label: 'Webpack 接入', path: '/guide/webpack' },
+        { label: 'Vite 集成', path: '/guide/vite' },
+        { label: 'Webpack 集成', path: '/guide/webpack' },
       ],
     },
-    en: {
-      title: 'Set up the build',
-      body: 'Match the deployed asset prefix, set the fallback order, and test a primary CDN outage.',
-      links: [
-        { label: 'Quick start', path: '/guide/quick-start' },
-        { label: 'Webpack setup', path: '/guide/webpack' },
-      ],
-    },
-  },
-  {
-    file: 'fallback-events.js',
-    code: `window.addEventListener(
-  'rf:fallback',
-  ({ detail }) => {
-    console.log(detail.from, detail.to);
-  },
-);`,
-    zh: {
-      title: '定位故障',
-      body: '沿着运行时事件检查请求经过哪些地址、在哪里恢复，以及何时耗尽候选。',
+    {
+      title: '排查失败请求',
+      body: '按实际请求地址和运行时事件找出失败环节。',
       links: [
         { label: '故障排查', path: '/guide/troubleshooting' },
         { label: '运行时事件', path: '/guide/runtime-events' },
       ],
     },
-    en: {
-      title: 'Trace a failure',
-      body: 'Follow runtime events to see which URLs were tried, where recovery succeeded, or when the chain ran out.',
+    {
+      title: '查阅接口',
+      body: '核对回退顺序、重试预算、熔断和插件参数。',
+      links: [
+        { label: '配置参考', path: '/guide/configuration' },
+        { label: 'API 参考', path: '/api/README' },
+      ],
+    },
+  ],
+  en: [
+    {
+      title: 'Set up your build',
+      body: 'Install the plugin and verify the first fallback in a production build.',
+      links: [
+        { label: 'Vite integration', path: '/guide/vite' },
+        { label: 'Webpack integration', path: '/guide/webpack' },
+      ],
+    },
+    {
+      title: 'Diagnose a failed request',
+      body: 'Match the requested URLs to runtime events to see where recovery failed.',
       links: [
         { label: 'Troubleshooting', path: '/guide/troubleshooting' },
         { label: 'Runtime events', path: '/guide/runtime-events' },
       ],
     },
-  },
-  {
-    file: 'FallbackRule',
-    code: `interface FallbackRule {
-  base: string;
-  urls: string[];
-  retry?: RetryOptions;
-  circuit?: CircuitOptions;
-}`,
-    zh: {
-      title: '查阅接口',
-      body: '查阅回退规则、重试预算、熔断策略和插件参数的类型与默认值。',
-      links: [
-        { label: '配置参考', path: '/guide/configuration' },
-        { label: 'API', path: '/api/' },
-      ],
-    },
-    en: {
+    {
       title: 'Look up the API',
-      body: 'Find types and defaults for fallback rules, retry budgets, circuit breakers, and plugin options.',
+      body: 'Check fallback order, retry budgets, circuit breakers, and plugin options.',
       links: [
         { label: 'Configuration', path: '/guide/configuration' },
-        { label: 'API', path: '/api/' },
+        { label: 'API reference', path: '/api/README' },
       ],
     },
-  },
-];
+  ],
+};

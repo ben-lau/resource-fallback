@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import ArrowIcon from './ArrowIcon.vue';
 import { example, type Locale } from './home-copy';
 import { data as traces, type Scenario, type TraceFrame } from './request-trace.data';
 
@@ -142,11 +143,18 @@ onUnmounted(() => clearTimeout(timer));
         <span>{{ copy.simulation }}</span>
       </p>
       <button v-if="interactive" type="button" class="trace-play" @click="toggleReplay">
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M4 2.5v11L12 8z" />
-          <path v-if="playing" d="M12 3h2v10h-2z" />
+        <svg
+          class="rf-icon"
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M4 3.5v9L11 8z" />
+          <path v-if="playing" d="M12 4h1.5v8H12z" />
         </svg>
-        {{ playing ? copy.finish : copy.play }}
+        <span>{{ playing ? copy.finish : copy.play }}</span>
       </button>
     </figcaption>
 
@@ -199,7 +207,25 @@ onUnmounted(() => clearTimeout(timer));
       <div class="trace-footer">
         <details ref="log" class="trace-log">
           <summary>
-            {{ copy.log }} <span>({{ events.length }})</span>
+            <svg
+              class="rf-icon trace-chevron"
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="m6 4 4 4-4 4"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span
+              >{{ copy.log }} <span class="trace-count">({{ events.length }})</span></span
+            >
           </summary>
           <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
             <ol v-if="events.length">
@@ -212,10 +238,8 @@ onUnmounted(() => clearTimeout(timer));
           </div>
         </details>
         <a :href="guideLink">
-          {{ copy.guide }}
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
-            <path d="M2 8h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" />
-          </svg>
+          <span>{{ copy.guide }}</span>
+          <ArrowIcon />
         </a>
       </div>
     </div>

@@ -28,14 +28,14 @@ export default withMermaid(
       lineNumbers: true,
       theme: { light: 'github-light', dark: 'github-dark-default' },
       config(md) {
-        md.core.ruler.after('anchor', 'resource-fallback-chapter-cover', (state) => {
+        md.core.ruler.after('anchor', 'resource-fallback-doc-header', (state) => {
           const { tokens } = state;
           const title = tokens.findIndex(
             (token) => token.type === 'heading_open' && token.tag === 'h1' && token.level === 0,
           );
           if (title === -1) return;
 
-          // Weight CJK glyphs more heavily when deciding whether copy fits the cover.
+          // Weight CJK glyphs more heavily when deciding whether a heading needs a smaller scale.
           const measure = (text: string) => text.replace(/\p{Script=Han}/gu, 'xx').length;
           const longTitle = measure(tokens[title + 1].content) > 40;
           const afterTitle = title + 3;
@@ -52,12 +52,7 @@ export default withMermaid(
           const start = moduleNav ? 0 : title;
           const end = shortLead ? afterTitle + 3 : afterTitle;
           const open = new state.Token('html_block', '', 0);
-          open.content = `<header class="rf-doc-cover${longTitle ? ' rf-doc-cover--long' : ''}">
-<svg class="rf-doc-route" viewBox="0 0 288 224" fill="none" aria-hidden="true" focusable="false">
-  <path d="M20 234l48-49a42 42 0 0 0 13-30v-23a46 46 0 0 1 46-46h173" stroke="currentColor" stroke-width="13"/>
-  <circle cx="142" cy="86" r="13" fill="var(--rf-chapter)" stroke="currentColor" stroke-width="5"/>
-</svg>
-`;
+          open.content = `<header class="rf-doc-header${longTitle ? ' rf-doc-header--long' : ''}">\n`;
           const close = new state.Token('html_block', '', 0);
           close.content = '</header>\n';
           tokens.splice(end, 0, close);
@@ -131,7 +126,7 @@ export default withMermaid(
             text: '在 GitHub 上编辑此页',
             pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
           },
-          docFooter: { prev: '上一站', next: '下一站' },
+          docFooter: { prev: '上一篇', next: '下一篇' },
           returnToTopLabel: '返回顶部',
           sidebarMenuLabel: '文档目录',
           darkModeSwitchLabel: '外观',
@@ -146,7 +141,6 @@ export default withMermaid(
         themeConfig: {
           nav: enNav(),
           sidebar: enSidebar(),
-          docFooter: { prev: 'Previous stop', next: 'Next stop' },
           editLink: {
             text: 'Edit this page on GitHub',
             pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
