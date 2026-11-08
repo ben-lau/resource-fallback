@@ -49,7 +49,7 @@ const labels = {
       switching: 'Switching',
     },
     selector: 'Choose a failure scenario',
-    options: { backup: 'Backup available', origin: 'Origin only', none: 'All unavailable' },
+    options: { backup: 'Backup works', origin: 'Origin only', none: 'All fail' },
     log: 'Event log',
     waiting: 'Waiting for the first recovery event.',
     guide: 'Troubleshooting',

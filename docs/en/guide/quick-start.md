@@ -92,7 +92,7 @@ module.exports = {
 
 The replay uses `https://cdn1.example.com/` as `rules[].base`, followed by `https://cdn2.example.com/` and `'/'` as fallback prefixes. With `retry.max: 1`, each URL gets one retry after its initial request fails.
 
-Select **Backup available**, play the trace, and open the event log.
+Select **Backup works**, play the trace, and open the event log.
 
 | Event         | Fields to check in the runtime     | What happens in the replay                                            |
 | ------------- | ---------------------------------- | --------------------------------------------------------------------- |

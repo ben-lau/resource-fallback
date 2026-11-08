@@ -25,7 +25,7 @@ export const homeCopy = {
     explain: '看懂这次回退',
     caseTitle: '从演练到接入',
     caseBody:
-      '示例先匹配主 CDN，重试失败后切换到备用 CDN，最后尝试页面源站。把这份规则里的地址换成你的部署前缀，就可以用自己的构建验证同样的流程。',
+      '每个地址可以重试一次。主 CDN 的重试失败后，按顺序尝试备用 CDN 和源站。把配置换成你的发布前缀，就能用自己的生产构建复现。',
     caseLink: '对照配置与事件',
     directory: '按任务查阅',
     coverage: '测试覆盖率',
@@ -36,9 +36,9 @@ export const homeCopy = {
     summary: 'Runtime retries, backup CDNs, and origin recovery for Vite and Webpack assets.',
     start: 'Quick start',
     explain: 'Read the replay',
-    caseTitle: 'Use the replay as a starting point',
+    caseTitle: 'From replay to setup',
     caseBody:
-      'The rule matches the primary CDN, retries once, then tries the backup CDN and the page origin in order. Replace the prefixes with your deployment paths to verify the same sequence in your own build.',
+      'Each URL gets one retry. If the primary CDN still fails, the rule tries the backup CDN and then the origin. Use your deployment prefixes to verify the sequence in a production build.',
     caseLink: 'Match the rule to the events',
     directory: 'Find the right guide',
     coverage: 'Test coverage',
