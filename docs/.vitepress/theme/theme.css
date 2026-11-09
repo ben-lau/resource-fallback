@@ -1,11 +1,11 @@
 :root {
   --rf-accent: #245674;
   --rf-on-accent: #fff;
-  --rf-figure: #fdfdfc;
+  --rf-figure: #fdfdfd;
   --rf-code-bg: #edf1f3;
   --rf-trace-rail: #b5c0c9;
   --rf-trace-idle: #657788;
-  --rf-failure: #a0473c;
+  --rf-failure: #9c3f38;
   --rf-gutter: clamp(1.125rem, 4vw, 4rem);
   --rf-measure: 88rem;
   --rf-radius: 5px;
@@ -16,7 +16,7 @@
   --vp-nav-height: 72px;
   --vp-sidebar-width: 238px;
 
-  --vp-c-bg: #f7f7f4;
+  --vp-c-bg: #f6f6f4;
   --vp-c-bg-alt: #f0f1ee;
   --vp-c-bg-elv: var(--rf-figure);
   --vp-c-bg-soft: #e9eef1;

@@ -15,8 +15,14 @@
 }
 
 .rf-hero {
-  align-items: center;
+  align-items: start;
   padding-block: clamp(2.25rem, 4.15vw, 4rem) clamp(3.5rem, 5.7vw, 5.5rem);
+}
+
+@media (min-width: 960px) {
+  .rf-intro {
+    padding-block-start: clamp(2.5rem, 5.4vw, 5rem);
+  }
 }
 
 .rf-intro h1 {
@@ -46,7 +52,7 @@
 
 .rf-intro p {
   margin-block: 1.25rem 1.875rem;
-  font-size: clamp(1.0625rem, 1.4vw, 1.3125rem);
+  font-size: clamp(1.125rem, 1.4vw, 1.3125rem);
 }
 
 .rf-hero-actions {
@@ -209,6 +215,10 @@
 }
 
 @media (max-width: 639px) {
+  .rf-hero-actions {
+    column-gap: 0.75rem;
+  }
+
   .rf-case,
   .rf-directory-list {
     grid-template-columns: minmax(0, 1fr);
