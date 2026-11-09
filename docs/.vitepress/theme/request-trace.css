@@ -266,10 +266,6 @@
 }
 
 .trace-output {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 0.875rem;
   padding-block-start: 0.625rem;
   border-block-start: 1px solid var(--vp-c-divider);
 }
@@ -280,7 +276,7 @@
   align-content: center;
   align-items: baseline;
   gap: 0.125rem 0.625rem;
-  min-block-size: 44px;
+  min-block-size: 2rem;
   font-size: clamp(0.875rem, 1.05vw, 1rem);
   line-height: 1.45;
 }
@@ -296,9 +292,9 @@
 }
 
 .trace-footer {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: clamp(0.625rem, 1.25vw, 1.25rem);
   font-size: 0.875rem;
   line-height: 1.4;
@@ -348,7 +344,6 @@
 }
 
 .trace-log-entries {
-  width: clamp(11rem, 24vw, 21rem);
   max-block-size: 10rem;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
@@ -362,18 +357,6 @@
   gap: 0.125rem 0.75rem;
   padding-block: 0.25rem;
   line-height: 1.45;
-}
-
-@container (max-width: 40rem) {
-  .trace-output {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-    padding-block-start: 0.5rem;
-  }
-
-  .trace-log-entries {
-    width: auto;
-  }
 }
 
 @container (max-width: 33rem) {
