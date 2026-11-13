@@ -51,6 +51,7 @@ export interface FallbackRule {
 
 export type RetryEvent = { url: string; attempt: number };
 export type FallbackEvent = { from: string; to: string; reason?: unknown };
+/** Page: total session attempts. SW: attempts on the final URL, reset after each fallback. */
 export type SuccessEvent = { url: string; attempts: number };
 export type ErrorEvent = { url: string; reason?: unknown };
 
@@ -59,7 +60,8 @@ export interface RuntimeHooks {
   onFallback?: (e: FallbackEvent) => void;
   onSuccess?: (e: SuccessEvent) => void;
   /**
-   * 所有候选 URL（包括源站）均失败后触发。
+   * 页面恢复终止（候选耗尽、超时等）或 SW 透传网络失败时触发；SW 随后仍可能返回缓存。
+   * Fired on terminal page recovery or a bridged SW network failure; SW may still return cache.
    * 不会自动执行 `location.reload()` ——由业务决定如何兜底。
    */
   onError?: (e: ErrorEvent) => void;
@@ -70,14 +72,16 @@ export type SriPolicy = 'strip' | 'keep' | 'strict';
 export type DebugFlag = boolean | 'auto';
 
 /**
- * 浏览器运行时使用的配置对象。
+ * Browser runtime configuration.
  *
- * 注意：该对象会被 JSON 序列化并嵌入页面，所有值必须是原始类型（不能有函数）。
+ * Plugin injection serializes this object and drops functions. Live hooks only work
+ * when passed to the first manual install in the browser.
  * {@link FallbackRule.base} 必须为 string URL 前缀。
  */
 export interface RuntimeConfig {
   rules: FallbackRule[];
   defaults?: { retry?: RetryOptions; circuit?: CircuitOptions };
+  /** Live callbacks for the first manual install; plugin serialization drops functions. */
   hooks?: RuntimeHooks;
   /** Service Worker hybrid 资源回退配置。默认关闭。 */
   serviceWorker?: boolean | ServiceWorkerOptions;
@@ -91,7 +95,8 @@ export interface RuntimeConfig {
   disableCookie?: string;
   /**
    * - `true` 始终打印日志
-   * - `false` 永不打印（生产环境默认）
+   * - `false` 永不打印
+   * - 省略时采用 `auto`；omitting this option uses `auto`
    * - `'auto'` 当 `localStorage.__RF_DEBUG__` 为真值时打印
    */
   debug?: DebugFlag;
@@ -111,7 +116,7 @@ export interface HtmlTag {
 }
 
 export interface ServiceWorkerOptions {
-  /** 是否启用 Hybrid Service Worker。默认 false。 */
+  /** Enable Hybrid SW. Omitted/false disables it; an options object defaults enabled to true. */
   enabled?: boolean;
   /** Service Worker 文件 URL。默认跟随 scope：`/` → `/rf-sw.js`，`/app/` → `/app/rf-sw.js`。 */
   path?: string;
