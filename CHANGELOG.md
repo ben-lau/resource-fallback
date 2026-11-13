@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 Packages (`@resource-fallback/core`, `@resource-fallback/vite-plugin`, `@resource-fallback/webpack-plugin`) are released with the same version number.
 
+## [0.3.2](https://github.com/ben-lau/resource-fallback/compare/v0.3.1...v0.3.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **ci:** pin Playwright jobs to Ubuntu 24.04 ([1d48304](https://github.com/ben-lau/resource-fallback/commit/1d48304317d1cd7d24999ff2ed41beb87db578d2))
+
+
+### Code Refactoring
+
+* **docs:** extract markdown rendering extensions ([5581951](https://github.com/ben-lau/resource-fallback/commit/55819510ab5b266e63ddb743e52b965e321b3e0d))
+
 ## [0.3.1](https://github.com/ben-lau/resource-fallback/compare/v0.3.0...v0.3.1) (2026-10-12)
 
 
