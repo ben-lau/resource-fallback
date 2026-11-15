@@ -24,6 +24,27 @@ Page-side adapters (Observer, Vite, Webpack, SystemJS) hand failures to the Reco
 - SW recovery success events require a usable **network** response. If the network chain is exhausted and a cached response is returned, the current implementation emits `rf:error` first and does not add an `rf:success` event.
   :::
 
+### rf:retry: retry the same URL {#rf-retry}
+
+`attempt` starts at `1` and counts retries on the current URL, excluding its initial request. With `retry.max: 1`, each URL gets its initial attempt plus one retry.
+
+### rf:fallback: change candidate {#rf-fallback}
+
+`from` and `to` identify the previous and next URL. A single recovery can switch several candidates, so switch count is not affected-resource count.
+
+### rf:success: success and attempts {#rf-success}
+
+| Producer         | Current meaning of `attempts`                                 | Primary fails twice, backup succeeds first try |
+| ---------------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| Page Coordinator | Total attempts in the recovery, including the initial failure | `3`                                            |
+| Hybrid SW        | Attempts on the final URL, reset after every candidate switch | `1`                                            |
+
+Both report network success after recovery. The home replay uses the page-side count.
+
+### rf:error: terminal failure and cached recovery {#rf-error}
+
+Page events indicate terminal recovery, including candidate exhaustion or attempt/session deadlines. SW events indicate network failure and may still be followed by a Cache API hit. **This is not a universal user-visible failure signal.** See [Timeouts and retry budgets](./configuration.md).
+
 ## DOM listener examples
 
 ::: tip TypeScript
@@ -79,10 +100,17 @@ For page-side recovery, `rf:error.detail.url` is the current destination when th
 
     window.addEventListener('rf:error', onRfError);
 
-    // Remove this from your app entry after successful boot:
-    // window.removeEventListener('rf:error', onRfError);
+    window.addEventListener('app:ready', () => window.removeEventListener('rf:error', onRfError), {
+      once: true,
+    });
   })();
 </script>
+```
+
+After successful application boot, dispatch this event to remove the listener in its original scope:
+
+```js
+window.dispatchEvent(new Event('app:ready'));
 ```
 
 Use the deployed entry filename, including its build hash, and register the listener before the browser requests the entry. Keep the entry fallback message generic. Watch `rf:retry` and `rf:fallback` to confirm recovery ran.
@@ -107,7 +135,9 @@ function didFallbackRun(since: number) {
 
 ## JS function hooks
 
-If you need function hooks, call `window.__RF__.install()` manually in page code so you can pass live function objects directly:
+Pass live function hooks during the **first installation**. A second `install()` is ignored after plugin auto-initialization and cannot add hooks. Use DOM events in plugin setups; see [Manual integration](./manual-integration.md) for a complete first-install example.
+
+The following requires a loaded runtime that has not been installed yet:
 
 ```ts
 window.__RF__.install({
@@ -143,13 +173,17 @@ window.addEventListener('rf:error', (e) => {
 
 ### Dashboard suggestions
 
-| Metric          | Source                                                       |
-| --------------- | ------------------------------------------------------------ |
-| Retry rate      | `rf:retry` count by host                                     |
-| Fallback rate   | `rf:fallback` `from` → `to`                                  |
-| Terminal errors | `rf:error` count                                             |
-| Exhaustion rate | SW-bridged `rf:error` where `reason === 'rules-exhausted'`   |
-| Circuit trips   | host skipped in fallback chain (via logging + circuit state) |
+| Metric                      | Source                                                       |
+| --------------------------- | ------------------------------------------------------------ |
+| Retry count                 | `rf:retry` count by host                                     |
+| Candidate switch count      | `rf:fallback` `from` → `to`                                  |
+| Error signal count          | `rf:error` count                                             |
+| SW network exhaustion count | SW-bridged `rf:error` where `reason === 'rules-exhausted'`   |
+| Circuit trips               | host skipped in fallback chain (via logging + circuit state) |
+
+Counts are not rates: one recovery may emit several retries/switches, and first-try successes emit no recovery event. A recovery success rate needs a defined recovery denominator and deduplication; an all-resource failure rate also needs all initial loads. An SW `rf:error` may be followed by a cached response, so check the actual resource or application outcome.
+
+Public events currently expose neither `source` nor `sessionId`. Do not infer the producer from `reason` or assume concurrent recoveries can be reliably correlated. Collect source-specific metrics only where the surrounding integration can establish the source.
 
 ### Hybrid SW events
 

@@ -78,7 +78,7 @@ const tags = buildInjectedTags({
 // ]
 ```
 
-Note: `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize config before it reaches the page. Functions inside `hooks` — and any other function-valued fields — are dropped at that step. `externalRuntime` externalizes only the runtime IIFE; the automatic `install(...)` call is still an inline script and needs a nonce or equivalent authorization under a strict CSP. It also does not preserve those functions. For auto-injected setups, prefer DOM `rf:*` events. Use JS hooks only when you manually call `window.__RF__.install()` in page code.
+Note: `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls always serialize config before it reaches the page. Functions inside `hooks` — and any other function-valued fields — are dropped at that step. `externalRuntime` externalizes only the runtime IIFE; the automatic `install(...)` call is still an inline script and needs a nonce or equivalent authorization under a strict CSP. It also does not preserve those functions. For auto-injected setups, prefer DOM `rf:*` events. Supply live hooks in the first manual browser installation. Repeating `install()` after plugin initialization does not add hooks; see [Manual integration](https://ben-lau.github.io/resource-fallback/en/guide/manual-integration).
 
 ## Browser Runtime
 

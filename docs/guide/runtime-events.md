@@ -24,6 +24,27 @@ resource-fallback 通过 DOM CustomEvent 和可选 JS 函数钩子暴露运行�
 - SW 的恢复成功事件只针对可用的**网络**响应；若网络链路耗尽后命中缓存，当前实现会先发 `rf:error`，不会补发 `rf:success`
   :::
 
+### rf:retry：同一地址重试 {#rf-retry}
+
+`attempt` 从 `1` 开始，表示当前 URL 的第几次重试，不包括该 URL 的首次请求。`retry.max: 1` 允许首次请求后再重试一次。
+
+### rf:fallback：切换候选 {#rf-fallback}
+
+`from` 和 `to` 是切换前后的地址。一次恢复可以切换多个候选，因此事件次数不等于受影响资源数。
+
+### rf:success：成功与 attempts {#rf-success}
+
+| 来源             | `attempts` 的当前含义                   | 主 CDN 失败两次、备用首次成功 |
+| ---------------- | --------------------------------------- | ----------------------------- |
+| 页面 Coordinator | 本次恢复累计尝试次数，包含初始失败      | `3`                           |
+| Hybrid SW        | 最终 URL 上的尝试次数，每次切换候选重置 | `1`                           |
+
+两种来源均只报告经历恢复后的网络成功。首页请求演练展示页面侧口径。
+
+### rf:error：终态与缓存恢复 {#rf-error}
+
+页面侧表示恢复终止，可能由候选耗尽、单次或 session 超时等原因引起。SW 表示网络链路失败，随后仍可能命中 Cache API。**它不是统一的用户侧失败信号。** 超时边界见[超时与重试预算](./configuration.md)。
+
 ## 监听示例
 
 ::: tip TypeScript
@@ -81,10 +102,17 @@ window.addEventListener('rf:error', (e) => {
 
     window.addEventListener('rf:error', onRfError);
 
-    // 应用成功启动后请在入口代码里执行：
-    // window.removeEventListener('rf:error', onRfError);
+    window.addEventListener('app:ready', () => window.removeEventListener('rf:error', onRfError), {
+      once: true,
+    });
   })();
 </script>
+```
+
+应用成功启动后，在入口代码里派发事件，监听器会在原作用域内清理：
+
+```js
+window.dispatchEvent(new Event('app:ready'));
 ```
 
 将示例路径替换为实际发布的入口文件名（包括构建哈希），并在入口加载前注册监听。入口兜底使用通用失败文案。判断请求是否进入过回退链时，观察 `rf:retry` 和 `rf:fallback`。
@@ -127,17 +155,23 @@ function didFallbackRun(since: number) {
 
 ### 监控指标建议
 
-| 指标       | 推荐来源                                                  |
-| ---------- | --------------------------------------------------------- |
-| 重试率     | `rf:retry` 按 host 计数                                   |
-| 回退率     | `rf:fallback` 的 `from` → `to`                            |
-| 终态失败率 | `rf:error` 总量                                           |
-| SW 耗尽率  | **仅在 SW 透传语境下**统计 `reason === 'rules-exhausted'` |
-| 熔断命中   | 结合 debug 日志或 circuit state 观测被跳过的 host         |
+| 指标            | 推荐来源                                                  |
+| --------------- | --------------------------------------------------------- |
+| 重试次数        | `rf:retry` 按 host 计数                                   |
+| 候选切换次数    | `rf:fallback` 的 `from` → `to`                            |
+| 错误信号次数    | `rf:error` 总量                                           |
+| SW 网络耗尽次数 | **仅在 SW 透传语境下**统计 `reason === 'rules-exhausted'` |
+| 熔断命中        | 结合 debug 日志或 circuit state 观测被跳过的 host         |
+
+事件次数不能直接作为失败率：一次恢复可能产生多条重试或切换事件，首轮直接成功也没有 `rf:success`。恢复成功率需要明确恢复流程的去重口径；全部资源失败率还需要全部加载的分母。SW 的 `rf:error` 之后可能返回缓存，应结合图片、字体或应用的实际加载结果判断用户侧失败。
+
+当前公开事件没有 `source` 或 `sessionId` 字段，不能靠 `reason` 猜测来源或可靠关联并发恢复。需要精确统计时，在可明确资源来源的场景单独采集，并保留该限制。
 
 ### JS 函数钩子
 
-如需函数钩子，请在页面里手动调用 `window.__RF__.install()`；只有直接传入函数对象时这些钩子才会保留：
+函数钩子必须在页面 runtime 的**首次安装**时直接传入。插件已自动调用 `install()` 后，再次调用会被忽略，不能补加 hooks。自动注入场景使用 DOM 事件；完整的首次手动安装见[手动集成](./manual-integration.md)。
+
+下面仅适用于 runtime 已加载、尚未安装的页面：
 
 ```ts
 window.__RF__.install({
@@ -152,7 +186,7 @@ window.__RF__.install({
 ```
 
 ::: warning hooks 限制
-`buildInjectedTags()` 与插件自动生成的 `install(...)` 调用都会先序列化配置对象，因此构建配置里的函数钩子总会被丢弃。`externalRuntime` 只把 runtime IIFE 改为外链，自动 `install(...)` 仍是内联脚本；它同样不会保留这些函数。自动注入场景请使用 DOM `rf:*` 事件；如需 hooks，请在页面代码里手动调用 `window.__RF__.install()`。
+`buildInjectedTags()` 与插件自动生成的 `install(...)` 调用都会先序列化配置对象，因此构建配置里的函数钩子总会被丢弃。`externalRuntime` 只把 runtime IIFE 改为外链，自动 `install(...)` 仍是内联脚本；它同样不会保留这些函数。自动注入场景请使用 DOM `rf:*` 事件；如需 hooks，请按[手动集成](./manual-integration.md)在首次安装时传入；重复 `install()` 不会更新订阅。
 :::
 
 ## HookBus 与 adapter 关系
