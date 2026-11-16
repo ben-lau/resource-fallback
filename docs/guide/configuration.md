@@ -15,7 +15,7 @@ Vite 与 Webpack 插件的配置类型 `ViteResourceFallbackOptions` / `WebpackP
 | `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                                    |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                                       |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制                               |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                                          |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | 创建恢复标签时对 `integrity` 的处理，包括同地址重试                                               |
 | `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                                                |
 | `nonce`               | `string`                          | —                    | 附加到每个注入 `<script>`（包括自动内联 `install(...)`）的 CSP nonce                              |
 | `externalRuntime`     | `boolean`                         | `false`              | 只把 runtime IIFE 改为外链；自动 `install(...)` 仍内联且需 CSP 授权；不会保留构建配置里的函数钩子 |
@@ -48,7 +48,7 @@ Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vit
 - 一次恢复会先根据初始 URL 选中一条规则，再沿该规则的有序 `urls` 候选继续 retry / fallback；
 - 页面 runtime 当前只有一个 circuit registry，使用第一条已编译规则的 circuit 选项初始化；`FallbackRule.circuit` 仍是公开类型，但页面侧“每条规则独立熔断器”尚未实现。
 
-## RetryOptions
+## RetryOptions：重试配置 {#retryoptions}
 
 | 字段        | 类型      | 默认值 | 说明                     |
 | ----------- | --------- | ------ | ------------------------ |
@@ -57,7 +57,13 @@ Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vit
 | `maxDelay`  | `number`  | `3000` | 指数退避的延迟上限（ms） |
 | `jitter`    | `boolean` | `true` | 为延迟添加 ±25% 随机抖动 |
 
-## CircuitOptions
+## 超时与重试预算 {#timeouts}
+
+页面 Coordinator 当前使用固定的单次尝试 **30 秒**、恢复 session **120 秒**超时；尚未公开 `retry.timeout` 等配置。session 预算包含恢复期间的退避等待，可能在候选耗尽之前终止。计时从适配器进入 Coordinator 开始，Observer 之前的浏览器原始请求耗时不在这段预算内。
+
+`retry.max` 是每个 URL 的重试次数，不包括首次请求。在无熔断、未超时且所有候选都失败的情况下，主地址和两个备用地址、`max: 1` 最多产生 `3 × (1 + 1) = 6` 次尝试。这是请求次数上界，不是等待时间保证。Hybrid SW 使用独立 resolver，不共享页面的固定 deadline。
+
+## CircuitOptions：熔断配置 {#circuitoptions}
 
 | 字段              | 类型      | 默认值   | 说明                                     |
 | ----------------- | --------- | -------- | ---------------------------------------- |
@@ -75,7 +81,7 @@ Vite 的配置项 `base` 与 `FallbackRule.base` 同名：文中分别称为 Vit
 - 构建配置里的 `hooks` 不会在自动注入场景下保留下来；
 - `externalRuntime` 只改变 runtime IIFE 是否外链，不会改变上述序列化行为；自动 `install(...)` 仍是内联脚本，严格 CSP 下需要 `nonce` 或等效授权；
 - 推荐用 DOM `rf:*` 事件作为自动注入场景的监控接入方式；
-- 如需 JS hooks，请在页面代码里手动调用 `window.__RF__.install()`，直接传入函数对象。
+- JS hooks 必须在首次手动安装时传入；插件已安装后重复调用无效，详见[手动集成](./manual-integration.md)。
 
 ## ServiceWorkerOptions
 

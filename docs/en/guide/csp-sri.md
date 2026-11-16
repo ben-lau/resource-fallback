@@ -63,7 +63,7 @@ If the runtime file is not same-origin, add its origin to `script-src` as well.
 `externalRuntime` only changes where the runtime script is placed for CSP. It does **not** make build-config callbacks serializable. `buildInjectedTags()` and plugin-generated `window.__RF__.install(...)` calls still serialize config first, so function-valued `hooks` are dropped in auto-injected setups.
 :::
 
-If you manually call `window.__RF__.install()` in page code and pass live function objects yourself, hooks work without requiring `externalRuntime: true`. The key is avoiding build-time serialization:
+Live hooks must be supplied during the **first installation**. A repeated `install()` after plugin auto-initialization is ignored. The following only applies before installation; see [Manual integration](./manual-integration.md) for the full startup sequence:
 
 ```ts
 window.__RF__.install({
@@ -91,15 +91,17 @@ When CSP limits the origins for a resource type, include the primary and fallbac
 
 This table covers CSP source restrictions only. Cross-origin fonts and Hybrid SW requests must still satisfy browser CORS, MIME, SRI, and related security constraints.
 
+The nonce option is a build-time string. For a per-response nonce, replace a placeholder in the HTML at the server or edge and use the same value in the CSP response header. The plugin does not generate per-response nonces; see Production deployment.
+
 ## SRI strategies
 
-When Observer replaces `<script>` or `<link>` during fallback, the `sri` option controls `integrity` handling:
+SRI verifies file contents. Deploying identical build artifacts to multiple CDNs preserves the same hash. When Observer creates a recovery `<script>` or `<link>`, `sri` controls `integrity` handling:
 
-| Strategy          | Behavior                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| `strip` (default) | Remove `integrity` on fallback — different CDNs typically produce different hashes               |
-| `keep`            | Preserve `integrity`; browser verification failure triggers error and continues to next fallback |
-| `strict`          | Same as `keep`, with more explicit semantics                                                     |
+| Strategy          | Behavior                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `strip` (default) | Do not copy `integrity` onto recovery tags, including same-URL retries; that tag no longer verifies SRI |
+| `keep`            | Preserve `integrity`; browser verification failure triggers error and continues to next fallback        |
+| `strict`          | Same as `keep`, with more explicit semantics                                                            |
 
 ```ts
 resourceFallback({

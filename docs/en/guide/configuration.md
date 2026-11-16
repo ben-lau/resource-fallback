@@ -15,7 +15,7 @@ Both Vite (`ViteResourceFallbackOptions`) and Webpack (`WebpackPluginOptions`) p
 | `rules`               | `FallbackRule[]`                  | **Required**         | Fallback rules; compilation sorts by descending `base` length so longer prefixes match first                                                   |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | Default retry/circuit config for all rules                                                                                                     |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` always logs; `'auto'` controlled via `localStorage.__RF_DEBUG__`                                                                        |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Strategy for handling `integrity` during fallback                                                                                              |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | Handling `integrity` on recovery tags, including same-URL retries                                                                              |
 | `enableDev`           | `boolean`                         | `false`              | Whether to activate in dev mode                                                                                                                |
 | `nonce`               | `string`                          | —                    | CSP nonce appended to every injected `<script>`, including the automatic inline `install(...)`                                                 |
 | `externalRuntime`     | `boolean`                         | `false`              | Externalizes only the runtime IIFE; automatic `install(...)` stays inline and needs CSP authorization; it does not preserve build-config hooks |
@@ -48,7 +48,7 @@ Current page-side rule and circuit behavior is more specific than the public typ
 - a recovery session first selects one rule from the initial URL, then walks that rule's ordered `urls` candidates;
 - the page runtime currently has one circuit registry, initialized from the first compiled rule's circuit options. `FallbackRule.circuit` remains public, but independent per-rule page circuits are not implemented yet.
 
-## RetryOptions
+## RetryOptions: retries {#retryoptions}
 
 | Field       | Type      | Default | Description                        |
 | ----------- | --------- | ------- | ---------------------------------- |
@@ -57,7 +57,13 @@ Current page-side rule and circuit behavior is more specific than the public typ
 | `maxDelay`  | `number`  | `3000`  | Exponential backoff delay cap (ms) |
 | `jitter`    | `boolean` | `true`  | Add ±25% random jitter to delay    |
 
-## CircuitOptions
+## Timeouts and retry budgets {#timeouts}
+
+The page Coordinator currently uses fixed deadlines: **30 seconds per attempt** and **120 seconds per recovery session**. There is no public `retry.timeout` option. The session includes backoff waits and may end before candidates are exhausted. Timing begins when the adapter enters the Coordinator; the browser's original request before Observer recovery is outside this budget.
+
+`retry.max` counts retries per URL, excluding its first attempt. With a primary plus two candidates and `max: 1`, at most `3 × (1 + 1) = 6` attempts occur if no host is circuit-open and no deadline expires. This bounds request count, not end-to-end latency. Hybrid SW uses its own resolver and does not share these page deadlines.
+
+## CircuitOptions: circuit breakers {#circuitoptions}
 
 | Field             | Type      | Default  | Description                                                       |
 | ----------------- | --------- | -------- | ----------------------------------------------------------------- |
@@ -75,7 +81,7 @@ The page-side RecoveryCoordinator also shares one in-flight recovery Promise per
 - `hooks` in build config do not survive automatic injection;
 - `externalRuntime` only changes whether the runtime IIFE is inline or external, not the serialization behavior; the automatic `install(...)` call remains inline and needs a `nonce` or equivalent authorization under a strict CSP;
 - DOM `rf:*` events are the recommended monitoring path for auto-injected setups;
-- use JS hooks only when you manually call `window.__RF__.install()` in page code and pass live function objects yourself.
+- pass JS hooks in the first manual installation. Repeating `install()` after plugin initialization has no effect; see [Manual integration](./manual-integration.md).
 
 ## ServiceWorkerOptions
 

@@ -43,7 +43,7 @@ Both report network success after recovery. The home replay uses the page-side c
 
 ### rf:error: terminal failure and cached recovery {#rf-error}
 
-Page events indicate terminal recovery, including candidate exhaustion or attempt/session deadlines. SW events indicate network failure and may still be followed by a Cache API hit. **This is not a universal user-visible failure signal.** See [Timeouts and retry budgets](./configuration.md).
+Page events indicate terminal recovery, including candidate exhaustion or attempt/session deadlines. SW events indicate network failure and may still be followed by a Cache API hit. **This is not a universal user-visible failure signal.** See [Timeouts and retry budgets](./configuration.md#timeouts).
 
 ## DOM listener examples
 

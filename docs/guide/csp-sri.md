@@ -52,7 +52,7 @@ resourceFallback({
 
 `externalRuntime` 只解决 CSP 下 runtime script 的放置方式；它**不会**让构建配置里的函数变得可序列化。`buildInjectedTags()` 与插件自动生成的 `window.__RF__.install(...)` 调用都会先序列化配置对象，因此自动注入场景下 `hooks` 里的函数始终会被丢弃。
 
-若你在页面代码里**手动**调用 `window.__RF__.install()`，并直接传入 live 函数对象，hooks 可以生效；这**不要求** `externalRuntime: true`，关键在于绕过构建期序列化：
+hooks 需要在 runtime 的**首次安装**时直接传入函数对象；插件已自动安装后，重复 `install()` 会被忽略。以下片段仅用于尚未安装的页面，完整启动顺序见[手动集成](./manual-integration.md)：
 
 ```ts
 window.__RF__.install({
@@ -80,15 +80,17 @@ window.__RF__.install({
 
 这张表只覆盖 CSP 来源限制；跨源字体和 Hybrid SW 的网络请求仍需满足 CORS、MIME、SRI 等浏览器安全约束。
 
+配置中的 nonce 是构建期字符串。动态 nonce 需要服务端或边缘层为每次 HTML 响应替换占位值，并在 CSP 响应头使用同一个值。插件不会自动生成每响应 nonce；部署步骤见生产部署。
+
 ## SRI 策略
 
-fallback 到不同 CDN 时，文件的 hash 可能不一致。resource-fallback 提供三种 SRI 处理策略：
+SRI 校验取决于文件内容。同一份构建产物同步到不同 CDN 时，hash 应保持一致。Observer 创建恢复用的 `<script>` / `<link>` 时，按以下策略处理 `integrity`：
 
-| 策略            | 行为                                                                  |
-| --------------- | --------------------------------------------------------------------- |
-| `strip`（默认） | fallback 时移除 `integrity` 属性，因为不同 CDN 的文件 hash 通常不匹配 |
-| `keep`          | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退                |
-| `strict`        | 同 `keep`，语义化更明确                                               |
+| 策略            | 行为                                                                                |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `strip`（默认） | 创建恢复标签时不复制 `integrity`，包括同地址重试；恢复请求不再执行该标签的 SRI 校验 |
+| `keep`          | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退                              |
+| `strict`        | 同 `keep`，语义化更明确                                                             |
 
 ```ts
 resourceFallback({

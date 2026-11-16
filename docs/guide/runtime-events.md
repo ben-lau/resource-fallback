@@ -43,7 +43,7 @@ resource-fallback 通过 DOM CustomEvent 和可选 JS 函数钩子暴露运行�
 
 ### rf:error：终态与缓存恢复 {#rf-error}
 
-页面侧表示恢复终止，可能由候选耗尽、单次或 session 超时等原因引起。SW 表示网络链路失败，随后仍可能命中 Cache API。**它不是统一的用户侧失败信号。** 超时边界见[超时与重试预算](./configuration.md)。
+页面侧表示恢复终止，可能由候选耗尽、单次或 session 超时等原因引起。SW 表示网络链路失败，随后仍可能命中 Cache API。**它不是统一的用户侧失败信号。** 超时边界见[超时与重试预算](./configuration.md#timeouts)。
 
 ## 监听示例
 
