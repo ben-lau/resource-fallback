@@ -447,7 +447,7 @@ pnpm --filter @resource-fallback-example/webpack-react test:e2e
 
 ### 测试预览包
 
-分支 push 和 PR 在所有 CI 检查通过后，会通过 [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) 生成临时预览包，不会发布到 npm。普通 PR 评论提供固定 SHA 链接；待发版的 Release PR 评论提供 `main` 和 SHA 链接。也可以在 [预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)或 CI 的 `preview / publish` 摘要中查找。
+新建或更新 PR，以及 push 到 `main` 时，所有 CI 检查通过后会通过 [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) 生成临时预览包。普通 PR 评论提供固定 SHA 链接；待发版的 Release PR 评论提供 `main` 和 SHA 链接。也可以在 [预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)或 CI 的 `preview / publish` 摘要中查找。
 
 例如，按需安装最新成功构建的 `main` 预览：
 

@@ -91,15 +91,14 @@ feat!: rename config option `retryCount` to `maxRetries`
 
 维护者先为本仓库安装 [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new/installations/new)，选择 `ben-lau/resource-fallback` 即可。CLI 已固定在开发依赖和锁文件中；预览发布不需要 npm token。
 
-| 触发方式            | 构建与安装命令位置                                                     |
-| ------------------- | ---------------------------------------------------------------------- |
-| push 仓库内任意分支 | 所有 CI 检查通过后发布；安装命令显示在 `CI` → `preview / publish` 摘要 |
-| 提交或更新 PR       | 所有 CI 检查通过后发布；安装命令显示在 PR 评论和上述运行摘要中         |
-| push 到 `main`      | 同样等待所有 CI 检查；待发版 PR 评论另提供 `@main` 和固定 SHA 链接     |
+| 触发方式       | 构建与安装命令位置                                                 |
+| -------------- | ------------------------------------------------------------------ |
+| 提交或更新 PR  | 所有 CI 检查通过后发布；安装命令显示在 PR 评论和上述运行摘要中     |
+| push 到 `main` | 同样等待所有 CI 检查；待发版 PR 评论另提供 `@main` 和固定 SHA 链接 |
 
 预览一次发布 `core`、`vite-plugin`、`webpack-plugin`，包内版本为 `0.0.0-preview-<sha>`，内部依赖指向同一批预览包。普通 PR 评论由 pkg.pr.new 自动更新，外部 fork PR 也使用同一流程。自动评论对所有包都显示 `pnpm add`；插件作为开发依赖时可加 `-D`，CI 摘要已按包区分命令。CI 对 PR 测试模拟合并结果，预览构建则检出 PR head，使预览链接中的 SHA 与构建源码对应；因此完整 CI 检查的是合并结果，而不是单独的 head。若旧分支尚无 `pkg-pr-new` 依赖，需先同步接入配置。首次贡献的 fork PR 可能需要维护者批准运行 workflow。
 
-`@main` 指向最近一次成功生成的预览，新提交后请先确认对应 CI 成功；需要复现时使用固定 SHA 链接，并在切换预览时更新锁文件。没有待发版 PR 时，仍可从运行摘要或[预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)获取安装入口。仓库内已有 PR 的分支 push 可能同时触发 push 和 PR 两次构建；较旧的分支构建可能被新的 push 取消。
+`@main` 指向最近一次成功生成的预览，新提交后请先确认对应 CI 成功；需要复现时使用固定 SHA 链接，并在切换预览时更新锁文件。没有待发版 PR 时，仍可从运行摘要或[预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)获取安装入口。普通分支需要打开 PR 才会触发 CI。推送到已有 PR 的分支时会触发 PR CI，并取消同一 PR 上仍在运行的旧一轮 CI。
 
 预览包会被服务定期清理，仅用于临时测试，长期使用请换回正式 npm 版本。npm 12 安装插件预览时，其 core 预览也是远程依赖，可能需要 `--allow-remote=all`；后续重新安装时也需保留相应设置。
 

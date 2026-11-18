@@ -447,7 +447,7 @@ The manual `Publish` workflow uses the same checks. See [CONTRIBUTING.md](./CONT
 
 ### Testing preview packages
 
-Branch pushes and pull requests produce temporary packages through [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) after all CI checks pass, without publishing to npm. Ordinary PR comments contain commit SHA links; the pending Release PR links to both `main` and a specific SHA. Commands are also available on the [preview page](https://pkg.pr.new/~/ben-lau/resource-fallback) and in the CI `preview / publish` summary.
+Opening or updating a PR and pushing to `main` produce temporary packages through [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) after all CI checks pass. Ordinary PR comments contain commit SHA links; the pending Release PR links to both `main` and a specific SHA. Commands are also available on the [preview page](https://pkg.pr.new/~/ben-lau/resource-fallback) and in the CI `preview / publish` summary.
 
 For example, install the latest successful `main` preview for the package you need:
 
