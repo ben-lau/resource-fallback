@@ -441,15 +441,13 @@ pnpm --filter @resource-fallback-example/webpack-react test:e2e
 1. 正常提交代码到 `main`（使用 conventional commits 格式）
 2. release-please 自动创建/更新一个 **Release PR**（包含版本号 bump + CHANGELOG 更新）
 3. 想要发版时，合并该 Release PR → 自动创建 GitHub Release + git tag
-4. npm 发布：
+4. 用独立项目安装三个候选 `.tgz`，通过构建和浏览器回退验收后，将同一批包发布到 npm
 
-```bash
-pnpm release                # build + publish 所有包到 npm
-```
+手动补发走 GitHub Actions 的 `Publish`，同样需要通过验收。详情见 [CONTRIBUTING.md](./CONTRIBUTING.md#发布流程)。
 
 ### 测试预览包
 
-分支 push 和 PR 在所有 CI 检查通过后，会通过 [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) 生成临时预览包，不会发布到 npm。普通 PR 评论提供固定 SHA 链接；待发版的 Release PR 评论提供 `main` 和 SHA 链接。也可以在 [预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)或 CI 的 `preview / publish` 摘要中查找。
+新建或更新 PR，以及 push 到 `main` 时，所有 CI 检查通过后会通过 [pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) 生成临时预览包。普通 PR 评论提供固定 SHA 链接；待发版的 Release PR 评论提供 `main` 和 SHA 链接。也可以在 [预览列表](https://pkg.pr.new/~/ben-lau/resource-fallback)或 CI 的 `preview / publish` 摘要中查找。
 
 例如，按需安装最新成功构建的 `main` 预览：
 
