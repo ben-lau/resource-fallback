@@ -78,7 +78,14 @@ feat!: rename config option `retryCount` to `maxRetries`
 1. 提交 `feat:` / `fix:` 类型 commits 到 `main`
 2. release-please 自动创建/更新 Release PR
 3. 合并 Release PR → 自动创建 GitHub Release + tag
-4. 自动构建并发布 npm 包；也保留手动触发 `Publish` workflow 的入口
+4. `Verify Release` 从该提交构建并打包三个 npm 包，用独立消费项目安装候选 `.tgz`，验证包入口、生产构建和 Chromium 中的入口及懒加载回退
+5. 验收通过后，自动将同一批 `.tgz` 按 core、Vite 插件、Webpack 插件的顺序发布到 npm
+
+手动触发 `Publish` 也会先跑同一套验收。想单独检查某个分支或 tag 的候选包，可以手动触发 `Verify Release`。验收组合见[兼容性](./docs/guide/compatibility.md)。
+
+如果 npm 发布中途失败，用原工作流的 **Re-run failed jobs** 继续发布。发布脚本会核对 npm 中已有版本的包完整性，跳过内容相同的包。
+
+如果连续推送导致 Release Please 创建的 tag 与工作流的提交不同，自动发布会停止。用该 tag 触发 `Publish`，让验收、发布包和 npm provenance 都对应同一个提交。
 
 ## 未发版预览包
 

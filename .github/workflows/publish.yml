@@ -3,37 +3,35 @@ name: Publish
 on:
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
+  verify:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/verify-release.yml
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
+    concurrency:
+      group: npm-publish
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
           node-version-file: '.node-version'
           registry-url: 'https://registry.npmjs.org'
 
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-packages
+          path: ${{ runner.temp }}/release-packages
+
       - run: npm i -g npm@latest
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm build
-
-      - run: pnpm typecheck
-
-      - run: pnpm test
-
-      - run: pnpm publint
-
-      - run: pnpm attw
-
-      - run: pnpm size:check
-
-      - run: pnpm -r --filter='./packages/*' publish --provenance --access public --no-git-checks
+      - run: node scripts/publish-release.mjs "$RUNNER_TEMP/release-packages"

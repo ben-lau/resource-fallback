@@ -441,11 +441,9 @@ This project uses [release-please](https://github.com/googleapis/release-please)
 1. Push commits to `main` using conventional commits format
 2. release-please automatically creates/updates a **Release PR** (with version bump + CHANGELOG)
 3. Merge the Release PR when ready → automatically creates GitHub Release + git tag
-4. Publish to npm:
+4. Install the three candidate `.tgz` files in clean consumer projects, then publish those same files to npm once the builds and browser fallback checks pass.
 
-```bash
-pnpm release                # build + publish all packages to npm
-```
+The manual `Publish` workflow uses the same checks. See [CONTRIBUTING.md](./CONTRIBUTING.md#发布流程) for the release process.
 
 ### Testing preview packages
 

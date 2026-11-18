@@ -1,0 +1,121 @@
+name: Verify Release
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-sha:
+        type: string
+        default: ''
+      release-tag:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Check the release commit and version
+        env:
+          RELEASE_SHA: ${{ inputs.release-sha || github.sha }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          checked_out_sha=$(git rev-parse HEAD)
+          if [ "$checked_out_sha" != "$RELEASE_SHA" ]; then
+            echo "::error::Workflow commit $checked_out_sha differs from release commit $RELEASE_SHA. Run Publish for tag $RELEASE_TAG."
+            exit 1
+          fi
+          if [ -n "$RELEASE_TAG" ]; then
+            test "v$(node -p "require('./package.json').version")" = "$RELEASE_TAG"
+          fi
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm size:check
+
+      - name: Pack the npm release candidates
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-packages"
+          for package in core vite-plugin webpack-plugin; do
+            pnpm --dir "packages/$package" pack --out "$RUNNER_TEMP/release-packages/$package.tgz"
+          done
+
+      - name: Lint the packed packages and their type declarations
+        run: |
+          for archive in "$RUNNER_TEMP/release-packages/"*.tgz; do
+            pnpm exec publint run "$archive"
+            pnpm exec attw "$archive" --entrypoints .
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: ${{ runner.temp }}/release-packages/*.tgz
+          if-no-files-found: error
+          overwrite: true
+
+  consumer:
+    needs: package
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { bundler: vite, version: '4.0.0', node-version: 18 }
+          - { bundler: vite, version: '7', node-version: 22 }
+          - { bundler: vite, version: '8', node-version: 22 }
+          - { bundler: webpack, version: '5', node-version: 18 }
+          - { bundler: webpack, version: '5', node-version: 22 }
+    name: ${{ matrix.bundler }} ${{ matrix.version }} on Node ${{ matrix.node-version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-packages
+          path: ${{ runner.temp }}/release-packages
+
+      - name: Install the packed plugin and core in a clean project
+        env:
+          BUNDLER: ${{ matrix.bundler }}
+          BUNDLER_VERSION: ${{ matrix.version }}
+        run: |
+          cp -R tests/release-consumer "$RUNNER_TEMP/release-consumer"
+          cd "$RUNNER_TEMP/release-consumer"
+          packages=(
+            "$RUNNER_TEMP/release-packages/core.tgz"
+            "$RUNNER_TEMP/release-packages/$BUNDLER-plugin.tgz"
+            "$BUNDLER@$BUNDLER_VERSION"
+          )
+          if [ "$BUNDLER" = webpack ]; then
+            packages+=(html-webpack-plugin@5)
+          fi
+          npm install --engine-strict --ignore-scripts --no-audit --no-fund --package-lock=false --save-exact "${packages[@]}"
+
+      - name: Install Chromium
+        working-directory: ${{ runner.temp }}/release-consumer
+        run: node_modules/.bin/playwright install --with-deps --only-shell chromium
+
+      - name: Verify package exports, production build and browser fallback
+        working-directory: ${{ runner.temp }}/release-consumer
+        env:
+          BUNDLER: ${{ matrix.bundler }}
+        run: node verify.mjs "$BUNDLER"

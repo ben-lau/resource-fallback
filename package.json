@@ -31,7 +31,6 @@
     "size:check": "size-limit --limit",
     "size:why": "size-limit --why",
     "cz": "czg",
-    "release": "pnpm build && pnpm -r --filter='./packages/*' publish",
     "prepare": "lefthook install",
     "docs:typedoc": "typedoc",
     "docs:dev": "pnpm docs:typedoc && vitepress dev docs",
