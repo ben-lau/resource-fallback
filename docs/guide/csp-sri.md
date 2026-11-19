@@ -80,7 +80,7 @@ window.__RF__.install({
 
 这张表只覆盖 CSP 来源限制；跨源字体和 Hybrid SW 的网络请求仍需满足 CORS、MIME、SRI 等浏览器安全约束。
 
-配置中的 nonce 是构建期字符串。动态 nonce 需要服务端或边缘层为每次 HTML 响应替换占位值，并在 CSP 响应头使用同一个值。插件不会自动生成每响应 nonce；部署步骤见生产部署。
+配置中的 nonce 是构建期字符串。动态 nonce 需要服务端或边缘层为每次 HTML 响应替换占位值，并在 CSP 响应头使用同一个值。插件不会自动生成每响应 nonce；部署步骤见[生产部署](./deployment.md#nonce)。
 
 ## SRI 策略
 

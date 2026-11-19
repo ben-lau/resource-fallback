@@ -91,7 +91,7 @@ When CSP limits the origins for a resource type, include the primary and fallbac
 
 This table covers CSP source restrictions only. Cross-origin fonts and Hybrid SW requests must still satisfy browser CORS, MIME, SRI, and related security constraints.
 
-The nonce option is a build-time string. For a per-response nonce, replace a placeholder in the HTML at the server or edge and use the same value in the CSP response header. The plugin does not generate per-response nonces; see Production deployment.
+The nonce option is a build-time string. For a per-response nonce, replace a placeholder in the HTML at the server or edge and use the same value in the CSP response header. The plugin does not generate per-response nonces; see [Production deployment](./deployment.md#nonce).
 
 ## SRI strategies
 

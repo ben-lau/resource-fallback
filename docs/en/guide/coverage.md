@@ -44,5 +44,5 @@ If entry candidates all fail, React/Vue has not booted. Register [entry degradat
 
 - [Compatibility](./compatibility.md): declared support and continuous validation.
 - [Quick start](./quick-start.md): reproduce primary CDN failure.
-- Deployment: publish identical artifacts and verify candidates.
+- [Deployment](./deployment.md): publish identical artifacts and verify candidates.
 - [Troubleshooting](./troubleshooting.md): start with the observed symptom.

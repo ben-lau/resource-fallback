@@ -31,4 +31,4 @@ runtime IIFE 的编译目标为 ES2020，并使用原生动态 `import()`。Syst
 | Vite dev                  | 默认关闭，动态导入恢复不在完整支持范围         |
 | Worker / SSR              | 当前页面 runtime 在非浏览器环境跳过安装        |
 
-对照[覆盖范围](./coverage.md)与发布验收，分别验证入口、懒加载、CSS 和需要的 SW 资源。
+对照[覆盖范围](./coverage.md)与[发布验收](./deployment.md#verification)，分别验证入口、懒加载、CSS 和需要的 SW 资源。

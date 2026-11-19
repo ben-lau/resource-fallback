@@ -31,4 +31,4 @@ The runtime IIFE targets ES2020 and uses native dynamic `import()`. The SystemJS
 | Vite dev                  | Disabled by default; full dynamic-import recovery is outside coverage         |
 | Worker / SSR              | Page runtime skips installation outside the browser                           |
 
-Use [Coverage](./coverage.md) and release acceptance to test entry, lazy JS/CSS, and the required SW resources separately.
+Use [Coverage](./coverage.md) and [release acceptance](./deployment.md#verification) to test entry, lazy JS/CSS, and the required SW resources separately.
