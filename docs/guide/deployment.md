@@ -96,4 +96,4 @@ Vite 会把 public 文件复制到输出目录；Webpack 项目需在发布步�
 | 旧页面加载新路由 | 旧 hash 文件仍可下载                         |
 | Hybrid SW        | 首次访问与受控页面、冷缓存与已有缓存分别验证 |
 
-故障验证步骤见[快速开始](./quick-start.md#验证)；SW 更新和停用见 SW 运维。
+故障验证步骤见[快速开始](./quick-start.md#验证)；SW 更新和停用见 [SW 运维](./sw-operations.md)。

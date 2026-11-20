@@ -96,4 +96,4 @@ For static hosting without response transformation, evaluate CSP hash authorizat
 | Old page opens a route | Old hashed files remain available                                 |
 | Hybrid SW              | First/controlled visits and cold/warm caches checked separately   |
 
-See [Quick start](./quick-start.md#verification) for fault injection and SW operations for update and shutdown.
+See [Quick start](./quick-start.md#verification) for fault injection and [SW operations](./sw-operations.md) for update and shutdown.

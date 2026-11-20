@@ -40,7 +40,7 @@ if (runtime && typeof runtime.load === 'function') {
 
 ## dispose() {#dispose}
 
-取消进行中的页面恢复、移除监听器并清理全局对象。卸载后的旧恢复不会继续影响下一次安装。已注册 SW 及受控客户端需单独管理，见 SW 运维。
+取消进行中的页面恢复、移除监听器并清理全局对象。卸载后的旧恢复不会继续影响下一次安装。已注册 SW 及受控客户端需单独管理，见 [SW 运维](../guide/sw-operations.md)。
 
 ## TypeScript 接入 {#typescript}
 

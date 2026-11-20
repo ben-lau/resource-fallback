@@ -174,3 +174,5 @@ Page kill switches such as `window.__RF_DISABLE__`, query flags, or cookies only
 - [SW Fallback Comparison](../design/sw-comparison.md) — design rationale
 - [Configuration Reference](./configuration.md)
 - [Runtime Events](./runtime-events.md)
+
+See [SW operations](./sw-operations.md) for updates, existing PWAs, and shutdown; see [Coverage](./coverage.md) for manifest requirements.

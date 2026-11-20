@@ -9,13 +9,13 @@ Declared support, example dependencies, and CI coverage are separate. Verify fai
 
 ## Bundlers and plugins
 
-| Combination              | Declaration or example dependency    | Continuous validation                                       |
-| ------------------------ | ------------------------------------ | ----------------------------------------------------------- |
-| Vite                     | Peer `>=4`; examples use Vite 7.x    | Vite + Vue production builds and Chromium E2E               |
-| Webpack                  | Peer `>=5`; examples use Webpack 5.x | Webpack + React production builds and Chromium E2E          |
-| html-webpack-plugin      | Optional peer `>=4`                  | Example HTML injection; manual injection when absent        |
-| SystemJS / plugin-legacy | Instantiate integration exists       | Scenarios covered by example tests, not every legacy target |
-| Workbox / other PWA      | No merged integration guarantee      | Design scope/routing first; see SW operations               |
+| Combination              | Declaration or example dependency    | Continuous validation                                                            |
+| ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------- |
+| Vite                     | Peer `>=4`; examples use Vite 7.x    | Vite + Vue production builds and Chromium E2E                                    |
+| Webpack                  | Peer `>=5`; examples use Webpack 5.x | Webpack + React production builds and Chromium E2E                               |
+| html-webpack-plugin      | Optional peer `>=4`                  | Example HTML injection; manual injection when absent                             |
+| SystemJS / plugin-legacy | Instantiate integration exists       | Scenarios covered by example tests, not every legacy target                      |
+| Workbox / other PWA      | No merged integration guarantee      | Design scope/routing first; see [SW operations](./sw-operations.md#existing-pwa) |
 
 Vite 4+ is the package's support declaration, not a CI matrix containing every major. Build and browser requirements also differ: packages declare Node `>=18`; unit tests currently run on Node 20/22/24.
 

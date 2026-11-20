@@ -40,7 +40,7 @@ Keep ordinary framework dynamic imports in application code. `window.__RF__.inte
 
 ## dispose() {#dispose}
 
-Cancels in-flight page recovery, removes listeners, and clears the global object. Old recovery work cannot affect the next installation. Manage worker registrations and controlled clients separately; see SW operations.
+Cancels in-flight page recovery, removes listeners, and clears the global object. Old recovery work cannot affect the next installation. Manage worker registrations and controlled clients separately; see [SW operations](../guide/sw-operations.md).
 
 ## TypeScript integration {#typescript}
 

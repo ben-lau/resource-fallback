@@ -143,3 +143,5 @@ SW 注册、安装、激活、接管页面是异步流程。第一次访问页�
 - [配置参考 — ServiceWorkerOptions](./configuration.md#serviceworkeroptions)
 - [SW 对比设计](../design/sw-comparison.md)
 - [CSP 与 SRI](./csp-sri.md)
+
+部署更新、已有 PWA 与紧急停用步骤见 [SW 运维](./sw-operations.md)。资源的 manifest 条件见[覆盖范围](./coverage.md)。

@@ -9,13 +9,13 @@ description: 区分构建器的支持声明、示例依赖、浏览器运行要�
 
 ## 构建器与插件
 
-| 组合                     | 声明或当前依赖                              | 持续验证范围                                       |
-| ------------------------ | ------------------------------------------- | -------------------------------------------------- |
-| Vite                     | peer dependency `>=4`；示例使用 Vite 7.x    | Vite + Vue 生产构建与 Chromium E2E                 |
-| Webpack                  | peer dependency `>=5`；示例使用 Webpack 5.x | Webpack + React 生产构建与 Chromium E2E            |
-| html-webpack-plugin      | peer dependency `>=4`，可选                 | 示例通过它自动注入 HTML；缺省时需手动注入          |
-| SystemJS / plugin-legacy | 具备 instantiate 接入路径                   | 以示例测试覆盖的场景为准，不代表所有 legacy target |
-| Workbox / 其他 PWA       | 无独立合并集成保证                          | 先设计 scope 与路由，见 SW 运维                    |
+| 组合                     | 声明或当前依赖                              | 持续验证范围                                                       |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------ |
+| Vite                     | peer dependency `>=4`；示例使用 Vite 7.x    | Vite + Vue 生产构建与 Chromium E2E                                 |
+| Webpack                  | peer dependency `>=5`；示例使用 Webpack 5.x | Webpack + React 生产构建与 Chromium E2E                            |
+| html-webpack-plugin      | peer dependency `>=4`，可选                 | 示例通过它自动注入 HTML；缺省时需手动注入                          |
+| SystemJS / plugin-legacy | 具备 instantiate 接入路径                   | 以示例测试覆盖的场景为准，不代表所有 legacy target                 |
+| Workbox / 其他 PWA       | 无独立合并集成保证                          | 先设计 scope 与路由，见 [SW 运维](./sw-operations.md#existing-pwa) |
 
 `Vite 4+` 是包的支持声明，不等于每个 Vite 大版本都在 CI 矩阵内。构建插件和浏览器运行环境也有不同要求：包声明 Node `>=18`，当前单元测试矩阵为 Node 20/22/24。
 

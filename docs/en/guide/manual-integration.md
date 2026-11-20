@@ -59,7 +59,7 @@ This example installs the page Observer. Vite dynamic-import rewriting, the Webp
 ## Installation and disposal
 
 - `install()` is idempotent: a second call neither updates rules nor adds hooks.
-- `dispose()` cancels page recovery and removes page listeners/global state; it does not immediately disable an existing worker. See SW operations.
+- `dispose()` cancels page recovery and removes page listeners/global state; it does not immediately disable an existing worker. See [SW operations](./sw-operations.md).
 - Do not dispose/reinstall for ordinary event subscription. If reinstallation is necessary, recreate the entire startup path and verify in-flight resources.
 
 See the [Runtime API](../reference/runtime.md) for method availability.
