@@ -158,18 +158,7 @@ resourceFallback({
 
 ## 版本升级建议
 
-本项目使用 [release-please](https://github.com/googleapis/release-please) 管理版本号和 changelog：
-
-1. 正常提交代码到 `main`（使用 conventional commits 格式）
-2. release-please 自动创建/更新 Release PR（包含版本号 bump + CHANGELOG 更新）
-3. 合并 Release PR → 自动创建 GitHub Release + git tag
-4. npm 发布：`pnpm release`
-
-升级时注意：
-
-- 查看 [更新日志](../changelog.md) 了解 breaking changes
-- Hybrid SW 启用后，确保 `rf-sw.js` 正确部署到 scope 对应路径
-- SW 更新时浏览器会自动获取新版本（`updateViaCache: 'none'`）
+升级插件后，核对 runtime 文件、规则行为与 SW 更新。具体步骤见[升级与迁移](./migration.md)；维护者发布流程见 [CONTRIBUTING](https://github.com/ben-lau/resource-fallback/blob/main/CONTRIBUTING.md#发布流程)。
 
 ## React / Vue 异步组件
 
