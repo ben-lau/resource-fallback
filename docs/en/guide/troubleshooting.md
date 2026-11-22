@@ -11,6 +11,8 @@ Start with one failed static asset. Use Network to check which URLs were request
 
 | Signal                                                     | Next check                                                           |
 | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| Blank entry or failed lazy route                           | [Check startup and error boundaries](#entry-failure)                 |
+| Slow recovery or termination before exhaustion             | [Timeouts and budgets](./configuration.md#timeouts)                  |
 | The primary CDN failed with no `rf:retry` or `rf:fallback` | [Check the runtime and rule match](#rule-match)                      |
 | `rf:fallback` fired, but the next request failed           | [Check the destination and response](#candidate-response)            |
 | `rf:error` fired and the user outcome is unclear           | [Distinguish a terminal error from cache recovery](#terminal-result) |
@@ -19,6 +21,12 @@ Start with one failed static asset. Use Network to check which URLs were request
 ::: tip Reproduce one failure at a time
 Use a production build and a fresh browser context. Open Network, block one lazy-loaded chunk on the primary CDN, and visit its route. The page can boot, so you can correlate events for that asset.
 :::
+
+## Blank entry or failed lazy route {#entry-failure}
+
+For a blank entry, verify the runtime, initializer, and entry asset actually execute. Register [entry degradation](./runtime-events.md#degraded-ui-for-entry-failures) before the entry; waiting for React/Vue boot is too late.
+
+If only a route fails, start with that route's JS and CSS requests. Handle terminal recovery in an application error boundary; do not create a reload loop from `rf:error`. If the expected backup request never appears, inspect rule matching next.
 
 ## Check the runtime and rule match {#rule-match}
 

@@ -21,10 +21,6 @@ pnpm add -D @resource-fallback/webpack-plugin html-webpack-plugin
 
 :::
 
-::: warning Webpack dependency
-The Webpack plugin relies on `html-webpack-plugin` to inject the runtime automatically. If your project does not use it, inject the runtime manually via `@resource-fallback/core`.
-:::
-
 ## Minimal Vite config
 
 ```ts
@@ -44,8 +40,6 @@ export default defineConfig({
             'https://backup.example.com/',
             '/', // origin fallback
           ],
-          retry: { max: 2, baseDelay: 300 },
-          circuit: { threshold: 3, cooldown: 30000 },
         },
       ],
     }),
@@ -81,6 +75,10 @@ module.exports = {
   ],
 };
 ```
+
+::: warning Webpack dependency
+The Webpack plugin relies on `html-webpack-plugin` to inject the runtime automatically. If your project does not use it, inject the runtime manually via `@resource-fallback/core`.
+:::
 
 ::: tip Align rule `base` with publicPath
 `rules[].base` (rule `base`) should equal `output.publicPath`.
@@ -167,3 +165,5 @@ The plugin is inactive in dev by default (`enableDev: false`). Use `vite build &
 - [Configuration Reference](./configuration.md) — full options
 - [Runtime Events](./runtime-events.md) — event listening and monitoring
 - [Best Practices](./best-practices.md) — production recommendations
+
+Before release, read [Production deployment](./deployment.md) and check paths with the URL prefix preview.

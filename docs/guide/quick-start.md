@@ -21,10 +21,6 @@ pnpm add -D @resource-fallback/webpack-plugin html-webpack-plugin
 
 :::
 
-::: warning Webpack 依赖
-Webpack 插件依赖 `html-webpack-plugin` 自动注入运行时。如果项目不使用它，需要通过 `@resource-fallback/core` 手动注入 runtime。
-:::
-
 ## Vite 最小配置
 
 ```ts
@@ -44,8 +40,6 @@ export default defineConfig({
             'https://backup.example.com/',
             '/', // 回源
           ],
-          retry: { max: 2, baseDelay: 300 },
-          circuit: { threshold: 3, cooldown: 30000 },
         },
       ],
     }),
@@ -81,6 +75,10 @@ module.exports = {
   ],
 };
 ```
+
+::: warning Webpack 依赖
+Webpack 插件依赖 `html-webpack-plugin` 自动注入运行时。如果项目不使用它，需要通过 `@resource-fallback/core` 手动注入 runtime。
+:::
 
 ::: tip rule `base` 与 publicPath 对齐
 `rules[].base`（rule `base`）应当与 `output.publicPath` 保持一致。
@@ -167,3 +165,5 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 - [配置参考](./configuration.md) — 完整配置选项
 - [运行时事件](./runtime-events.md) — 事件监听与监控对接
 - [最佳实践](./best-practices.md) — 生产环境建议
+
+上线前继续阅读[生产部署](./deployment.md)，用 URL 前缀预览器核对发布路径。

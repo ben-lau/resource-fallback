@@ -188,7 +188,7 @@ module.exports = {
 | `rules`               | `FallbackRule[]`                  | **必填**             | 回退规则数组；编译时按 `base` 长度降序排序，匹配时优先更长前缀                                    |
 | `defaults`            | `{ retry?, circuit? }`            | —                    | 所有规则的默认重试/熔断配置                                                                       |
 | `debug`               | `boolean \| 'auto'`               | `'auto'`             | `true` 始终打印日志；`'auto'` 通过 `localStorage.__RF_DEBUG__` 控制                               |
-| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | fallback 时对 `integrity` 属性的处理策略                                                          |
+| `sri`                 | `'strip' \| 'keep' \| 'strict'`   | `'strip'`            | 创建恢复标签时对 `integrity` 的处理，包括同地址重试                                               |
 | `enableDev`           | `boolean`                         | `false`              | 开发模式下是否启用                                                                                |
 | `nonce`               | `string`                          | —                    | 附加到每个注入 `<script>`（包括自动内联 `install(...)`）的 CSP nonce                              |
 | `externalRuntime`     | `boolean`                         | `false`              | 只把 runtime IIFE 改为外链；自动 `install(...)` 仍内联且需 CSP 授权；不会保留构建配置里的函数钩子 |
@@ -277,7 +277,7 @@ SW 内部 resolver 的熔断器始终使用独立内存状态，即使页面侧 
 因此：
 
 - 自动注入 / 构建配置里的监控接入，推荐使用 DOM `rf:retry`、`rf:fallback`、`rf:success`、`rf:error` 事件；
-- 只有在你手动控制 `window.__RF__.install()` 调用、并在页面里直接传入函数对象时，JS hooks 才会生效。
+- JS hooks 必须在首次手动 `install()` 时传入；插件已安装后，重复调用不会更新规则或 hooks。
 
 ## 运行时行为
 
@@ -330,11 +330,11 @@ resourceFallback({
 
 ## SRI 策略
 
-| 策略            | 行为                                                                  |
-| --------------- | --------------------------------------------------------------------- |
-| `strip`（默认） | fallback 时移除 `integrity` 属性，因为不同 CDN 的文件 hash 通常不匹配 |
-| `keep`          | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退                |
-| `strict`        | 同 `keep`，语义化更明确                                               |
+| 策略            | 行为                                                                            |
+| --------------- | ------------------------------------------------------------------------------- |
+| `strip`（默认） | 创建恢复标签时不复制 `integrity`，包括同地址重试；同一份构建产物应保持相同 hash |
+| `keep`          | 保留属性，浏览器校验不匹配时触发 error，继续下一个回退                          |
+| `strict`        | 同 `keep`，语义化更明确                                                         |
 
 > 若需在所有 CDN 上保留 SRI，请确保**同一文件在所有 CDN 上的 hash 一致**（推荐：将构建产物同步到多个对象存储桶）。
 
@@ -374,7 +374,7 @@ window.addEventListener('rf:error', (e) => {
 });
 ```
 
-或在页面里手动调用 `window.__RF__.install(...)` 并直接传入 live hooks（不要求 `externalRuntime`；关键在于绕过构建期序列化）：
+手动管理 HTML 的项目可在首次 `window.__RF__.install(...)` 时传入 live hooks。插件已安装后重复调用无效，完整步骤见[手动集成](https://ben-lau.github.io/resource-fallback/guide/manual-integration)：
 
 ```ts
 window.__RF__.install({
@@ -478,7 +478,7 @@ pnpm release                # build + publish 所有包到 npm
 ### 文档
 
 - [x] **API Reference 独立文档站** — 已由 TypeDoc 生成并挂载到 VitePress 的 `/api/` 页面
-- [ ] **迁移指南** — 从无回退方案迁移的步骤
+- [x] **迁移指南** — [升级与迁移](https://ben-lau.github.io/resource-fallback/guide/migration)，说明行为变化与回滚验证
 - [ ] **常见问题 FAQ** — 收集社区反馈的典型问题
 
 ## 许可证

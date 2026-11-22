@@ -1,0 +1,115 @@
+---
+title: How it works
+outline: [2, 3]
+---
+
+# How it works
+
+Bundler adapters preserve loading semantics while the page Coordinator owns recovery decisions. SW handles managed subresources in its own context.
+
+## Architecture overview
+
+```mermaid
+graph TB
+  subgraph build["Build Time (Node)"]
+    VP["Vite Plugin<br/><small>writeBundle dynamic import rewrite<br/>transformIndexHtml HTML injection</small>"]
+    WP["Webpack Plugin<br/><small>RuntimeModule<br/>HtmlWebpackPlugin</small>"]
+    CORE["@resource-fallback/core<br/><small>buildInjectedTags() → &lt;script&gt; IIFE<br/>serialiseConfig() → JSON config</small>"]
+    VP --> CORE
+    WP --> CORE
+  end
+
+  CORE -->|"HTML Injection"| INSTALL
+
+  subgraph runtime["Runtime (Browser)"]
+    INSTALL["window.__RF__.install(config)"]
+
+    subgraph adapters["Adapter Layer"]
+      OBS["Observer<br/><small>&lt;script&gt; / &lt;link&gt; error listening</small>"]
+      VA["Vite Adapter<br/><small>__RF__.load / __RF__.url</small>"]
+      WA["Webpack Adapter<br/><small>__webpack_require__.l wrapping</small>"]
+      SA["SystemJS Adapter<br/><small>instantiate hook</small>"]
+      SWA["SW Adapter<br/><small>register / postMessage bridge</small>"]
+    end
+
+    subgraph engine["Decision Engine"]
+      RC["RecoveryCoordinator<br/><small>retry / fallback / deadlines / cancellation</small>"]
+      REG["In-flight Registry + Circuit Registry + EventBus"]
+    end
+
+    HB["HookBus<br/><small>rf:retry / rf:fallback<br/>rf:success / rf:error</small>"]
+
+    INSTALL --> OBS
+    INSTALL --> VA
+    INSTALL --> WA
+    INSTALL --> SA
+    INSTALL --> SWA
+    OBS --> RC
+    VA --> RC
+    WA --> RC
+    SA --> RC
+    RC --> REG
+    REG --> HB
+  end
+```
+
+### Fallback flow
+
+```mermaid
+flowchart TD
+  START(["Resource load failed"]) --> MATCH{"Rule match?"}
+  MATCH -->|No| IGNORE["Ignore<br/><small>browser default behavior</small>"]
+  MATCH -->|Yes| RETRY{"Retries ≤ max?"}
+  RETRY -->|Yes| DELAY["Exponential backoff delay"] --> RELOAD["Retry same URL<br/><small>module scripts append __rf= param</small>"]
+  RELOAD --> RESULT{"Load result"}
+  RESULT -->|Success| SUCCESS["rf:success ✓"]
+  RESULT -->|Failed| RETRY
+  RETRY -->|No| RECORD["Record host failure<br/>to circuit breaker"] --> NEXT{"Uncircuited<br/>candidates remain?"}
+  NEXT -->|Yes| SWITCH["Switch to next URL<br/><small>reset retry counter</small>"] --> RELOAD2["Load new URL"]
+  RELOAD2 --> RESULT2{"Load result"}
+  RESULT2 -->|Success| SUCCESS
+  RESULT2 -->|Failed| RETRY
+  NEXT -->|No| GIVEUP["rf:error ✗<br/><small>all candidates exhausted</small>"]
+```
+
+## Package structure
+
+| Package                                                                                                | Description                                   | Version source              |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------- |
+| [`@resource-fallback/core`](https://www.npmjs.com/package/@resource-fallback/core)                     | Browser IIFE runtime + Node utility functions | See npm page / package.json |
+| [`@resource-fallback/vite-plugin`](https://www.npmjs.com/package/@resource-fallback/vite-plugin)       | Vite 4+ plugin                                | See npm page / package.json |
+| [`@resource-fallback/webpack-plugin`](https://www.npmjs.com/package/@resource-fallback/webpack-plugin) | Webpack 5+ plugin                             | See npm page / package.json |
+
+### @resource-fallback/core
+
+Core runtime and build utilities:
+
+- **RecoveryCoordinator** — the page-side decision engine for rule selection, retry/fallback, deadlines, cancellation, and events
+- **Retry** — exponential backoff + jitter
+- **Circuit Registry** — per-host circuit state; the page runtime currently uses a single registry with optional localStorage cross-tab sharing
+- **Observer** — listens for `<script>` / `<link>` error events
+- **Adapters** — Vite / Webpack / SystemJS / SW adapters; they provide transport and ownership admission
+- **buildInjectedTags()** — generates HTML injection tags
+- **getRuntimeCode()** — returns IIFE runtime source
+
+### @resource-fallback/vite-plugin
+
+Vite build integration — see [Vite Integration](../guide/vite.md):
+
+- `transformIndexHtml` HTML injection
+- dynamic `import()` wrapping
+- Optional Hybrid SW asset generation
+
+Three current page-runtime limits are worth calling out:
+
+- `window.__RF__.url(filename)` always builds the initial URL from the first compiled rule's `base`; it does not skip circuit-open hosts;
+- rules are compiled with longer `base` prefixes first, and once recovery starts the RecoveryCoordinator picks one rule from the initial URL and walks that rule's ordered candidates;
+- the page runtime currently initializes one circuit registry rather than one per rule.
+
+### @resource-fallback/webpack-plugin
+
+Webpack build integration — see [Webpack Integration](../guide/webpack.md):
+
+- `RuntimeModule` injection, patches `__webpack_require__.l`
+- `html-webpack-plugin` HTML injection integration
+- Optional Hybrid SW asset generation
