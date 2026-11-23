@@ -1,8 +1,24 @@
 ---
 title: Case Studies
+outline: 2
 ---
 
-# IV. Problems Solved in This Repo (Background → Thinking → Solution)
+# Case Studies
+
+<span id="iv-problems-solved-in-this-repo-background-→-thinking-→-solution" aria-hidden="true"></span>
+
+Find a case by its symptom, then read the context, analysis, and solution. Each case distinguishes historical and current behavior.
+
+| Symptom                                                  | Start here                                          |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| Duplicate requests, lazy load rejects after CSS recovery | [Webpack ownership](#case-1)                        |
+| Dynamic imports or async CSS fail                        | [Vite rewriting](#case-2)                           |
+| Retrying a module does not request it again              | [ESM cache](#case-3)                                |
+| Unexpected CDN / origin path                             | [Build prefixes](#case-4), [relative URLs](#case-6) |
+| Duplicate legacy recovery                                | [SystemJS](#case-7)                                 |
+| Events disagree with user-visible results                | [Event semantics](#case-9), [Hybrid SW](#case-10)   |
+
+<span id="case-1" aria-hidden="true"></span>
 
 ## 4.1 Webpack: global Observer and chunk runtime both handle the same failure
 
@@ -53,6 +69,8 @@ Not limited to mini-css: any **non-`j`** loader on **`__webpack_require__.f`** w
 CSS loading still via Observer **`<link>`** (unchanged ownership). See **`examples/webpack-react`** lazy-b with **`*.css` chunk** E2E.
 
 ---
+
+<span id="case-2" aria-hidden="true"></span>
 
 ## 4.2 Vite: `import()` failure cannot be fixed by DOM alone; rewriting too early breaks preload/CSS topology
 
@@ -105,6 +123,8 @@ Payload is on **`event.payload`**, not `detail`; without **`preventDefault()`**,
 
 ---
 
+<span id="case-3" aria-hidden="true"></span>
+
 ## 4.3 Browser: ES Module failed URL / module map cache; re-inserting same URL is ineffective
 
 ### Background
@@ -132,6 +152,8 @@ When switching to **new host** in `urls`, carrying retry-only query long-term **
 Expected: each real retry shows **changed URL or host** in Network.
 
 ---
+
+<span id="case-4" aria-hidden="true"></span>
 
 ## 4.4 Vite `base: '/'` but rules use CDN rule `base` — async chunks wrongly point at CDN
 
@@ -167,6 +189,8 @@ Two gates:
 
 ---
 
+<span id="case-5" aria-hidden="true"></span>
+
 ## 4.5 `<script>` `cloneNode` to preserve attrs then change `src` — new script may not execute
 
 ### Background
@@ -191,6 +215,8 @@ Works with §4.3 URL rewrite: **new node** + stripped or `__rf` URL.
 
 ---
 
+<span id="case-6" aria-hidden="true"></span>
+
 ## 4.6 Rule `base: '/'` but runtime reads `script.src` as absolute URL — prefix match fails
 
 ### Background
@@ -208,6 +234,8 @@ Compare **same URL dimension** as config — use **`getAttribute('src')`/`href`*
 **`base: '/'` + `<script src="/assets/…">`** still prefix-matches. Ensure **rule `base` matches the attribute literal** if frameworks write absolute URLs.
 
 ---
+
+<span id="case-7" aria-hidden="true"></span>
 
 ## 4.7 SystemJS (legacy) vs Observer fighting the same load — double fallback or gaps
 
@@ -228,6 +256,8 @@ Same as §4.1: **ownership first**. SystemJS needs **runtime URL registration** 
 Observer: if **`ownership.admit('observer', logicalKey)` is denied**, **return**. Legacy and modern share the page ownership boundary without double-counting retries.
 
 ---
+
+<span id="case-8" aria-hidden="true"></span>
 
 ## 4.8 Legacy Resolver (mainly SW / historical discussion): try initial URL first, circuit vs `urls`, `findPrepared`/`isFallback`
 
@@ -254,6 +284,8 @@ Use **`joinAssetPrefix`** in **`swap`** to avoid **`prod` + `js/foo.js` → `pro
 
 ---
 
+<span id="case-9" aria-hidden="true"></span>
+
 ## 4.9 Observability: don't treat page-side `rf:error` as a stable reason contract
 
 ### Background
@@ -267,6 +299,8 @@ Monitoring treating all **`rf:error`** as incidents → **alert noise** (third-p
 Demos: only **`retry` or `fallback`** in new event slice means **"entered fallback state machine"**; **`error` only** → UI shows **"not intercepted (expected)"**. Production: split dashboards by event type first, and treat `reason` as diagnostic detail rather than stable page API.
 
 ---
+
+<span id="case-10" aria-hidden="true"></span>
 
 ## 4.10 Hybrid Service Worker: images/fonts/CSS subresources — SW is not universal onerror
 

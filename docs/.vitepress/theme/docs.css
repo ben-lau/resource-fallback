@@ -234,6 +234,10 @@
   text-underline-offset: 0.2em;
 }
 
+.vp-doc span[id][aria-hidden='true'] {
+  scroll-margin-block-start: calc(var(--vp-nav-height) + 4rem);
+}
+
 .vp-doc p,
 .vp-doc li {
   line-height: inherit;

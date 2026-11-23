@@ -1,12 +1,28 @@
 ---
 title: 问题案例
+outline: 2
 ---
 
-# 四、本仓库内解决过的问题（背景 → 思考过程 → 解决方案）
+# 问题案例
 
-### 4.1 Webpack：全局 Observer 与 chunk runtime 同时对同一失败做文章
+<span id="四、本仓库内解决过的问题-背景-→-思考过程-→-解决方案" aria-hidden="true"></span>
 
-#### 背景
+按现象找到案例，再阅读背景、分析与解决方案。各案例区分历史实现与当前行为。
+
+| 现象                               | 先看                                       |
+| ---------------------------------- | ------------------------------------------ |
+| 请求量翻倍、CSS 恢复后懒加载仍失败 | [Webpack ownership](#case-1)               |
+| 动态导入或异步 CSS 失败            | [Vite 产物改写](#case-2)                   |
+| 同一模块 URL 没有重新请求          | [ESM 缓存](#case-3)                        |
+| CDN / 回源地址不符合预期           | [构建前缀](#case-4)、[相对 URL](#case-6)   |
+| Legacy 重复回退                    | [SystemJS](#case-7)                        |
+| 事件与用户结果对不上               | [事件语义](#case-9)、[Hybrid SW](#case-10) |
+
+<span id="case-1" aria-hidden="true"></span>
+
+## 4.1 Webpack：全局 Observer 与 chunk runtime 同时对同一失败做文章
+
+### 背景
 
 Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流程往 DOM 里挂 `<script>`。为了覆盖 **入口脚本**、**异步 JS**、**CSS chunk**，工程里同时使用：
 
@@ -17,14 +33,14 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 
 另外，Webpack 会给 **异步 chunk** 的 `<script>` 打上 **`data-webpack="..."`**。但 **extract 出来的样式** 常以 **`<link data-webpack="...">`** 形式出现；Webpack 自带的 chunk JS 加载器 **并不等同地处理 `<link>` 的失败链**——若\_observer 整块退出，CSS chunk 又没人管。
 
-#### 思考过程
+### 思考过程
 
 首先确认 **是不是双订阅**：临时关掉一端，请求轮数是否减半。  
 接着明确 **划界粒度不能是「有 data-webpack 就全不干」**：那样会放空 CSS。
 
 结论应是：**同一种「已由 Webpack loader 管线明确 owning」的失败只走一条路径**；**CSS** 由于没有对称的 runtime adapter，必须由 **仍能看见 `<link>` error 的那一途**接管。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 在 `packages/core/src/runtime/observer.ts` 内：
 
@@ -36,7 +52,7 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 
 实施后预期：**单次失败只驱动一条 retry/fallback 序列**；Webpack 控制台与 rf 事件对齐后，可对「每个 chunk 的失败次数上限」心里有数。当前实现还额外通过 ownership registry + in-flight sharing 保证：同一个逻辑 chunk 只会有一个 owner 接管，而同 owner 的并发请求复用同一个 recovery Promise。
 
-#### 延伸：异步 CSS chunk — Observer 不够，还须拦住 **`Promise.all` 里的 reject**
+### 延伸：异步 CSS chunk — Observer 不够，还须拦住 **`Promise.all` 里的 reject**
 
 **背景**：`mini-css-extract-plugin`、webpack **`experiments.css`** 等会在运行时往 **`__webpack_require__.f`** 上挂 **除 `j`（JS）以外的 loader**（典型键名如 **`miniCss`**）。异步分包若带独立 **`.css` chunk**，`__webpack_require__.e(chunkId)` 实质是 **`Promise.all`** 收集 **`l.f.j`** 与各 CSS loader 推入的 promise。**CSS `<link>` 加载失败**时，插件生成的 **`onerror` 会直接 `reject(ChunkLoadError)`**（常见 **`code: 'CSS_CHUNK_LOAD_FAILED'`**，且 **`request`** 指向含 `.css` 的 URL）。
 
@@ -53,9 +69,11 @@ Webpack 5 异步 chunk 由 runtime 调用类似 `__webpack_require__.l` 的流�
 
 ---
 
-### 4.2 Vite：`import()` 失败无法单靠 DOM 替换兜底；改产物过早会破坏 preload/CSS 拓扑
+<span id="case-2" aria-hidden="true"></span>
 
-#### 背景
+## 4.2 Vite：`import()` 失败无法单靠 DOM 替换兜底；改产物过早会破坏 preload/CSS 拓扑
+
+### 背景
 
 Vue/React Router 懒加载在打包结果里多半是：
 
@@ -70,13 +88,13 @@ import('./views/About-xxxx.js');
 
 早期若尝试仅用 `renderDynamicImport` 等钩子，常与 **preload 代码生成顺序**打架。
 
-#### 思考过程
+### 思考过程
 
 - **手工方案**（每个 `lazy` 外包 try/catch、业务里手写换 URL）：无法覆盖将来新增的懒加载入口，也不可维护。
 - **纯 HTML/onerror**：只覆盖静态入口 `<script>`，**盖不住 `import()` 图**。
 - **钩子时序**：改写动态 import 的 **最晚安全点**应当是「Vite 写完磁盘上的 chunk，`dynamicImports`、`__vitePreload`、CSS 侧的引用均已定型」——即 **bundle 已落地之后**再做 **文本级、可审计的替换**。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 插件实现见 `packages/vite-plugin/src/index.ts`：
 
@@ -100,7 +118,7 @@ import('./views/About-xxxx.js');
 
 附加闸门见 **4.4**——只有 `shouldRewriteUrls` 为真时才执行上述磁盘改写，以免 Vite `base` 与 rule `base` **不一致**时还去动 chunk。
 
-#### 延伸：`vite:preloadError` 会「顺手」掐断后面的 JS 动态加载
+### 延伸：`vite:preloadError` 会「顺手」掐断后面的 JS 动态加载
 
 **背景**：Vite 生成的 **`__vitePreload`** 在 **CSS 预加载失败**时会派发 **`vite:preloadError`**（可 `cancelable`），并在 **`defaultPrevented` 为假时 `throw`**。若插件把动态 import 改成了 **`__vitePreload(..., () => __RF__.load(...))`** 这类形态，则 **CSS 预加载一失败就先抛错**，**后续的 `__RF__.load()` 根本不会执行**——表现为 **直达异步路由时 About 等 chunk 的 JS 永远不加载**，与 CSS 是否最终被 Observer 修好无关。
 
@@ -110,9 +128,11 @@ import('./views/About-xxxx.js');
 
 ---
 
-### 4.3 浏览器：ES Module 失败 URL / module map 缓存；重插「同一 URL」无效
+<span id="case-3" aria-hidden="true"></span>
 
-#### 背景
+## 4.3 浏览器：ES Module 失败 URL / module map 缓存；重插「同一 URL」无效
+
+### 背景
 
 对 **`type="module"`** 的 `<script>` 或运行时 **`import(specifier)`**：一旦某 **绝对 URL**（含 origin + path）对应 **失败的 module graph**，浏览器会 **缓存失败状态**。此时你在 DOM 上做：
 
@@ -122,14 +142,14 @@ import('./views/About-xxxx.js');
 
 另一类需求：**切换到 `urls` 里全新的 host** 时，若在 URL 上 **长期携带** 「仅用于重试去重缓存」的 query，会 **稀释 CDN 边缘缓存**，同一内容变成多个 cache key。
 
-#### 思考过程
+### 思考过程
 
 - Classic script：**每次插入新标签**更容易触发新请求，因此不必默认加 cache bust。
 - **`type=\"module"` 与动态 import**：必须 **换一个「对 module loader 来说是新 URL」的字符串**，常见手段是 **`?__rf=attempt-nonce`**；换到 **fallback host**后应 **删掉**该类参数，只对 **同源重试 URL**短暂存在。
 
 Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 append/strip），否则一端能恢复一端不能。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 **Observer**（`observer.ts`）：
 
@@ -147,9 +167,11 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.4 `vite.config` 里 Vite `base: '/'`，规则却写 CDN `base` —— 异步 chunk 被整块拼到 CDN 外域（或逻辑错位）
+<span id="case-4" aria-hidden="true"></span>
 
-#### 背景
+## 4.4 `vite.config` 里 Vite `base: '/'`，规则却写 CDN `base` —— 异步 chunk 被整块拼到 CDN 外域（或逻辑错位）
+
+### 背景
 
 很常见的一种配置心理状态：
 
@@ -164,7 +186,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 - Vite `base`仍是 `/`，但懒加载请求的却是 **`https://cdn.../assets/xxx.js`**，出现 **Mixed Content/CORS**，或无故 **变慢**；
 - 与产品设计「**不对齐就不改语义**」相反——**没在 CDN 发布的构建**却被 **构建插件硬改**.
 
-#### 思考过程
+### 思考过程
 
 需要两层闸门：
 
@@ -174,7 +196,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 不应靠业务「记得删掉规则」人肉保证。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 在 `vite-plugin` 的 **`configResolved`**：
 
@@ -194,19 +216,21 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.5 `<script>` 用 `cloneNode`「保留属性后再改 src」— 新脚本不执行或行为诡异
+<span id="case-5" aria-hidden="true"></span>
 
-#### 背景
+## 4.5 `<script>` 用 `cloneNode`「保留属性后再改 src」— 新脚本不执行或行为诡异
+
+### 背景
 
 替换失败节点的直觉实现是：**`el.cloneNode(true)`**，改掉 `src`，再 **`replaceChild`**。在某些浏览器路径下，克隆的脚本元素 **继承「已开始执行」等内部槽位**，规范层面 **禁止对已完成生命周期的克隆再 fetch**，现象是：**Network 静默**、控制台无报错、页面卡在半初始化。
 
 这和普通 `div` 的 clone **完全不是同一种心智模型**。
 
-#### 思考过程
+### 思考过程
 
 一旦确认 **「新建一个没有历史负担的脚本元素」是唯一稳妥路径**，就要系统化 **属性白名单**：不能无脑 copy 全部 attribute（部分安全或执行相关属性需要和 SRI/`nonce`/CSP 策略一致）。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 在 `observer.ts` 的 `cloneTag`（函数名沿用历史语义，实际是 \*\*create 而非 clone）：
 
@@ -224,19 +248,21 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.6 规则写 `base: '/'`，运行时用 `script.src` 得到绝对 URL —— 前缀匹配失败
+<span id="case-6" aria-hidden="true"></span>
 
-#### 背景
+## 4.6 规则写 `base: '/'`，运行时用 `script.src` 得到绝对 URL —— 前缀匹配失败
+
+### 背景
 
 配置里习惯写 **「相对站点根」**的前缀，例如 `base: '/'` 或 `base: 'https://app.example.com/'` 与 **部署时 publicPath** 对齐。但 DOM 里 **`<script src="/assets/index.js">`** 读出 **`.src` 属性**时，浏览器 **规范化为完整的 `https://origin/assets/…`**。
 
 若沿用旧的 **resolver / observer string 前缀匹配**语义（例如 **`url.indexOf(pattern) === 0`**），则 **`/` 作为前缀**会与 **`https://…`**形态的字符串 **对不上**：表现为 **「首页明明挂了 CDN，Observer 永远不介入」**，或误以为库坏了。
 
-#### 思考过程
+### 思考过程
 
 必须统一 **「参与匹配的那一维 URL」**：要么 **规则全部写完整 origin**（对用户不友好），要么 **读 DOM 时使用与字面配置可比的形态**。业内常见做法是 **比对 `getAttribute('src')`/href**（保持 **HTML 字面量**，与 `href`/`src`写入时一致），而不是 **总是 canonicalize 之后的属性取值**。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 `readUrl(el)`：**仅使用 `el.getAttribute('src')` 或 `el.getAttribute('href')`**（空串兜底），绝不为了「方便」改成 `HTMLScriptElement.prototype.src`。
 
@@ -246,9 +272,11 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 ---
 
-### 4.7 SystemJS（legacy）与 Observer 争抢同一加载 — 双倍回退或漏处理
+<span id="case-7" aria-hidden="true"></span>
 
-#### 背景
+## 4.7 SystemJS（legacy）与 Observer 争抢同一加载 — 双倍回退或漏处理
+
+### 背景
 
 `@vitejs/plugin-legacy` 等流水线会在不支持 `import` 的环境走 **SystemJS**。资源 URL、`fetch`/`instantiate` 路径与现代 **原生 `import`** 分叉。若在 **不知情**前提下仍只靠 **全局 `error` Observer**：
 
@@ -257,7 +285,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 两条链 **互不感知**，易出现 **双倍请求**，或一端 **改写 DOM** 另一端 **仍以旧 URL 重试**，状态机错乱。
 
-#### 思考过程
+### 思考过程
 
 与 **§4.1**同理：**ownership**先于算法。区别在于 **Webpack 可以用 `data-webpack` 判别**；SystemJS 路径需要 **运行时登记「此 URL 由 SystemJS 适配器认领」**，Observer **看到同一个 URL（或等价键）就不再接管**。
 
@@ -275,7 +303,7 @@ Observer 路径与 **`__RF__.load`** 路径必须 **语义对齐**（同一套 a
 
 方案 B 的核心优势：**不复制 SystemJS 内部实现**，当 SystemJS 升级或内部行为变化时自动兼容，维护成本显著低于方案 A。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 采用 **方案 B（委托式）**：在 **`System.constructor.prototype.instantiate`** 上做薄封装：**内部仍调原始 instantiate**，在失败时通过 `.catch()` 接入页面侧 **`RecoveryCoordinator.recover(...)`** 驱动 retry/fallback 循环。成功把 **进入 SystemJS 管线的 URL** 通过 ownership registry 认领，Observer 对同一 logical key 的 admission 会被拒绝。
 
@@ -285,9 +313,11 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 ---
 
-### 4.8 Legacy Resolver（主要用于 SW / 历史讨论）：初始链路先试、熔断与 `urls`、`findPrepared`/`isFallback`
+<span id="case-8" aria-hidden="true"></span>
 
-#### 背景
+## 4.8 Legacy Resolver（主要用于 SW / 历史讨论）：初始链路先试、熔断与 `urls`、`findPrepared`/`isFallback`
+
+### 背景
 
 产品上常同时要求：
 
@@ -303,7 +333,7 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 这一节描述的是 `packages/core/src/runtime/resolver.ts` 仍保留的 legacy `Resolver` 语义，当前主要服务于 SW fetch 层与历史对照。页面 runtime 已改由 `RecoveryCoordinator` + compileRuntimeConfig 管理恢复，不再直接把这套匹配顺序、reason 枚举和 circuit 组合暴露为页面契约。
 
-#### 思考过程（与实现对齐）
+### 思考过程（与实现对齐）
 
 参阅 `packages/core/src/runtime/resolver.ts`：
 
@@ -323,15 +353,17 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 若需要讨论重复 rule `base` 的优先级，请明确限定在 legacy resolver / SW 语境；不要把它描述成当前页面 runtime 的公开行为。
 
-#### 解决方案小结
+### 解决方案小结
 
 把这些 **写成代码与注释**，比单纯文档承诺「先试主链路」更可维护；熔断 **作用在备选链上的 host**，与 **首轮 rule `base`**解耦。**`swap`/`joinAssetPrefix`** 等小函数避免 **CDN 前缀少写末尾 `/`**时 **字符串直连文件名** 拼成 **`…prod` + `js/foo.js` → `…prodjs/foo.js`** 的病态 URL（线上表现为路径缺一层目录、404）；实现上需在 **`joinAssetPrefix`** 中 **按需补 `/`**，并在 **`swap` 剥前缀后走同一拼接**。
 
 ---
 
-### 4.9 观测与示例：不要把页面 `rf:error` 当作稳定 reason 协议
+<span id="case-9" aria-hidden="true"></span>
 
-#### 背景
+## 4.9 观测与示例：不要把页面 `rf:error` 当作稳定 reason 协议
+
+### 背景
 
 为调试方便，项目在 HTML 早期注入 listener，把所有 **`rf:*`** push 进 **`window.__RF_EVENTS__`**。
 
@@ -339,14 +371,14 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 产品上 **监控**若把 **`rf:error` 全盘当成事故**，也会产生 **告警风暴**——其中大量可能是 **预期的 no-match（第三方脚本、无关域）**.
 
-#### 思考过程
+### 思考过程
 
 必须把 **语义细分**落实到 **示例与消费者指南**：
 
 - **`rf:retry` / `rf:fallback`**：说明 **确实进入了回退状态机**，下一轮会换 URL / 再加参数。
 - **`rf:error`**：在页面侧应视为 **终态失败信号**，而不是稳定的 reason 枚举；`no-match` / `rules-exhausted` 之类的细分更适合放在历史或 SW resolver 讨论里。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 示例应用（Vue/React demo）改为：在点击「加载不匹配规则脚本」后，只扫描 **`__RF_EVENTS__` 新增的 slice**，若 **`type` 字段为 `'retry'` 或 `'fallback'`** 才认定为 **「本库已进入回退状态机」**；若仅有 **`error` 且无 retry/fallback**，则 UI 文案为 **符合预期的「未被拦截」**。
 
@@ -354,9 +386,11 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 ---
 
-### 4.10 Hybrid Service Worker：补齐图片/字体/CSS 子资源，但不能把 SW 当成“全能 onerror”
+<span id="case-10" aria-hidden="true"></span>
 
-#### 背景
+## 4.10 Hybrid Service Worker：补齐图片/字体/CSS 子资源，但不能把 SW 当成“全能 onerror”
+
+### 背景
 
 本轮引入 **Hybrid SW** 的目标不是替换现有 Observer / Vite / Webpack / SystemJS adapter，而是补齐 DOM 层很难看见的资源：`img`、`@font-face`、CSS `url()`、媒体资源以及受控 CSS `@import`。
 
@@ -369,7 +403,7 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 - **Service Worker 持久存在**：rebuild 后旧 SW 可能继续控制当前页面；磁盘 `dist/rf-sw.js` 已经是新的，不代表浏览器当前 controller 就是新的。
 - **测试“元素可见”不等于资源生效**：`<img>` 元素可见、背景块可见，只说明 DOM 渲染了；必须检查 `naturalWidth`、`document.fonts.check()`、SW 事件和 request/response，才能证明图片/字体真正 fallback 成功。
 
-#### 思考过程
+### 思考过程
 
 核心取舍是 **Hybrid ownership**：
 
@@ -380,7 +414,7 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 由此可以把 SW 当成 **一层补充的资源请求 owner**，而不是“fetch 层统一替换所有 adapter”。
 
-#### 解决方案（如何实现）
+### 解决方案（如何实现）
 
 1. **默认 path 跟随 scope 派生**
 
@@ -422,7 +456,7 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
    另一个容易忽略的边界是熔断器：页面 runtime 默认可以通过 `localStorage` 跨 tab 共享 host 状态，但 SW resolver 必须强制使用独立内存 circuit。否则某个 tab 的页面侧状态会影响 SW 全局 fetch 决策，排障时会出现“清了页面状态但 SW 仍跳过 host”的错觉。
 
-#### 排障经验
+### 排障经验
 
 - **先看 secure context**：`localhost` 能跑、IP 不行，通常不是库逻辑错，而是 SW 注册被浏览器拒绝。必须用 `localhost`、`127.0.0.1` 或 HTTPS。
 - **先清旧 SW 再判断**：调试命令：
@@ -449,7 +483,7 @@ Observer 在处理 error 目标时：**若 `ownership.admit('observer', logicalK
 
 - **字体示例必须用真实字体**：文本占位的 `.woff2` 会被浏览器当坏字体丢弃，E2E 应使用真实 `.ttf/.woff2` 并断言 `document.fonts.check()`。
 
-#### 亮点总结
+### 亮点总结
 
 这套 Hybrid SW 的亮点不是“多写一个 SW”，而是 **把每种资源的 owner、时机和可观测性拆清楚**：
 
