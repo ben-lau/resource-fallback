@@ -12,15 +12,15 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "vue": "^3.5.13",
-    "vue-router": "^4.4.5"
+    "vue": "^3.5.46",
+    "vue-router": "^4.6.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0",
+    "@playwright/test": "^1.65.1",
     "@resource-fallback/vite-plugin": "workspace:*",
     "@vitejs/plugin-legacy": "^6.1.1",
-    "@vitejs/plugin-vue": "^6.0.7",
-    "terser": "^5.46.2",
-    "vite": "^7.3.5"
+    "@vitejs/plugin-vue": "^6.0.11",
+    "terser": "^5.51.3",
+    "vite": "^7.3.8"
   }
 }
