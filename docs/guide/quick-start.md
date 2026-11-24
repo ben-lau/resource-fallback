@@ -166,4 +166,4 @@ pnpm --filter @resource-fallback-example/webpack-react start   # http://127.0.0.
 - [运行时事件](./runtime-events.md) — 事件监听与监控对接
 - [最佳实践](./best-practices.md) — 生产环境建议
 
-上线前继续阅读[生产部署](./deployment.md)，用 URL 前缀预览器核对发布路径。
+上线前继续阅读[生产部署](./deployment.md)，用 [URL 前缀预览器](./url-preview.md)核对发布路径。

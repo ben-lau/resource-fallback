@@ -31,7 +31,7 @@ resourceFallback({
 });
 ```
 
-回退替换整个 `base`，保留 `assets/app-HASH.js`。`'/'` 指页面源站根目录；部署在 `/app/` 时应使用 `'/app/'`。可用 URL 前缀预览器核对。
+回退替换整个 `base`，保留 `assets/app-HASH.js`。`'/'` 指页面源站根目录；部署在 `/app/` 时应使用 `'/app/'`。可用 [URL 前缀预览器](./url-preview.md)核对。
 
 ## 发布与保留旧文件 {#release}
 

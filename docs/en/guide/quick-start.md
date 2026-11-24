@@ -166,4 +166,4 @@ The plugin is inactive in dev by default (`enableDev: false`). Use `vite build &
 - [Runtime Events](./runtime-events.md) — event listening and monitoring
 - [Best Practices](./best-practices.md) — production recommendations
 
-Before release, read [Production deployment](./deployment.md) and check paths with the URL prefix preview.
+Before release, read [Production deployment](./deployment.md) and check paths with the [URL prefix preview](./url-preview.md).

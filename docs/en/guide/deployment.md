@@ -31,7 +31,7 @@ resourceFallback({
 });
 ```
 
-Fallback replaces the entire `base` and retains `assets/app-HASH.js`. `'/'` means the page origin root; use `'/app/'` when files are deployed there. Check the URL prefix preview.
+Fallback replaces the entire `base` and retains `assets/app-HASH.js`. `'/'` means the page origin root; use `'/app/'` when files are deployed there. Check the [URL prefix preview](./url-preview.md).
 
 ## Publish and retain old artifacts {#release}
 

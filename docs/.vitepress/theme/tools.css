@@ -1,0 +1,147 @@
+.rf-tool {
+  margin-block: 1.5rem;
+  padding: clamp(1rem, 2.4vw, 1.75rem);
+  border-radius: var(--rf-radius);
+  background: var(--vp-c-bg-alt);
+}
+
+.rf-tool-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rf-tool label {
+  display: grid;
+  min-width: 0;
+  gap: 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.rf-tool-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.rf-tool :is(input, textarea, select) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: var(--rf-radius);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.rf-tool textarea {
+  resize: vertical;
+}
+.rf-tool :disabled {
+  opacity: 0.65;
+}
+.rf-tool-wide {
+  grid-column: 1 / -1;
+}
+.rf-tool summary {
+  cursor: pointer;
+  padding-block: 0.5rem;
+}
+.rf-tool details label {
+  margin-block-start: 0.75rem;
+}
+
+.rf-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rf-tool button {
+  min-height: 44px;
+  padding: 0.625rem 1rem;
+  border-radius: var(--rf-radius);
+  background: var(--vp-c-bg-soft);
+  color: var(--rf-accent);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.rf-tool button.rf-tool-primary {
+  background: var(--rf-accent);
+  color: var(--rf-on-accent);
+}
+.rf-tool button:hover {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-1);
+}
+.rf-tool button.rf-tool-primary:hover {
+  background: var(--vp-c-brand-2);
+  color: var(--rf-on-accent);
+}
+.rf-tool-result {
+  margin-block-start: 1.5rem;
+}
+.rf-tool .rf-tool-help {
+  margin-block: 0.75rem 0;
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+}
+.rf-tool-error {
+  margin-block-start: 1rem;
+  color: var(--vp-c-danger-1);
+  overflow-wrap: anywhere;
+}
+.rf-tool-facts {
+  margin: 0;
+}
+.rf-tool-facts div {
+  margin-block: 0.75rem;
+}
+.rf-tool-facts dt {
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+}
+.rf-tool-facts dd {
+  margin: 0;
+}
+.rf-tool code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.rf-tool .rf-url-chain {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+.rf-url-chain li {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  background: var(--vp-c-bg);
+}
+.rf-url-chain li > span {
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 639px) {
+  .rf-tool-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
