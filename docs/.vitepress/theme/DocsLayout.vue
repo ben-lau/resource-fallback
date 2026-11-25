@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useData, withBase } from 'vitepress';
 import DefaultTheme from 'vitepress/theme';
 
-const { lang, page } = useData();
+const { lang, page, theme } = useData();
 const english = computed(() => lang.value === 'en-US');
 const prefix = computed(() => (english.value ? '/en' : ''));
 
@@ -11,7 +11,8 @@ const sections = {
   guide: { zh: '指南', en: 'Guide', path: '/guide/introduction' },
   design: { zh: '设计', en: 'Design', path: '/design/sw-comparison' },
   experience: { zh: '开发经验', en: 'Dev experience', path: '/experience/' },
-  api: { zh: 'API', en: 'API', path: '/api/README' },
+  api: { zh: 'API', en: 'API', path: '/reference/' },
+  reference: { zh: 'API', en: 'API', path: '/reference/' },
 };
 
 const pagePath = computed(
@@ -44,6 +45,11 @@ const section = computed(() => {
           <li aria-current="page">{{ page.title }}</li>
         </ol>
       </nav>
+      <p class="rf-doc-version">
+        <a :href="withBase(prefix + '/guide/migration')"
+          >{{ english ? 'Docs for' : '文档版本' }} {{ theme.docVersion }}</a
+        >
+      </p>
     </template>
   </DefaultTheme.Layout>
 </template>

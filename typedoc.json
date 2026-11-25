@@ -15,5 +15,5 @@
   "outputFileStrategy": "modules",
   "hidePageHeader": true,
   "hideGroupHeadings": false,
-  "useCodeBlocks": true
+  "useCodeBlocks": false
 }

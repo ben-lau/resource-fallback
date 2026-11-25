@@ -1,11 +1,12 @@
-import { defineConfig } from 'vitepress';
+import { defineConfigWithTheme, type DefaultTheme } from 'vitepress';
 import { withMermaid } from 'vitepress-plugin-mermaid';
+import metadata from '../../package.json';
 import { configureMarkdown } from './markdown';
 
 const apiPage = /(^|\/)api\//;
 
 export default withMermaid(
-  defineConfig({
+  defineConfigWithTheme<DefaultTheme.Config & { docVersion?: string }>({
     base: '/resource-fallback/',
     title: 'Resource Fallback',
     description: '为 Vite 和 Webpack 构建产物提供运行时重试、多 CDN 回退和回源。',
@@ -15,8 +16,21 @@ export default withMermaid(
     lastUpdated: true,
     cleanUrls: true,
 
-    transformPageData({ relativePath, frontmatter }) {
-      if (apiPage.test(relativePath)) frontmatter.outline ??= [2, 3];
+    transformPageData(page) {
+      const { relativePath, frontmatter } = page;
+      if (apiPage.test(relativePath)) {
+        frontmatter.outline ??= [2, 3];
+        frontmatter.pageClass = 'rf-api-page';
+        const english = relativePath.startsWith('en/');
+        const names = {
+          index: ['函数与工具', 'Functions and helpers'],
+          types: ['类型与接口', 'Types and interfaces'],
+          'service-worker': ['Service Worker 工具', 'Service Worker helpers'],
+        };
+        const key = relativePath.split('/').pop()?.replace('.md', '') as keyof typeof names;
+        if (names[key]) page.title = frontmatter.title = names[key][english ? 1 : 0];
+      }
+      if (/(^|\/)reference\//.test(relativePath)) frontmatter.pageClass = 'rf-api-page';
     },
 
     srcExclude: [
@@ -32,6 +46,7 @@ export default withMermaid(
     },
 
     themeConfig: {
+      docVersion: metadata.version,
       logo: '/logo.svg',
       socialLinks: [{ icon: 'github', link: 'https://github.com/ben-lau/resource-fallback' }],
       search: {
@@ -62,7 +77,7 @@ export default withMermaid(
         },
       },
       editLink: {
-        pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+        pattern: sourceEditLink,
       },
     },
 
@@ -77,7 +92,7 @@ export default withMermaid(
           lastUpdated: { text: '最后更新' },
           editLink: {
             text: '在 GitHub 上编辑此页',
-            pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+            pattern: sourceEditLink,
           },
           docFooter: { prev: '上一篇', next: '下一篇' },
           returnToTopLabel: '返回顶部',
@@ -96,7 +111,7 @@ export default withMermaid(
           sidebar: enSidebar(),
           editLink: {
             text: 'Edit this page on GitHub',
-            pattern: 'https://github.com/ben-lau/resource-fallback/edit/main/docs/:path',
+            pattern: sourceEditLink,
           },
         },
       },
@@ -115,65 +130,41 @@ export default withMermaid(
   }),
 );
 
-function zhNav() {
+function zhNav(): DefaultTheme.NavItem[] {
   return [
     { text: '指南', link: '/guide/introduction', activeMatch: '/guide/' },
     {
       text: '深入',
       items: [
         { text: '开发经验', link: '/experience/' },
+        { text: '工作原理', link: '/design/architecture' },
         { text: 'SW 设计对比', link: '/design/sw-comparison' },
       ],
     },
-    { text: 'API', link: '/api/', activeMatch: '/api/' },
+    { text: 'API', link: '/reference/', activeMatch: '/(api|reference)/' },
     { text: '更新日志', link: '/changelog' },
   ];
 }
 
-function enNav() {
+function enNav(): DefaultTheme.NavItem[] {
   return [
     { text: 'Guide', link: '/en/guide/introduction', activeMatch: '/en/guide/' },
     {
       text: 'Deep Dive',
       items: [
         { text: 'Dev Experience', link: '/en/experience/' },
+        { text: 'How it works', link: '/en/design/architecture' },
         { text: 'SW Design', link: '/en/design/sw-comparison' },
       ],
     },
-    { text: 'API', link: '/en/api/', activeMatch: '/en/api/' },
+    { text: 'API', link: '/en/reference/', activeMatch: '/en/(api|reference)/' },
     { text: 'Changelog', link: '/en/changelog' },
   ];
 }
 
 function zhSidebar() {
   return {
-    '/guide/': [
-      {
-        text: '开始使用',
-        items: [
-          { text: '简介', link: '/guide/introduction' },
-          { text: '快速开始', link: '/guide/quick-start' },
-        ],
-      },
-      {
-        text: '构建工具集成',
-        items: [
-          { text: 'Vite', link: '/guide/vite' },
-          { text: 'Webpack', link: '/guide/webpack' },
-          { text: '配置参考', link: '/guide/configuration' },
-          { text: 'Hybrid Service Worker', link: '/guide/service-worker' },
-        ],
-      },
-      {
-        text: '上线与排查',
-        items: [
-          { text: '故障排查', link: '/guide/troubleshooting' },
-          { text: '运行时事件', link: '/guide/runtime-events' },
-          { text: 'CSP 与 SRI', link: '/guide/csp-sri' },
-          { text: '最佳实践', link: '/guide/best-practices' },
-        ],
-      },
-    ],
+    '/guide/': guideSidebar('zh'),
     '/experience/': [
       {
         text: '开发经验',
@@ -190,42 +181,20 @@ function zhSidebar() {
     '/design/': [
       {
         text: '设计文档',
-        items: [{ text: 'SW 资源回退对比', link: '/design/sw-comparison' }],
+        items: [
+          { text: '工作原理', link: '/design/architecture' },
+          { text: 'SW 资源回退对比', link: '/design/sw-comparison' },
+        ],
       },
     ],
     '/api/': apiSidebar('zh'),
+    '/reference/': apiSidebar('zh'),
   };
 }
 
 function enSidebar() {
   return {
-    '/en/guide/': [
-      {
-        text: 'Getting Started',
-        items: [
-          { text: 'Introduction', link: '/en/guide/introduction' },
-          { text: 'Quick Start', link: '/en/guide/quick-start' },
-        ],
-      },
-      {
-        text: 'Build Tool Integration',
-        items: [
-          { text: 'Vite', link: '/en/guide/vite' },
-          { text: 'Webpack', link: '/en/guide/webpack' },
-          { text: 'Configuration', link: '/en/guide/configuration' },
-          { text: 'Hybrid Service Worker', link: '/en/guide/service-worker' },
-        ],
-      },
-      {
-        text: 'Production',
-        items: [
-          { text: 'Troubleshooting', link: '/en/guide/troubleshooting' },
-          { text: 'Runtime Events', link: '/en/guide/runtime-events' },
-          { text: 'CSP & SRI', link: '/en/guide/csp-sri' },
-          { text: 'Best Practices', link: '/en/guide/best-practices' },
-        ],
-      },
-    ],
+    '/en/guide/': guideSidebar('en'),
     '/en/experience/': [
       {
         text: 'Dev Experience',
@@ -242,24 +211,89 @@ function enSidebar() {
     '/en/design/': [
       {
         text: 'Design Docs',
-        items: [{ text: 'SW Fallback Comparison', link: '/en/design/sw-comparison' }],
+        items: [
+          { text: 'How it works', link: '/en/design/architecture' },
+          { text: 'SW Fallback Comparison', link: '/en/design/sw-comparison' },
+        ],
       },
     ],
     '/en/api/': apiSidebar('en'),
+    '/en/reference/': apiSidebar('en'),
   };
 }
 
+function guideSidebar(locale: 'zh' | 'en') {
+  const english = locale === 'en';
+  const root = english ? '/en/guide/' : '/guide/';
+  const group = (zh: string, en: string, items: Array<[string, string, string]>) => ({
+    text: english ? en : zh,
+    items: items.map(([path, chinese, translated]) => ({
+      text: english ? translated : chinese,
+      link: root + path,
+    })),
+  });
+  return [
+    group('开始使用', 'Getting started', [
+      ['introduction', '简介', 'Introduction'],
+      ['coverage', '覆盖范围与限制', 'Coverage and limits'],
+      ['compatibility', '兼容性', 'Compatibility'],
+      ['quick-start', '快速开始', 'Quick start'],
+    ]),
+    group('构建工具集成', 'Build integrations', [
+      ['vite', 'Vite', 'Vite'],
+      ['webpack', 'Webpack', 'Webpack'],
+      ['manual-integration', '手动集成', 'Manual integration'],
+    ]),
+    group('上线与运维', 'Production', [
+      ['configuration', '配置参考', 'Configuration'],
+      ['deployment', '生产部署', 'Deployment'],
+      ['service-worker', 'Hybrid Service Worker', 'Hybrid Service Worker'],
+      ['sw-operations', 'SW 运维', 'SW operations'],
+      ['runtime-events', '运行时事件', 'Runtime events'],
+      ['csp-sri', 'CSP 与 SRI', 'CSP and SRI'],
+      ['migration', '升级与迁移', 'Upgrading'],
+    ]),
+    group('排查与验证', 'Diagnose and verify', [
+      ['troubleshooting', '故障排查', 'Troubleshooting'],
+      ['url-preview', 'URL 前缀预览', 'URL prefix preview'],
+      ['best-practices', '最佳实践', 'Best practices'],
+    ]),
+  ];
+}
+
 function apiSidebar(locale: 'zh' | 'en') {
-  const root = locale === 'en' ? '/en/api/' : '/api/';
+  const english = locale === 'en';
+  const root = english ? '/en' : '';
   return [
     {
-      text: locale === 'en' ? 'API Reference' : 'API 参考',
+      text: english ? 'API guides' : 'API 使用指南',
       items: [
-        { text: locale === 'en' ? 'Overview' : '概览', link: root + 'README' },
-        { text: locale === 'en' ? 'Functions & Helpers' : '函数与工具', link: root },
-        { text: locale === 'en' ? 'Types & Interfaces' : '类型与接口', link: root + 'types' },
-        { text: 'Service Worker', link: root + 'service-worker' },
+        { text: english ? 'Choose an API' : '按任务查找', link: root + '/reference/' },
+        { text: english ? 'Browser runtime' : '浏览器运行时', link: root + '/reference/runtime' },
+        { text: english ? 'Configuration' : '配置与选项', link: root + '/guide/configuration' },
+        { text: english ? 'Runtime events' : '运行时事件', link: root + '/guide/runtime-events' },
+      ],
+    },
+    {
+      text: english ? 'Generated reference' : '完整类型参考',
+      collapsed: false,
+      items: [
+        { text: english ? 'Modules' : '模块概览', link: root + '/api/README' },
+        { text: english ? 'Functions and helpers' : '函数与工具', link: root + '/api/' },
+        { text: english ? 'Types and interfaces' : '类型与接口', link: root + '/api/types' },
+        {
+          text: english ? 'Service Worker helpers' : 'Service Worker 工具',
+          link: root + '/api/service-worker',
+        },
       ],
     },
   ];
+}
+
+function sourceEditLink({ relativePath }: { relativePath: string }) {
+  const match = relativePath.match(/^(?:en\/)?api\/(README|index|types|service-worker)\.md$/);
+  const path = match
+    ? 'packages/core/src/' + (match[1] === 'README' ? 'index' : match[1]) + '.ts'
+    : 'docs/' + relativePath;
+  return 'https://github.com/ben-lau/resource-fallback/edit/main/' + path;
 }

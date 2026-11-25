@@ -54,6 +54,8 @@ export const guideEntries = {
       links: [
         { label: 'Vite 集成', path: '/guide/vite' },
         { label: 'Webpack 集成', path: '/guide/webpack' },
+        { label: '覆盖范围', path: '/guide/coverage' },
+        { label: '生产部署', path: '/guide/deployment' },
       ],
     },
     {
@@ -62,6 +64,7 @@ export const guideEntries = {
       links: [
         { label: '故障排查', path: '/guide/troubleshooting' },
         { label: '运行时事件', path: '/guide/runtime-events' },
+        { label: 'URL 前缀预览', path: '/guide/url-preview' },
       ],
     },
     {
@@ -69,7 +72,7 @@ export const guideEntries = {
       body: '核对回退顺序、重试预算、熔断和插件参数。',
       links: [
         { label: '配置参考', path: '/guide/configuration' },
-        { label: 'API 参考', path: '/api/README' },
+        { label: 'API 参考', path: '/reference/' },
       ],
     },
   ],
@@ -80,6 +83,8 @@ export const guideEntries = {
       links: [
         { label: 'Vite integration', path: '/guide/vite' },
         { label: 'Webpack integration', path: '/guide/webpack' },
+        { label: 'Coverage', path: '/guide/coverage' },
+        { label: 'Deployment', path: '/guide/deployment' },
       ],
     },
     {
@@ -88,6 +93,7 @@ export const guideEntries = {
       links: [
         { label: 'Troubleshooting', path: '/guide/troubleshooting' },
         { label: 'Runtime events', path: '/guide/runtime-events' },
+        { label: 'URL prefix preview', path: '/guide/url-preview' },
       ],
     },
     {
@@ -95,7 +101,7 @@ export const guideEntries = {
       body: 'Check fallback order, retry budgets, circuit breakers, and plugin options.',
       links: [
         { label: 'Configuration', path: '/guide/configuration' },
-        { label: 'API reference', path: '/api/README' },
+        { label: 'API reference', path: '/reference/' },
       ],
     },
   ],

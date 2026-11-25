@@ -3,6 +3,26 @@ import type { MarkdownRenderer } from 'vitepress';
 const apiPage = /(^|\/)api\//;
 
 export function configureMarkdown(md: MarkdownRenderer) {
+  md.core.ruler.after('anchor', 'resource-fallback-api-titles', (state) => {
+    const path = state.env.relativePath ?? '';
+    if (!apiPage.test(path)) return;
+    const english = path.startsWith('en/');
+    const names: Record<string, [string, string]> = {
+      index: ['函数与工具', 'Functions and helpers'],
+      types: ['类型与接口', 'Types and interfaces'],
+      'service-worker': ['Service Worker 工具', 'Service Worker helpers'],
+    };
+    const key = path.split('/').pop()?.replace('.md', '') ?? '';
+    const heading = state.tokens.findIndex(
+      (token) => token.type === 'heading_open' && token.tag === 'h1',
+    );
+    const inline = state.tokens[heading + 1];
+    if (heading < 0 || !names[key] || !inline) return;
+    const text = inline.children?.find((token) => token.type === 'text');
+    if (text) text.content = names[key][english ? 1 : 0];
+    inline.content = names[key][english ? 1 : 0];
+  });
+
   md.core.ruler.after('anchor', 'resource-fallback-doc-header', (state) => {
     const { tokens } = state;
     const title = tokens.findIndex(
