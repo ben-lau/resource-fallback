@@ -23,6 +23,53 @@ export function configureMarkdown(md: MarkdownRenderer) {
     inline.content = names[key][english ? 1 : 0];
   });
 
+  // Attach real column labels at build time, so mobile tables work without JavaScript.
+  md.core.ruler.after('anchor', 'resource-fallback-option-tables', (state) => {
+    if (!/(^|\/)guide\/configuration\.md$/.test(state.env.relativePath ?? '')) return;
+    let headers: string[] = [];
+    let table: (typeof state.tokens)[number] | undefined;
+    let column = 0;
+    for (let index = 0; index < state.tokens.length; index++) {
+      const token = state.tokens[index];
+      if (token.type === 'table_open') {
+        headers = [];
+        table = token;
+      }
+      if (token.type === 'th_open') headers.push(state.tokens[index + 1].content);
+      if (token.type === 'tbody_open') {
+        table?.attrJoin('class', 'rf-option-table');
+        table?.attrSet('role', 'table');
+        token.attrSet('role', 'rowgroup');
+      }
+      if (token.type === 'thead_open') token.attrSet('role', 'rowgroup');
+      if (token.type === 'tr_open') {
+        column = 0;
+        token.attrSet('role', 'row');
+      }
+      if (token.type === 'th_open') token.attrSet('role', 'columnheader');
+      if (token.type === 'td_open') {
+        token.attrSet('data-label', headers[column++] ?? '');
+        token.attrSet('role', 'cell');
+      }
+    }
+  });
+  md.renderer.rules.table_open = (tokens, index, options, _env, renderer) => {
+    tokens[index].attrSet('tabindex', '0');
+    return renderer.renderToken(tokens, index, options);
+  };
+  md.renderer.rules.td_open = (tokens, index, options, _env, renderer) => {
+    const open = renderer.renderToken(tokens, index, options);
+    return tokens[index].attrGet('data-label') === null
+      ? open
+      : open + '<div class="rf-cell-value">';
+  };
+  md.renderer.rules.td_close = (tokens, index, options, _env, renderer) => {
+    let previous = index - 1;
+    while (previous >= 0 && tokens[previous].type !== 'td_open') previous--;
+    const close = renderer.renderToken(tokens, index, options);
+    return tokens[previous]?.attrGet('data-label') == null ? close : '</div>' + close;
+  };
+
   md.core.ruler.after('anchor', 'resource-fallback-doc-header', (state) => {
     const { tokens } = state;
     const title = tokens.findIndex(
