@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tokenizeSearch } from '../docs/.vitepress/search';
 import { previewPrefixes } from '../docs/.vitepress/theme/url-preview';
 
 const pageUrl = 'https://app.example.com/app/';
@@ -93,6 +94,20 @@ describe('documentation URL preview', () => {
         rules: [{ base: '/app/', urls: ['javascript:alert(1)'] }],
       }),
     ).toThrow('http');
+  });
+});
+
+describe('documentation search serialization', () => {
+  it('handles mixed Chinese/code tokens without splitting event names', () => {
+    const tokens = tokenizeSearch('页面 runtime 的 rf:error 与超时');
+    expect(tokens).toEqual(expect.arrayContaining(['页面', 'runtime', 'rf:error', '超时']));
+    expect(tokens).not.toContain('error');
+    expect(tokenizeSearch('资源回退')).toEqual(['资源', '源回', '回退']);
+  });
+
+  it('runs identically after VitePress serializes the function without module scope', () => {
+    const restored = new Function('return ' + tokenizeSearch.toString())() as typeof tokenizeSearch;
+    expect(restored('hooks 熔断 rf:error')).toEqual(tokenizeSearch('hooks 熔断 rf:error'));
   });
 });
 

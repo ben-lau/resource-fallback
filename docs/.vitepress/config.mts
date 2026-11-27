@@ -2,6 +2,7 @@ import { defineConfigWithTheme, type DefaultTheme } from 'vitepress';
 import { withMermaid } from 'vitepress-plugin-mermaid';
 import metadata from '../../package.json';
 import { configureMarkdown } from './markdown';
+import { boostSearchDocument, tokenizeSearch } from './search';
 
 const apiPage = /(^|\/)api\//;
 
@@ -52,6 +53,15 @@ export default withMermaid(
       search: {
         provider: 'local',
         options: {
+          miniSearch: {
+            options: { tokenize: tokenizeSearch },
+            searchOptions: {
+              fuzzy: false,
+              prefix: true,
+              combineWith: 'AND',
+              boostDocument: boostSearchDocument,
+            },
+          },
           locales: {
             root: {
               translations: {
