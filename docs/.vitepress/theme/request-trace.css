@@ -350,6 +350,46 @@
   background: var(--vp-c-bg-soft);
 }
 
+.trace-log-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin-block-end: 0.5rem;
+  color: var(--vp-c-text-2);
+}
+
+.trace-log-actions p {
+  flex: 1 1 14rem;
+}
+.trace-log-actions button {
+  min-height: 44px;
+  padding-inline: 0.75rem;
+  border-radius: var(--rf-radius);
+  background: var(--vp-c-bg-soft);
+  color: var(--rf-accent);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.trace-log-actions button:hover {
+  background: var(--vp-c-brand-soft);
+}
+.trace-log .trace-payload {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.trace-log .trace-payload summary {
+  min-height: 36px;
+  color: var(--rf-accent);
+}
+.trace-payload pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 .trace-log li {
   display: flex;
   flex-wrap: wrap;

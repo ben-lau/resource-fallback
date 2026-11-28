@@ -6,14 +6,21 @@ import {
   transitionAfterSuccess,
 } from '../../../packages/core/src/internal/recovery-engine';
 import { example } from './home-copy';
+import type {
+  ErrorEvent,
+  FallbackEvent,
+  RetryEvent,
+  SuccessEvent,
+} from '../../../packages/core/src/types';
 
 export type Scenario = 'backup' | 'origin' | 'none';
 
 export type TraceFrame =
   | { kind: 'request'; node: number }
-  | { kind: 'retry'; node: number; attempt: number }
-  | { kind: 'fallback'; node: number; from: number }
-  | { kind: 'success' | 'error'; node: number; attempts: number };
+  | { kind: 'retry'; node: number; attempt: number; detail: RetryEvent }
+  | { kind: 'fallback'; node: number; from: number; detail: FallbackEvent }
+  | { kind: 'success'; node: number; attempts: number; detail: SuccessEvent }
+  | { kind: 'error'; node: number; attempts: number; detail: ErrorEvent };
 
 export declare const data: Record<Scenario, TraceFrame[]>;
 
@@ -51,14 +58,36 @@ function simulate(availableHost?: string): TraceFrame[] {
 
     switch (action.kind) {
       case 'retry':
-        frames.push({ kind: 'retry', node, attempt: action.attempt });
+        frames.push({
+          kind: 'retry',
+          node,
+          attempt: action.attempt,
+          detail: { url: action.url, attempt: action.attempt },
+        });
         break;
       case 'fallback':
-        frames.push({ kind: 'fallback', node: nodeOf(action.url), from: node });
+        frames.push({
+          kind: 'fallback',
+          node: nodeOf(action.url),
+          from: node,
+          detail: { from: action.from, to: action.url, reason: 'retry-budget-exhausted' },
+        });
         break;
       case 'success':
+        frames.push({
+          kind: 'success',
+          node,
+          attempts: next.totalAttempts,
+          detail: { url: next.currentUrl, attempts: next.totalAttempts },
+        });
+        return frames;
       case 'error':
-        frames.push({ kind: action.kind, node, attempts: next.totalAttempts });
+        frames.push({
+          kind: 'error',
+          node,
+          attempts: next.totalAttempts,
+          detail: { url: next.currentUrl, reason: action.failure },
+        });
         return frames;
       case 'cancelled':
         throw new Error('Unexpected cancellation in request trace');

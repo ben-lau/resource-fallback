@@ -26,6 +26,11 @@ const labels = {
     selector: '选择故障场景',
     options: { backup: '备用 CDN 可用', origin: '仅源站可用', none: '全部不可用' },
     log: '事件记录',
+    payload: '数据详情',
+    copyEvents: '复制事件 JSON',
+    copied: '已复制',
+    copyFailed: '请展开数据后手动复制',
+    timing: '页面恢复模拟；播放速度不代表网络耗时。',
     waiting: '等待首个恢复事件。',
     guide: '故障排查',
     request: (node: string) => `正在请求 ${node} 上的资源。`,
@@ -51,6 +56,11 @@ const labels = {
     selector: 'Choose a failure scenario',
     options: { backup: 'Backup works', origin: 'Origin only', none: 'All fail' },
     log: 'Event log',
+    payload: 'Event detail',
+    copyEvents: 'Copy events as JSON',
+    copied: 'Copied',
+    copyFailed: 'Expand the data to copy it manually',
+    timing: 'Page recovery simulation; playback speed is not network timing.',
     waiting: 'Waiting for the first recovery event.',
     guide: 'Troubleshooting',
     request: (node: string) => `Requesting the asset from ${node}.`,
@@ -66,6 +76,7 @@ const scenario = ref<Scenario>('backup');
 const interactive = ref(false);
 const cursor = ref<number | null>(null);
 const log = ref<HTMLDetailsElement>();
+const copyState = ref<'idle' | 'copied' | 'failed'>('idle');
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const frames = computed(() => traces[scenario.value]);
@@ -117,6 +128,7 @@ function advance() {
 }
 
 function toggleReplay() {
+  copyState.value = 'idle';
   if (playing.value) {
     showResult();
   } else if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -127,7 +139,32 @@ function toggleReplay() {
   }
 }
 
-watch(scenario, showResult, { flush: 'sync' });
+async function copyEvents() {
+  try {
+    await navigator.clipboard.writeText(
+      JSON.stringify(
+        events.value.map((event) => ({
+          type: 'rf:' + event.kind,
+          detail: 'detail' in event ? event.detail : undefined,
+        })),
+        null,
+        2,
+      ),
+    );
+    copyState.value = 'copied';
+  } catch {
+    copyState.value = 'failed';
+  }
+}
+
+watch(
+  scenario,
+  () => {
+    showResult();
+    copyState.value = 'idle';
+  },
+  { flush: 'sync' },
+);
 onMounted(() => {
   interactive.value = true;
 });
@@ -227,11 +264,22 @@ onUnmounted(() => clearTimeout(timer));
               >{{ copy.log }} <span class="trace-count">({{ events.length }})</span></span
             >
           </summary>
+          <div class="trace-log-actions">
+            <p>{{ copy.timing }}</p>
+            <button type="button" @click="copyEvents">
+              {{ copyState === 'copied' ? copy.copied : copy.copyEvents }}
+            </button>
+            <span v-if="copyState === 'failed'" role="status">{{ copy.copyFailed }}</span>
+          </div>
           <div class="trace-log-entries" tabindex="0" role="region" :aria-label="copy.log">
             <ol v-if="events.length">
               <li v-for="(event, index) in events" :key="index" :data-event="event.kind">
                 <code>rf:{{ event.kind }}</code>
                 <span>{{ describe(event) }}</span>
+                <details v-if="'detail' in event" class="trace-payload">
+                  <summary>{{ copy.payload }}</summary>
+                  <pre><code>{{ JSON.stringify(event.detail, null, 2) }}</code></pre>
+                </details>
               </li>
             </ol>
             <p v-else>{{ copy.waiting }}</p>
