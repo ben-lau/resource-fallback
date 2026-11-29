@@ -36,7 +36,8 @@
     "docs:typedoc": "typedoc",
     "docs:dev": "pnpm docs:typedoc && vitepress dev docs",
     "docs:build": "pnpm docs:typedoc && vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
