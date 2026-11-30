@@ -37,7 +37,9 @@
     "docs:dev": "pnpm docs:typedoc && vitepress dev docs",
     "docs:build": "pnpm docs:typedoc && vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "docs:test": "node scripts/check-docs-browser.mjs",
+    "docs:typecheck": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --lib es2022,dom --resolveJsonModule --allowSyntheticDefaultImports --skipLibCheck --types node docs/.vitepress/config.mts docs/.vitepress/search.ts docs/.vitepress/markdown.ts docs/.vitepress/theme/url-preview.ts docs/.vitepress/theme/request-trace.data.ts"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
