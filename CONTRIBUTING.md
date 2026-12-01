@@ -93,3 +93,18 @@ resource-fallback/
 │   └── webpack-react/     # Webpack + React 示例
 └── tests/                 # 单元测试
 ```
+
+## 文档开发与检查
+
+```bash
+pnpm docs:dev
+pnpm docs:typecheck
+pnpm docs:build
+pnpm docs:check
+pnpm --filter @resource-fallback-example/vite-vue exec playwright install chromium
+pnpm docs:test
+```
+
+`docs:check` 检查构建页面中的站内链接、锚点、重复 ID 和双语路由。`docs:test` 用生产构建验证搜索目标、手机配置表、URL 预览、请求演练和主题状态，截图位于被 git 忽略的 `test-results/docs/`。本机也可通过 `DOCS_BROWSER_PATH` 指定 Chrome 可执行文件。
+
+指南负责接入步骤、限制与部署；根 README 保留定位与快速入口；配置类型与 API 注释在 `packages/core/src/` 修改，随后运行 `docs:typedoc`。`docs/api/` 是生成目录，`docs/reference/` 是手写 API 使用说明。中英文路由同步维护；替换标题或章节时保留已发布锚点。早期的两份 monolithic 报告已归档并排除出站点，维护拆分后的指南与案例。

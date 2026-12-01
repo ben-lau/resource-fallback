@@ -199,3 +199,30 @@ jobs:
           name: playwright-report-webpack
           path: examples/webpack-react/playwright-report
           retention-days: 7
+
+  docs:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: build-output
+          path: packages
+      - run: pnpm docs:typecheck
+      - run: pnpm docs:build
+      - run: pnpm docs:check
+      - run: pnpm --filter @resource-fallback-example/vite-vue exec playwright install --with-deps chromium
+      - run: pnpm docs:test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: docs-browser-report
+          path: test-results/docs
+          retention-days: 7
