@@ -226,3 +226,10 @@ jobs:
           name: docs-browser-report
           path: test-results/docs
           retention-days: 7
+
+  preview:
+    if: github.event_name == 'pull_request'
+    needs: [lint, quality, typecheck, unit-test, e2e-vite, e2e-webpack, docs]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish-preview.yml

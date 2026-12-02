@@ -1,0 +1,58 @@
+name: Publish Preview
+
+on:
+  workflow_call:
+    outputs:
+      sha:
+        description: Published commit SHA
+        value: ${{ jobs.publish.outputs.sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.publish.outputs.sha }}
+    steps:
+      # PRs use CI's merge result, including the publishing dependency from main.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm publint
+      - run: pnpm attw
+      - run: pnpm size:check
+
+      - name: Publish all preview packages together
+        id: publish
+        env:
+          PREVIEW_COMMENT: ${{ github.event_name == 'pull_request' && 'update' || 'off' }}
+        run: >-
+          pnpm exec pkg-pr-new publish --pnpm --previewVersion
+          --no-compact --no-template --comment="$PREVIEW_COMMENT"
+          --commentWithSha --packageManager=pnpm './packages/*'
+
+      - name: Show installation commands
+        env:
+          PREVIEW_SHA: ${{ steps.publish.outputs.sha }}
+          PREVIEW_URLS: ${{ steps.publish.outputs.urls }}
+        run: |
+          {
+            printf '## 预览包\n\n提交：`%s`\n\n选择对应包的安装命令：\n' "$PREVIEW_SHA"
+            read -r -a urls <<< "$PREVIEW_URLS"
+            for url in "${urls[@]}"; do
+              printf '\n```sh\npnpm add "%s"\n```\n' "$url"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

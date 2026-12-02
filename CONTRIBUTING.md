@@ -78,7 +78,22 @@ feat!: rename config option `retryCount` to `maxRetries`
 1. 提交 `feat:` / `fix:` 类型 commits 到 `main`
 2. release-please 自动创建/更新 Release PR
 3. 合并 Release PR → 自动创建 GitHub Release + tag
-4. npm 发布由维护者手动执行 `pnpm release`
+4. 自动构建并发布 npm 包；也保留手动触发 `Publish` workflow 的入口
+
+## 未发版预览包
+
+维护者先为本仓库安装 [pkg.pr.new GitHub App](https://github.com/apps/pkg-pr-new/installations/new)，选择 `ben-lau/resource-fallback` 即可。CLI 已固定在开发依赖和锁文件中；预览发布不需要 npm token。
+
+| 触发方式                                    | 构建与评论位置                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 其他分支向 `main` 提 PR，或继续向该 PR push | CI 检查通过后，基于 PR 与 main 的合并结果构建；安装命令评论在该 PR 下                 |
+| 直接 push 到 `main`                         | Release Please 创建或更新发版 PR 后，构建本次 `main` 提交；安装命令评论在待发版 PR 下 |
+
+两个入口都一次发布 `core`、`vite-plugin`、`webpack-plugin`，包内版本为 `0.0.0-preview-<sha>`，内部依赖指向同一批预览包。每次 push 后等流程完成，复制评论中的安装命令到外部工程测试即可，无需修改版本号或手动执行发布命令。正式发版仍通过合并 Release PR 完成。
+
+普通 PR 的评论由 pkg.pr.new 自动更新，外部 fork PR 也使用同一流程。`main` 的安装命令通过 Sticky Pull Request Comment 更新到待发版 PR，旧的 main 构建不会覆盖新评论。如果暂时没有待发版 PR（例如只有文档修改，尚未产生可发布的变更），安装命令仍会显示在 `Release Please` → `preview / publish` 的运行摘要中。
+
+预览包会被服务定期清理，仅用于临时测试，长期使用请换回正式 npm 版本。
 
 ## 项目结构
 

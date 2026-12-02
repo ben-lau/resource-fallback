@@ -18,6 +18,71 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  preview:
+    needs: release-please
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish-preview.yml
+
+  preview-comment:
+    needs: preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: main-preview-comment
+      cancel-in-progress: false
+    steps:
+      - name: Find the current pending release PR
+        id: release-pr
+        uses: actions/github-script@v9
+        env:
+          PREVIEW_SHA: ${{ needs.preview.outputs.sha }}
+        with:
+          script: |
+            const { data: branch } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (branch.commit.sha !== process.env.PREVIEW_SHA) return;
+            const prs = await github.paginate(github.rest.pulls.list, {
+              ...context.repo,
+              state: 'open',
+              base: 'main',
+              head: `${context.repo.owner}:release-please--branches--main`,
+              per_page: 100,
+            });
+            const pr = prs.find((item) => item.labels.some((label) => label.name === 'autorelease: pending'));
+            core.setOutput('number', pr?.number || '');
+            if (!pr) core.info('No pending release PR; copy installation commands from the preview job summary.');
+
+      - uses: marocchino/sticky-pull-request-comment@v3
+        if: steps.release-pr.outputs.number != ''
+        with:
+          number: ${{ steps.release-pr.outputs.number }}
+          header: resource-fallback-preview
+          skip_unchanged: true
+          message: |
+            ## 预览包
+
+            来源：`main` · 提交：`${{ needs.preview.outputs.sha }}`
+
+            Vite：
+            ```sh
+            pnpm add -D "https://pkg.pr.new/${{ github.repository }}/@resource-fallback/vite-plugin@${{ needs.preview.outputs.sha }}"
+            ```
+
+            Webpack：
+            ```sh
+            pnpm add -D "https://pkg.pr.new/${{ github.repository }}/@resource-fallback/webpack-plugin@${{ needs.preview.outputs.sha }}"
+            ```
+
+            Core：
+            ```sh
+            pnpm add "https://pkg.pr.new/${{ github.repository }}/@resource-fallback/core@${{ needs.preview.outputs.sha }}"
+            ```
+
+            临时测试包；正式发版时再合并本 PR。
+
   publish:
     needs: release-please
     if: needs.release-please.outputs.releases_created == 'true'
